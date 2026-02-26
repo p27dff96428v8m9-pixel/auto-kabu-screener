@@ -415,8 +415,8 @@ def auto_screen_and_add():
                     logging.info(f"成功: {s_code} を追加しました (勝率: {best_win_rate:.1f}%)")
                     added_count += 1
                     
-                    # Twitter自動投稿を実行
-                    post_to_twitter(x_text)
+                    # ユーザーの要望により、一時的にTwitter自動投稿を停止中（テスト期間）
+                    # post_to_twitter(x_text)
                     
             except Exception as e:
                 logging.error(f"スプレッドシートへの通信エラー ({s_code}): {e}")
