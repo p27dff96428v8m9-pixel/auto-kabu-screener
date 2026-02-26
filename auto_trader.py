@@ -174,7 +174,7 @@ def auto_screen_and_add():
         
         try:
             current_price = float(df['Close'].iloc[-1])
-            if current_price < 100: continue
+            if current_price < 100 or current_price > 1000: continue
             
             sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
             delta = df['Close'].diff()
@@ -216,13 +216,26 @@ def auto_screen_and_add():
     logging.info(f"一次スクリーニングで {len(candidates)} 銘柄を発見")
     
     added_count = 0
-    needed_count = 3 # 毎日最大3銘柄まで追加
+    needed_count = 1 # 毎日1銘柄のみ厳選追加
     
+    # 既存の配信済み銘柄を取得（重複排除）
+    try:
+        res = requests.post(WEBHOOK_URL, json={"action": "get_all"})
+        existing_data = res.json()
+        # 1列目(インデックス0)がコードだと仮定
+        existing_codes = [str(row[0]).replace(' ', '') for row in existing_data if len(row) > 0]
+    except Exception as e:
+        logging.warning(f"既存銘柄の取得に失敗: {e}")
+        existing_codes = []
+            
     for cand in candidates:
         if added_count >= needed_count:
             break
             
         s_code = cand['code']
+        if str(s_code) in existing_codes:
+            continue
+            
         pbr = cand['pbr']
         drop_pct = cand['drop_pct']
         c_div = cand['dividend']
@@ -271,6 +284,17 @@ def auto_screen_and_add():
                 ai_color = "blue"
                 ai_text = f"【中大型/業績良好】時価総額1千億超え＆業績堅調による安心感で買いが入りやすい。勝率{best_win_rate:.0f}%。"
                 
+            x_text = (
+                f"🤖本日のAI厳選【10万円以下で買える大底株】\n\n"
+                f"銘柄コード: {s_code}\n"
+                f"現在値: {current_price:.0f}円（必要資金 {int(current_price * 100):,}円）\n"
+                f"25日線乖離率: {deviation:.1f}%\n"
+                f"AI過去勝率: {best_win_rate:.0f}%\n\n"
+                f"💡テクニカル的にかなりの売られすぎ水準。目安の拾い場は{int(best_params['Buy'])}円付近です！\n\n"
+                f"※投資は自己責任でお願いします。\n"
+                f"#日本株 #デイトレ #投資初心者 #日本株予想"
+            )
+            
             payload = {
                 "action": "add_new",
                 "code": str(s_code),
@@ -279,7 +303,8 @@ def auto_screen_and_add():
                 "buy": int(best_params['Buy']),
                 "tp": int(best_params['TakeProfit']),
                 "sl": int(best_params['StopLoss']),
-                "current_price": float(current_price)
+                "current_price": float(current_price),
+                "x_post_text": x_text
             }
             
             try:
