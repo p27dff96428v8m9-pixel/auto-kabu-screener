@@ -89,7 +89,7 @@ def auto_screen_and_add():
     
     ticker_str = " ".join([f"{c}.T" for c in target_codes])
     # 25日移動平均やRSI算出のため3ヶ月取得
-    data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True, show_errors=False)
+    data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True)
     
     candidates = []
     
