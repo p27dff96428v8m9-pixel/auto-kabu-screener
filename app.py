@@ -351,7 +351,7 @@ function doPost(e) {
   var codeIdx = 0;
   var buyColL = 'D', tpColL = 'E', slColL = 'F', rrColL = 'J';
   for (var j = 0; j < h.length; j++) {
-    var colN = String(h[j]).replace(/[\u200b\s]/g, '');
+    var colN = String(h[j]).replace(/[\\u200b\\s]/g, '');
     if (colN === 'コード') codeIdx = j;
     else if (colN === '買い目標') buyColL = getColLetter(j);
     else if (colN === '利確目標') tpColL = getColLetter(j);
@@ -360,6 +360,17 @@ function doPost(e) {
   }
   var codeLetter = getColLetter(codeIdx);
   
+  if (data.action === "get_all") {
+    return ContentService.createTextOutput(JSON.stringify(values))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  if (data.action === "log_time") {
+    var timestampMsg = "🤖 自動監視 最終完了日時: " + data.time + "\\n本日追加された銘柄: " + data.count + " 件";
+    sheet.getRange(1, 1).setNote(timestampMsg);
+    return ContentService.createTextOutput("time_logged");
+  }
+
   if (data.action === "add_new") {
     var newRow = new Array(h.length).fill("");
     var rowIdx = sheet.getLastRow() + 1;
@@ -371,7 +382,7 @@ function doPost(e) {
     var nameBgColor = '';
     
     for(var j=0; j<h.length; j++){
-      var colName = String(h[j]).replace(/[\u200b\s]/g, '');
+      var colName = String(h[j]).replace(/[\\u200b\\s]/g, '');
       var colStr = String(h[j]);
       if(colName === 'コード') newRow[j] = data.code;
       else if(colName === '銘柄名') newRow[j] = '=IMPORTXML("https://finance.yahoo.co.jp/quote/"&'+codeLetter+rowIdx+', "//h1")';
@@ -407,14 +418,14 @@ function doPost(e) {
   }
   
   for (var i = 1; i < values.length; i++) {
-    if (String(values[i][codeIdx]).replace(/\s/g, '') == String(data.code).replace(/\s/g, '')) {
+    if (String(values[i][codeIdx]).replace(/[\\s]/g, '') == String(data.code).replace(/[\\s]/g, '')) {
       if (data.action === "hit_tp" || data.action === "hit_sl") {
         var colName = (data.action === "hit_tp") ? '🏆 利確回数' : '🩸 損切回数';
         var bgCol = (data.action === "hit_tp") ? '#d9ead3' : '#f4cccc';
         var fontCol = (data.action === "hit_tp") ? '#274e13' : '#a61c00';
         var existingCol = -1;
         for (var c=0; c<h.length; c++) {
-          if (String(h[c]).indexOf(colName.replace(/[🏆🩸\s]/g,'')) >= 0) { existingCol = c; break; }
+          if (String(h[c]).indexOf(colName.replace(/[🏆🩸\\s]/g,'')) >= 0) { existingCol = c; break; }
         }
         
         var targetCol = (existingCol < 0) ? h.length + 1 : existingCol + 1;
@@ -439,7 +450,7 @@ function doPost(e) {
       } else if (data.action === "update" || !data.action) {
         if(data.volume_surge) {
           for(var c=0; c<h.length; c++){
-            var colNameStr = String(h[c]).replace(/[\u200b\s]/g, '');
+            var colNameStr = String(h[c]).replace(/[\\u200b\\s]/g, '');
             if(String(h[c]).indexOf('出来高') >= 0 && colNameStr !== '出来高急増'){
               sheet.getRange(i + 1, c + 1).setBackground('#ffff00');
             }
@@ -462,7 +473,7 @@ function doPost(e) {
   return ContentService.createTextOutput("not found");
 }
 ```""")
-                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password")
+                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbwLdyeyjCduzHBqaLnH4e7Y1i_KeGqqZVhjAspDHFxdiiAtV3ylK6Pf40q6-UB4dlXi/exec")
                         if st.button("🚀 Webhook経由でスプレッドシートを更新！"):
                             if webhook_url:
                                 with st.spinner("スプレッドシートへ送信中..."):
@@ -549,7 +560,7 @@ batch_update_method = st.radio("一括処理の方法を選択", ["Google Apps S
 
 if batch_update_method == "Google Apps Script (Webhook) を使う":
     st.info("※ この機能を使用するには、GASのコードが**「削除 (delete) アクション」対応版（上の単独更新欄に表示されている最新コード）**である必要があります。念の為、現在の単独更新欄にあるGASコードを再コピーして再度デプロイしなおすことを推奨します。")
-    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook")
+    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbwLdyeyjCduzHBqaLnH4e7Y1i_KeGqqZVhjAspDHFxdiiAtV3ylK6Pf40q6-UB4dlXi/exec")
     
     if st.button("🚀 ウェブ上の全銘柄を一括実行！"):
         if not batch_webhook_url:
@@ -738,7 +749,7 @@ st.subheader("🤖 リアルタイム監視 ＆ 新規スクリーニング (全
 st.markdown("監視中の全銘柄の現在価格と出来高をチェックし、**利確または損切りに達した銘柄を全自動で削除＆勝率集計**します。\nさらに、削除されて枠が空いた分だけ、指定条件（PBR1〜2倍、時価総額500億〜2000億、直近10%下落等）に合致する銘柄を**自動で探し出し、独自計算式と色分けを設定してスプレッドシートに追加**します。")
 
 st.info("※ この機能は「GAS (Webhook)」を利用します。上の新しいコード例をGASにデプロイしてURLを入力してください。")
-live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook")
+live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbwLdyeyjCduzHBqaLnH4e7Y1i_KeGqqZVhjAspDHFxdiiAtV3ylK6Pf40q6-UB4dlXi/exec")
 
 if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行"):
     if not live_webhook_url or not live_webhook_url.startswith("http"):
@@ -893,8 +904,8 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         
                         deviation = (last_price - sma25) / sma25 * 100
                         
-                        if deviation <= -10 and rsi <= 30:
-                            if 50_000_000_000 <= mc <= 200_000_000_000 and 1.0 <= pbr <= 2.0 and (forward_pe > 0 or trailing_eps > 0):
+                        if deviation <= -3 and rsi <= 50:
+                            if 10_000_000_000 <= mc <= 1_000_000_000_000 and 0.2 <= pbr <= 5.0 and (forward_pe > 0 or trailing_eps > 0):
                                 candidates.append({
                                     "code": s_code,
                                     "pbr": pbr,
