@@ -385,7 +385,22 @@ function doPost(e) {
       var colName = String(h[j]).replace(/[\\u200b\\s]/g, '');
       var colStr = String(h[j]);
       if(colName === 'コード') newRow[j] = data.code;
-      else if(colName === '銘柄名') newRow[j] = '=IMPORTXML("https://finance.yahoo.co.jp/quote/"&'+codeLetter+rowIdx+', "//h1")';
+      else if(colName === '銘柄名') {
+        var baseFormula = '=IMPORTXML("https://finance.yahoo.co.jp/quote/"&'+codeLetter+rowIdx+', "//h1")';
+        if (data.current_price) {
+          var p = Number(data.current_price) * 100;
+          var emoji = '';
+          if(p <= 100000) { emoji = '①🟢'; nameBgColor = '#d9ead3'; }
+          else if(p <= 300000) { emoji = '③🟡'; nameBgColor = '#fff2cc'; }
+          else if(p <= 500000) { emoji = '⑤🟠'; nameBgColor = '#fce5cd'; }
+          else if(p <= 1000000) { emoji = '⑩🔴'; nameBgColor = '#f4cccc'; }
+          else { emoji = '💯🟥'; nameBgColor = '#ea9999'; }
+          newRow[j] = '="' + emoji + ' "&' + baseFormula;
+        } else {
+          newRow[j] = baseFormula;
+        }
+        nameColIdx = j + 1;
+      }
       else if(colName === '現在値') newRow[j] = '=VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")) + (0 * 1771905277482)';
       else if(colStr.indexOf('出来高') >= 0 && colName !== '出来高急増') newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
       else if(colName === '出来高急増') newRow[j] = false;
@@ -395,6 +410,7 @@ function doPost(e) {
       else if(colName === '利確目標') newRow[j] = data.tp;
       else if(colName === '損切り') newRow[j] = data.sl;
       else if(colStr.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
+      else if(colName === 'X配信テキスト') newRow[j] = data.x_post_text || '';
       else if(colName === '判定') newRow[j] = '監視中';
     }
     sheet.appendRow(newRow);
@@ -900,7 +916,7 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         sma25 = float(hist['SMA25'].iloc[-1])
                         rsi = float(hist['RSI'].iloc[-1])
                         
-                        if last_price < 100: continue
+                        if last_price < 100 or last_price > 1000: continue
                         
                         deviation = (last_price - sma25) / sma25 * 100
                         
