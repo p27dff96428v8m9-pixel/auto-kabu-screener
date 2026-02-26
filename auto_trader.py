@@ -185,8 +185,8 @@ def auto_screen_and_add():
             
             deviation = (current_price - sma25) / sma25 * 100
             
-            # 乖離率 -10%以下（または-15%近辺）かつ RSI 30以下
-            if deviation <= -10 and rsi <= 30:
+            # 乖離率 -3%以下 かつ RSI 50以下 (遊びを持たせる)
+            if deviation <= -3 and rsi <= 50:
                 ticker_obj = yf.Ticker(t_code)
                 info = ticker_obj.info
                 pbr = info.get('priceToBook', 0)
@@ -196,8 +196,8 @@ def auto_screen_and_add():
                 trailing_eps = info.get('trailingEps', 0)
                 
                 if pbr is not None and mc is not None:
-                    # 時価総額 500億円〜2,000億円, PBR 1倍〜2倍, 業績プラス予想(簡易チェック)
-                    if (50_000_000_000 <= mc <= 200_000_000_000) and (1.0 <= pbr <= 2.0) and (forward_pe > 0 or trailing_eps > 0):
+                    # 時価総額 100億円〜1兆円, PBR 0.2倍〜5.0倍 に緩和
+                    if (10_000_000_000 <= mc <= 1_000_000_000_000) and (0.2 <= pbr <= 5.0) and (forward_pe > 0 or trailing_eps > 0):
                         candidates.append({
                             "code": code,
                             "pbr": pbr,
