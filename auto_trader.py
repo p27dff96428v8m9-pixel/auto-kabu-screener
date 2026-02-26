@@ -60,20 +60,92 @@ def run_backtest(df, buy_price, tp_price, sl_price):
     return total_trades, win_rate, expected_value, trades
 
 def check_portfolio_status():
-    """スプレッドシート上の保有銘柄の利確・損切、出来高急増をチェック"""
+    """スプレッドシート上の保有銘柄のデータを取得し、利確・損切・出来高をチェック"""
     logging.info("--- 保有銘柄・監視銘柄のステータスチェック開始 ---")
     
     try:
-        # スプレッドシート側のGASは "get" アクションで現在のデータを返してくれないため、
-        # 自動化する場合は「監視・利確チェック」はPythonからGASへのWebhookでバッチ処理させるよう
-        # GAS側を改修するか、スプシの一括ダウンロードが必要です。
-        # 今のアプリの仕様では「ユーザーが画面にコードを手入力してチェック」する仕組みです。
+        # 新しいGASコードでは action="get_all" で全データが取れる前提
+        payload = {"action": "get_all"}
+        res = requests.post(WEBHOOK_URL, json=payload)
         
-        # 今回の完全自動化では、"全自動スクリーニングと追加" に特化します。
-        # (スプレッドシートの中身を取り出すAPIがないため、追加のみ行います)
-        pass
+        if res.status_code != 200 or "not found" in res.text:
+            logging.info("GASからのデータ取得に失敗したか、未対応のGASコードです。")
+            return
+            
+        try:
+            values = res.json()
+        except:
+            logging.info("取得したデータがJSONではありません。GASコードのアップデートが必要です。")
+            return
+            
+        if not values or len(values) < 2:
+            logging.info("監視中の銘柄がありません。")
+            return
+            
+        headers = values[0]
+        # ヘッダー名からインデックスを探す
+        col_idx = {str(h).replace('\u200b', '').replace(' ', ''): i for i, h in enumerate(headers)}
+        
+        c_code = col_idx.get('コード', -1)
+        c_buy = col_idx.get('買い目標', -1)
+        c_tp = col_idx.get('利確目標', -1)
+        c_sl = col_idx.get('損切り', -1)
+        
+        if c_code == -1: return
+        
+        removed_count = 0
+        
+        # 2行目からチェック
+        for i in range(1, len(values)):
+            row = values[i]
+            if len(row) <= c_code: continue
+            
+            code = str(row[c_code]).strip()
+            if not code or code == 'None': continue
+            
+            # 各値を取得
+            buy_val = float(row[c_buy]) if c_buy != -1 and row[c_buy] else None
+            tp_val = float(row[c_tp]) if c_tp != -1 and row[c_tp] else None
+            sl_val = float(row[c_sl]) if c_sl != -1 and row[c_sl] else None
+            
+            # 株価データを取得して判定
+            try:
+                hist = yf.Ticker(f"{code}.T").history(period="1mo")
+                if hist.empty: continue
+                
+                last_close = float(hist['Close'].iloc[-1])
+                hist_low = float(hist['Low'].min())
+                
+                vol_surge = False
+                if len(hist) >= 5:
+                    avg_vol = hist['Volume'].iloc[:-1].mean()
+                    if hist['Volume'].iloc[-1] > avg_vol * 3:
+                        vol_surge = True
+                
+                entered_flag = False
+                if buy_val and hist_low <= buy_val:
+                    entered_flag = True
+                
+                action = None
+                if tp_val and last_close >= tp_val:
+                    action = "hit_tp" if entered_flag else "delete"
+                elif sl_val and last_close <= sl_val:
+                    action = "hit_sl" if entered_flag else "delete"
+                    
+                if action:
+                    req_p = {"action": action, "code": str(code)}
+                    requests.post(WEBHOOK_URL, json=req_p)
+                    removed_count += 1
+                    logging.info(f"{code}: {action} により削除しました")
+                elif vol_surge:
+                    req_p = {"action": "update", "code": str(code), "volume_surge": True, "buy": buy_val, "tp": tp_val, "sl": sl_val}
+                    requests.post(WEBHOOK_URL, json=req_p)
+            except Exception as e:
+                logging.error(f"{code} のチェック中エラー: {e}")
+                
+        logging.info(f"ステータスチェック完了。{removed_count} 件処理しました。")
     except Exception as e:
-        logging.error(f"ステータスチェック中にエラー: {e}")
+        logging.error(f"ステータスチェック中に通信エラー: {e}")
 
 def auto_screen_and_add():
     """全自動スクリーニングと有望銘柄の追加"""
@@ -217,8 +289,16 @@ def auto_screen_and_add():
                     added_count += 1
             except Exception as e:
                 logging.error(f"スプレッドシートへの通信エラー ({s_code}): {e}")
+                logging.error(f"スプレッドシートへの通信エラー ({s_code}): {e}")
                 
     logging.info(f"--- 全自動スクリーニング完了 ({added_count} 銘柄追加) ---")
+    
+    # 最後に更新ログを書き込む
+    try:
+        now_str = datetime.now().strftime("%Y/%m/%d %H:%M")
+        requests.post(WEBHOOK_URL, json={"action": "log_time", "time": now_str, "count": added_count})
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     check_portfolio_status()
