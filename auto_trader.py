@@ -85,52 +85,61 @@ def auto_screen_and_add():
     # ここでは1300番台〜9900番台の一部をサンプリングします。
     import random
     all_codes = [str(c) for c in range(1300, 9999)]
-    target_codes = random.sample(all_codes, 300) # 300銘柄ランダムにピックアップして探索
+    target_codes = random.sample(all_codes, 600) # デイトレ仕様のため少し多めに
     
-    # 株価データを一括取得
     ticker_str = " ".join([f"{c}.T" for c in target_codes])
-    data = yf.download(ticker_str, period="1mo", group_by="ticker", threads=True, show_errors=False)
+    # 25日移動平均やRSI算出のため3ヶ月取得
+    data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True, show_errors=False)
     
     candidates = []
     
     for code in target_codes:
         t_code = f"{code}.T"
-        if t_code not in data.columns.levels[0]: continue
+        if not hasattr(data.columns, 'levels') or t_code not in data.columns.levels[0]: continue
         
         df = data[t_code]
-        if df.empty or len(df) < 10: continue
+        if df.empty or len(df) < 30: continue # 25日計算のため余裕を持たせる
         
         try:
             current_price = float(df['Close'].iloc[-1])
-            past_price = float(df['Close'].iloc[-10])
+            if current_price < 100: continue
             
-            if current_price < 100: continue # 100円未満の超低位株は除外
+            sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
+            delta = df['Close'].diff()
+            gain = delta.clip(lower=0).rolling(window=14).mean()
+            loss = -delta.clip(upper=0).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs)).iloc[-1]
             
-            drop_pct = (past_price - current_price) / past_price * 100
+            deviation = (current_price - sma25) / sma25 * 100
             
-            # 直近10日で少しでも下落している（安くなっている）銘柄を対象にする
-            if drop_pct > 0:
+            # 乖離率 -10%以下（または-15%近辺）かつ RSI 30以下
+            if deviation <= -10 and rsi <= 30:
                 ticker_obj = yf.Ticker(t_code)
                 info = ticker_obj.info
                 pbr = info.get('priceToBook', 0)
                 dividend = info.get('dividendYield', 0)
                 mc = info.get('marketCap', 0)
+                forward_pe = info.get('forwardPE', 0)
+                trailing_eps = info.get('trailingEps', 0)
                 
-                # 最低限のファンダメンタルズ
-                if pbr is not None and dividend is not None and mc is not None:
-                    if 0.1 <= pbr <= 10.0 and mc >= 10_000_000_000:
+                if pbr is not None and mc is not None:
+                    # 時価総額 500億円〜2,000億円, PBR 1倍〜2倍, 業績プラス予想(簡易チェック)
+                    if (50_000_000_000 <= mc <= 200_000_000_000) and (1.0 <= pbr <= 2.0) and (forward_pe > 0 or trailing_eps > 0):
                         candidates.append({
                             "code": code,
                             "pbr": pbr,
                             "dividend": dividend,
-                            "drop_pct": drop_pct,
+                            "drop_pct": abs(deviation), # ロジック整合性のため、乖離の広さを"drop_pct"として扱う
+                            "deviation": deviation,
+                            "rsi": rsi,
                             "current_price": current_price,
                             "mc": mc
                         })
         except Exception:
             continue
             
-    # 下落率が大きい順（大きく売られている順）に並び替え
+    # 乖離が激しい（マイナスに大きい）順に並び替え
     candidates = sorted(candidates, key=lambda x: x['drop_pct'], reverse=True)
     logging.info(f"一次スクリーニングで {len(candidates)} 銘柄を発見")
     
@@ -174,18 +183,21 @@ def auto_screen_and_add():
                             
         if best_params is not None and best_win_rate >= 65:
             # AI分析風テキスト
+            deviation = cand.get('deviation', 0)
+            rsi = cand.get('rsi', 0)
+
             ai_color = "orange"
-            ai_text = f"【自動検知】直近下落率{drop_pct:.1f}%。勝率{best_win_rate:.0f}%の反発ラインに到達。"
+            ai_text = f"【デイトレ特化】25日乖離 {deviation:.1f}%、RSI {rsi:.1f}到達。勝率{best_win_rate:.0f}%の超短期反発ライン。"
             
-            if pbr > 0 and pbr < 1.0:
+            if 1.0 <= pbr <= 1.5:
                 ai_color = "yellow"
-                ai_text = f"【自動検知/割安】PBR {pbr:.2f}倍と割安。勝率{best_win_rate:.0f}%の優位なポイント。"
+                ai_text = f"【仕手化排除/割安】PBR {pbr:.2f}倍と堅実。大底RSI {rsi:.1f}。勝率{best_win_rate:.0f}%の固いポイント。"
             elif c_div is not None and c_div > 0.035:
                 ai_color = "green"
-                ai_text = f"【自動検知/高配当】配当利回り{c_div*100:.1f}%。統計上、勝率{best_win_rate:.0f}%で安全圏。"
-            elif c_mc > 1_000_000_000_000:
+                ai_text = f"【反発/高配当】配当利回り{c_div*100:.1f}%が下支え。乖離{deviation:.1f}% 統計勝率{best_win_rate:.0f}%。"
+            elif c_mc > 100_000_000_000:
                 ai_color = "blue"
-                ai_text = f"【自動検知/大型優良】時価総額1兆円超の主力銘柄の調整。勝率{best_win_rate:.0f}%のサポートライン。"
+                ai_text = f"【中大型/業績良好】時価総額1千億超え＆業績堅調による安心感で買いが入りやすい。勝率{best_win_rate:.0f}%。"
                 
             payload = {
                 "action": "add_new",
