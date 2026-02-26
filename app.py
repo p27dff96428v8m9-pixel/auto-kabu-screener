@@ -411,10 +411,21 @@ function doPost(e) {
       else if(colName === '損切り') newRow[j] = data.sl;
       else if(colStr.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName === 'X配信テキスト') newRow[j] = data.x_post_text || '';
+      else if(colStr.indexOf('note用') >= 0 || colName === 'note用下書き') newRow[j] = data.note_text || '';
+      else if(colName === 'SNS配信済') newRow[j] = false;
       else if(colName === '判定') newRow[j] = '監視中';
     }
     sheet.appendRow(newRow);
-    var addedRange = sheet.getRange(rowIdx, 1, 1, h.length);
+    var addedRowNumber = sheet.getLastRow();
+    
+    // Set checkbox if needed
+    for(var j=0; j<h.length; j++){
+      if(String(h[j]).replace(/[\u200b\s]/g, '') === 'SNS配信済') {
+        sheet.getRange(addedRowNumber, j + 1).insertCheckboxes();
+      }
+    }
+    
+    var addedRange = sheet.getRange(addedRowNumber, 1, 1, h.length);
     addedRange.setFontWeight('bold'); // 行全体を太文字に
     
     if(nameColIdx > 0 && nameBgColor !== '') sheet.getRange(rowIdx, nameColIdx).setBackground(nameBgColor);
