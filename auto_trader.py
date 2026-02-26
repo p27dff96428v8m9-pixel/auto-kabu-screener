@@ -29,6 +29,10 @@ TWITTER_ACCESS_TOKEN = os.environ.get("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_SECRET = os.environ.get("TWITTER_ACCESS_SECRET")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+WP_URL = os.environ.get("WP_URL")
+WP_USERNAME = os.environ.get("WP_USERNAME")
+WP_APP_PASSWORD = os.environ.get("WP_APP_PASSWORD")
+
 if not WEBHOOK_URL:
     logging.error("WEBHOOK_URL が設定されていません。終了します。")
     sys.exit(1)
@@ -85,6 +89,50 @@ def post_to_twitter(base_text):
         logging.info("Twitterへの自動投稿に成功しました！")
     except Exception as e:
         logging.error(f"Twitterへの自動投稿に失敗: {e}")
+
+def post_to_wordpress(title, note_draft):
+    """WordPressのREST APIを使って記事を自動投稿(有料部分をcodoc化)する関数"""
+    if not all([WP_URL, WP_USERNAME, WP_APP_PASSWORD]):
+        logging.info("WordPressの環境変数が設定されていないため、投稿をスキップします。")
+        return None
+        
+    # note_draft の中身をcodocショートコードで囲む
+    split_keyword = "👇ここから先は有料エリアとなります"
+    if split_keyword in note_draft:
+        parts = note_draft.split(split_keyword, 1)
+        public_text = parts[0].strip()
+        premium_text = split_keyword + "\n" + parts[1].strip()
+        # [codoc]ショートコードで囲む (要: WordPress側のcodocプラグイン)
+        content = f"{public_text}\n\n[codoc]\n{premium_text}\n[/codoc]"
+        content = content.replace("\n", "<br>")
+    else:
+        content = note_draft.replace("\n", "<br>")
+        
+    # Basic認証ヘッダーの作成
+    import base64
+    wp_credential = f"{WP_USERNAME}:{WP_APP_PASSWORD}"
+    token = base64.b64encode(wp_credential.encode()).decode('utf-8')
+    headers = {'Authorization': f'Basic {token}', 'Content-Type': 'application/json'}
+    api_url = f"{WP_URL}/wp-json/wp/v2/posts"
+    
+    data = {
+        'title': title,
+        'content': content,
+        'status': 'publish'  # 'draft'にすると下書きとして保存されます
+    }
+    
+    try:
+        res = requests.post(api_url, headers=headers, json=data)
+        if res.status_code in [200, 201]:
+            post_url = res.json().get("link")
+            logging.info(f"WordPressへの自動投稿に成功しました！: {post_url}")
+            return post_url
+        else:
+            logging.error(f"WordPress投稿エラー: {res.status_code} - {res.text}")
+            return None
+    except Exception as e:
+        logging.error(f"WordPress投稿エラー: {e}")
+        return None
 
 def run_backtest(df, buy_price, tp_price, sl_price):
     """勝率のバックテスト関数"""
@@ -415,7 +463,15 @@ def auto_screen_and_add():
                     logging.info(f"成功: {s_code} を追加しました (勝率: {best_win_rate:.1f}%)")
                     added_count += 1
                     
+                    # 100%完全自動モード: WordPressへ記事を自動投稿
+                    # ※WP設定が済んでいなければスキップされるだけです
+                    wp_title = f"【本日の厳選AI分析】{s_code} の買い場と利確ライン（勝率{best_win_rate:.0f}%）"
+                    wp_post_url = post_to_wordpress(wp_title, note_draft)
+                    
                     # ユーザーの要望により、一時的にTwitter自動投稿を停止中（テスト期間）
+                    # 下記は将来再開したい時、note用からWP用リンクに書き換えたものです
+                    # if wp_post_url:
+                    #     x_text = x_text.replace("(noteのリンクを貼る予定地)", wp_post_url)
                     # post_to_twitter(x_text)
                     
             except Exception as e:
