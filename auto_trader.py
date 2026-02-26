@@ -295,7 +295,9 @@ def auto_screen_and_add():
     
     # 最後に更新ログを書き込む
     try:
-        now_str = datetime.now().strftime("%Y/%m/%d %H:%M")
+        from datetime import timezone, timedelta
+        jst = timezone(timedelta(hours=+9), 'JST')
+        now_str = datetime.now(jst).strftime("%Y/%m/%d %H:%M")
         requests.post(WEBHOOK_URL, json={"action": "log_time", "time": now_str, "count": added_count})
     except Exception:
         pass
