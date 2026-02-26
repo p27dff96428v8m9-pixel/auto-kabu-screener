@@ -5,7 +5,13 @@ import pandas as pd
 import json
 import logging
 import os
+import tweepy
 from datetime import datetime
+
+try:
+    from google import genai
+except ImportError:
+    genai = None
 
 # ==========================================
 # GitHub Actions で毎日自動で動くスクリプト
@@ -17,9 +23,56 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Webhook URLは環境変数（GitHub Secrets）から取得
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
+TWITTER_API_KEY = os.environ.get("TWITTER_API_KEY")
+TWITTER_API_SECRET = os.environ.get("TWITTER_API_SECRET")
+TWITTER_ACCESS_TOKEN = os.environ.get("TWITTER_ACCESS_TOKEN")
+TWITTER_ACCESS_SECRET = os.environ.get("TWITTER_ACCESS_SECRET")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
 if not WEBHOOK_URL:
     logging.error("WEBHOOK_URL が設定されていません。終了します。")
     sys.exit(1)
+
+def post_to_twitter(base_text):
+    """Geminiで文章を推敲し、Xに自動投稿する関数"""
+    if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET]):
+        logging.info("Twitterアカウントの環境変数が設定されていないため、ポストをスキップします。")
+        return
+        
+    final_text = base_text
+    
+    # 1. Geminiによる文章のブラッシュアップ（AI鍵があれば）
+    if genai and GEMINI_API_KEY:
+        try:
+            client = genai.Client(api_key=GEMINI_API_KEY)
+            prompt = (
+                "以下の形式の日本株のAI分析テキストを元に、Twitter(X)でフォロワーが思わず見たくなるような、"
+                "簡潔で魅力的なツイート文面を作成してください。必ず140文字以内に収め、"
+                "「銘柄コード」と「現在値」「勝率」「#日本株 #デイトレ」のハッシュタグは残してください。\n\n"
+                f"【元のテキスト】\n{base_text}"
+            )
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
+            if response.text:
+                final_text = response.text.strip()
+                logging.info("Geminiによる推敲が成功しました。")
+        except Exception as e:
+            logging.error(f"Gemini APIでのテキスト生成に失敗: {e}")
+            
+    # 2. X (Twitter) への送信処理
+    try:
+        t_client = tweepy.Client(
+            consumer_key=TWITTER_API_KEY,
+            consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN,
+            access_token_secret=TWITTER_ACCESS_SECRET
+        )
+        t_client.create_tweet(text=final_text)
+        logging.info("Twitterへの自動投稿に成功しました！")
+    except Exception as e:
+        logging.error(f"Twitterへの自動投稿に失敗: {e}")
 
 def run_backtest(df, buy_price, tp_price, sl_price):
     """勝率のバックテスト関数"""
@@ -312,8 +365,11 @@ def auto_screen_and_add():
                 if res.status_code == 200:
                     logging.info(f"成功: {s_code} を追加しました (勝率: {best_win_rate:.1f}%)")
                     added_count += 1
+                    
+                    # Twitter自動投稿を実行
+                    post_to_twitter(x_text)
+                    
             except Exception as e:
-                logging.error(f"スプレッドシートへの通信エラー ({s_code}): {e}")
                 logging.error(f"スプレッドシートへの通信エラー ({s_code}): {e}")
                 
     logging.info(f"--- 全自動スクリーニング完了 ({added_count} 銘柄追加) ---")
