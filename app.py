@@ -868,42 +868,43 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                     try:
                         ticker = yf.Ticker(f"{s_code}.T")
                         info = ticker.info
-                        hist = ticker.history(period="10d")
-                        if hist.empty or pd.isna(info.get('marketCap')):
+                        hist = ticker.history(period="3mo")
+                        if hist.empty or pd.isna(info.get('marketCap')) or len(hist) < 30:
                             continue
                             
                         mc = info.get('marketCap', 0)
                         pbr = info.get('priceToBook', 0)
+                        dividend = info.get('dividendYield', 0)
+                        forward_pe = info.get('forwardPE', 0)
+                        trailing_eps = info.get('trailingEps', 0)
                         
-                        past_price = hist['Close'].iloc[0]
-                        last_price = hist['Close'].iloc[-1]
+                        hist['SMA25'] = hist['Close'].rolling(window=25).mean()
+                        delta = hist['Close'].diff()
+                        gain = delta.clip(lower=0).rolling(window=14).mean()
+                        loss = -delta.clip(upper=0).rolling(window=14).mean()
+                        rs = gain / loss
+                        hist['RSI'] = 100 - (100 / (1 + rs))
                         
-                        # 配当利回りの安全な計算 (dividendYieldがおかしい場合に対処)
-                        div_rate = info.get('dividendRate')
-                        div_yield = info.get('dividendYield')
-                        actual_div = 0
-                        if div_rate and last_price > 0:
-                            actual_div = div_rate / last_price
-                        elif div_yield:
-                            actual_div = div_yield
+                        last_price = float(hist['Close'].iloc[-1])
+                        sma25 = float(hist['SMA25'].iloc[-1])
+                        rsi = float(hist['RSI'].iloc[-1])
                         
-                        # 異常値（20%超えなど）は除外
-                        if actual_div > 0.2:
-                            actual_div = 0
+                        if last_price < 100: continue
                         
-                        # 時価総額とPBRの基本条件 (より多くの銘柄を通すため上限を緩和)
-                        if 10_000_000_000 <= mc <= 20_000_000_000_000 and 0.1 <= pbr <= 10.0:
-                            drop_pct = (past_price - last_price) / past_price * 100
-                            
-                            # とりあえず候補として保存（下落率が高い順にソートするため）
-                            candidates.append({
-                                "code": s_code,
-                                "pbr": pbr,
-                                "dividend": actual_div,
-                                "drop_pct": drop_pct,
-                                "last_price": last_price,
-                                "mc": mc
-                            })
+                        deviation = (last_price - sma25) / sma25 * 100
+                        
+                        if deviation <= -10 and rsi <= 30:
+                            if 50_000_000_000 <= mc <= 200_000_000_000 and 1.0 <= pbr <= 2.0 and (forward_pe > 0 or trailing_eps > 0):
+                                candidates.append({
+                                    "code": s_code,
+                                    "pbr": pbr,
+                                    "dividend": dividend,
+                                    "drop_pct": abs(deviation),
+                                    "deviation": deviation,
+                                    "rsi": rsi,
+                                    "last_price": last_price,
+                                    "mc": mc
+                                })
                     except Exception:
                         pass
                 
@@ -937,11 +938,8 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         c_div = cand['dividend']
                         c_mc = cand['mc']
                         
-                        # 今までは「10日間で少しでも上昇していればスキップ」だったのを、「3%以上の上昇でなければ許容」に緩和
-                        if drop_pct < -3:
-                            continue # 直近10日で大きく上昇している銘柄はスキップ
-                            
-                        st.write(f"🔄 **{s_code}** (直近10日の変化: {drop_pct:.1f}%) の勝率を極限まで高めています...")
+                        
+                        st.write(f"🔄 **{s_code}** (25日乖離: {cand.get('deviation', 0):.1f}%, RSI: {cand.get('rsi', 0):.1f}) の勝率を極限まで高めています...")
                         
                         # 勝率を限界まで高める2年分バックテスト
                         hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
@@ -974,18 +972,21 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         # 勝率の合格ラインを70%→65%に少し緩和し、候補を増やします
                         if best_params is not None and best_win_rate >= 65:
                             # AI分析風の動的テキスト生成
-                            ai_color = "orange"
-                            ai_text = f"【リバウンド狙い】直近の高値から{drop_pct:.1f}%下落しており、過去2年の統計から勝率{best_win_rate:.0f}%の反発ラインに到達。押し目買いの好機。"
+                            deviation = cand.get('deviation', 0)
+                            rsi = cand.get('rsi', 0)
                             
-                            if pbr > 0 and pbr < 1.0:
+                            ai_color = "orange"
+                            ai_text = f"【デイトレ特化】25日乖離 {deviation:.1f}%、RSI {rsi:.1f}到達。勝率{best_win_rate:.0f}%の超短期反発ライン。"
+                            
+                            if 1.0 <= pbr <= 1.5:
                                 ai_color = "yellow"
-                                ai_text = f"【割安水準で反発力に期待】PBR {pbr:.2f}倍と割安放置されており下支えが強い。勝率{best_win_rate:.0f}%の優位なポイント。"
-                            elif c_div > 0.035:
+                                ai_text = f"【仕手化排除/割安】PBR {pbr:.2f}倍と堅実。大底RSI {rsi:.1f}。勝率{best_win_rate:.0f}%の固いポイント。"
+                            elif c_div is not None and c_div > 0.035:
                                 ai_color = "green"
-                                ai_text = f"【高配当＆底堅さ確認】配当利回りが {c_div*100:.1f}% と高く、配当狙いの買いが入りやすい水準。統計上、勝率{best_win_rate:.0f}%で安全圏。"
-                            elif c_mc > 1_000_000_000_000:
+                                ai_text = f"【反発/高配当】配当利回り{c_div*100:.1f}%が下支え。乖離{deviation:.1f}% 統計勝率{best_win_rate:.0f}%。"
+                            elif c_mc > 100_000_000_000:
                                 ai_color = "blue"
-                                ai_text = f"【大型優良株の調整】時価総額1兆円超の主力銘柄の調整局面。勝率{best_win_rate:.0f}%の最適なサポートラインと分析。"
+                                ai_text = f"【中大型/業績良好】時価総額1千億超え＆業績堅調による安心感で買いが入りやすい。勝率{best_win_rate:.0f}%。"
                             
                             payload = {
                                 "action": "add_new",
