@@ -358,6 +358,44 @@ def auto_screen_and_add():
                 f"過去勝率: {best_win_rate:.0f}%\n"
             )
             
+            note_draft = (
+                f"【本日の厳選ピックアップ銘柄】\n"
+                f"銘柄コード: {s_code}\n"
+                f"現在の株価: {current_price:.0f}円\n\n"
+                f"👇ここから先は有料エリアとなります（テクニカル分析とトレード戦略）👇\n"
+                f"==============================\n"
+                f"【テクニカル分析】\n"
+                f"25日移動平均線からの乖離率: {deviation:.1f}%\n"
+                f"RSI: {rsi:.1f}\n"
+                f"AI考察: {ai_text}\n\n"
+                f"【具体的なトレード戦略（過去勝率{best_win_rate:.0f}%）】\n"
+                f"✅ エントリー目安（買い場）: {int(best_params['Buy'])}円付近\n"
+                f"🎯 利確目標: {int(best_params['TakeProfit'])}円\n"
+                f"🛡️ 損切りライン: {int(best_params['StopLoss'])}円\n\n"
+                f"※本記事は過去データに基づく統計的分析です。投資は自己責任でお願いいたします。"
+            )
+            
+            # note用記事のAIによる推敲（よりリッチに・自然に）
+            if genai and GEMINI_API_KEY:
+                try:
+                    client_note = genai.Client(api_key=GEMINI_API_KEY)
+                    prompt_note = (
+                        "以下の草案を元に、noteの有料部分（300円）として購読者が満足できるような、"
+                        "丁寧でプロ風の分析記事テキストに推敲してください。"
+                        "絵文字などを適格に使い、見出しを含めて読みやすいレイアウトにしてください。\n"
+                        "※具体的な「買い場」「利確」「損切」の数値や「勝率」は絶対にそのまま残してください。\n\n"
+                        f"【草案】\n{note_draft}"
+                    )
+                    res_note = client_note.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt_note
+                    )
+                    if res_note.text:
+                        note_draft = res_note.text.strip()
+                        logging.info("Geminiによるnote記事推敲が成功しました。")
+                except Exception as e:
+                    logging.error(f"Gemini APIでのnote記事生成に失敗: {e}")
+            
             payload = {
                 "action": "add_new",
                 "code": str(s_code),
@@ -367,7 +405,8 @@ def auto_screen_and_add():
                 "tp": int(best_params['TakeProfit']),
                 "sl": int(best_params['StopLoss']),
                 "current_price": float(current_price),
-                "x_post_text": x_text
+                "x_post_text": x_text,
+                "note_text": note_draft
             }
             
             try:
