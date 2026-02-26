@@ -91,7 +91,7 @@ def post_to_twitter(base_text):
         logging.error(f"Twitterへの自動投稿に失敗: {e}")
 
 def post_to_wordpress(title, note_draft):
-    """WordPressのREST APIを使って記事を自動投稿(有料部分をcodoc化)する関数"""
+    """WordPressのXML-RPCを使って記事を自動投稿(有料部分をcodoc化)する関数"""
     if not all([WP_URL, WP_USERNAME, WP_APP_PASSWORD]):
         logging.info("WordPressの環境変数が設定されていないため、投稿をスキップします。")
         return None
@@ -102,36 +102,31 @@ def post_to_wordpress(title, note_draft):
         parts = note_draft.split(split_keyword, 1)
         public_text = parts[0].strip()
         premium_text = split_keyword + "\n" + parts[1].strip()
-        # [codoc]ショートコードで囲む (要: WordPress側のcodocプラグイン)
+        # [codoc]ショートコードで囲む
         content = f"{public_text}\n\n[codoc]\n{premium_text}\n[/codoc]"
         content = content.replace("\n", "<br>")
     else:
         content = note_draft.replace("\n", "<br>")
         
-    # Basic認証ヘッダーの作成
-    import base64
-    wp_credential = f"{WP_USERNAME}:{WP_APP_PASSWORD}"
-    token = base64.b64encode(wp_credential.encode()).decode('utf-8')
-    headers = {'Authorization': f'Basic {token}', 'Content-Type': 'application/json'}
-    api_url = f"{WP_URL}/wp-json/wp/v2/posts"
+    import xmlrpc.client
     
-    data = {
-        'title': title,
-        'content': content,
-        'status': 'publish'  # 'draft'にすると下書きとして保存されます
-    }
+    # HTTPのまま通信できる旧式のAPI（XML-RPC）を設定
+    xmlrpc_url = f"{WP_URL}/xmlrpc.php"
     
     try:
-        res = requests.post(api_url, headers=headers, json=data)
-        if res.status_code in [200, 201]:
-            post_url = res.json().get("link")
-            logging.info(f"WordPressへの自動投稿に成功しました！: {post_url}")
-            return post_url
-        else:
-            logging.error(f"WordPress投稿エラー: {res.status_code} - {res.text}")
-            return None
+        server = xmlrpc.client.ServerProxy(xmlrpc_url)
+        content_struct = {
+            'post_title': title,
+            'post_content': content,
+            'post_status': 'publish'
+        }
+        # wp.newPost (blog_id, username, password, content)
+        post_id = server.wp.newPost(1, WP_USERNAME, WP_APP_PASSWORD, content_struct)
+        post_url = f"{WP_URL}/?p={post_id}"
+        logging.info(f"WordPressへの自動投稿に成功しました！: {post_url}")
+        return post_url
     except Exception as e:
-        logging.error(f"WordPress投稿エラー: {e}")
+        logging.error(f"WordPress投稿エラー(XML-RPC): {e}")
         return None
 
 def run_backtest(df, buy_price, tp_price, sl_price):
