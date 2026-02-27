@@ -211,10 +211,13 @@ def check_portfolio_status():
             code = str(row[c_code]).strip()
             if not code or code == 'None': continue
             
-            # 各値を取得
-            buy_val = float(row[c_buy]) if c_buy != -1 and row[c_buy] else None
-            tp_val = float(row[c_tp]) if c_tp != -1 and row[c_tp] else None
-            sl_val = float(row[c_sl]) if c_sl != -1 and row[c_sl] else None
+            # 各値を取得 (カンマが含まれている場合の対策)
+            try:
+                buy_val = float(str(row[c_buy]).replace(',', '').strip()) if c_buy != -1 and str(row[c_buy]).strip() else None
+                tp_val = float(str(row[c_tp]).replace(',', '').strip()) if c_tp != -1 and str(row[c_tp]).strip() else None
+                sl_val = float(str(row[c_sl]).replace(',', '').strip()) if c_sl != -1 and str(row[c_sl]).strip() else None
+            except ValueError:
+                continue # 数値に変換できない値が入っている行はスキップ
             
             # 株価データを取得して判定
             try:
@@ -222,6 +225,10 @@ def check_portfolio_status():
                 if hist.empty: continue
                 
                 last_close = float(hist['Close'].iloc[-1])
+                last_high = float(hist['High'].iloc[-1])
+                last_low = float(hist['Low'].iloc[-1])
+                
+                # エントリー判定用に過去1ヶ月の安値を参照
                 hist_low = float(hist['Low'].min())
                 
                 vol_surge = False
@@ -235,9 +242,10 @@ def check_portfolio_status():
                     entered_flag = True
                 
                 action = None
-                if tp_val and last_close >= tp_val:
+                # その日の高値が利確を達成、または安値が損切を下回った場合
+                if tp_val and last_high >= tp_val:
                     action = "hit_tp" if entered_flag else "delete"
-                elif sl_val and last_close <= sl_val:
+                elif sl_val and last_low <= sl_val:
                     action = "hit_sl" if entered_flag else "delete"
                     
                 if action:
