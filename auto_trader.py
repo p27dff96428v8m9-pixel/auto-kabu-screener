@@ -301,8 +301,8 @@ def auto_screen_and_add():
             
             deviation = (current_price - sma25) / sma25 * 100
             
-            # 乖離率 -3%以下 かつ RSI 50以下 (遊びを持たせる)
-            if deviation <= -3 and rsi <= 50:
+            # どちらかの条件（デイトレorスイング）に該当しそうか荒く判定
+            if deviation <= -3 and rsi <= 45:
                 ticker_obj = yf.Ticker(t_code)
                 info = ticker_obj.info
                 pbr = info.get('priceToBook', 0)
@@ -312,18 +312,23 @@ def auto_screen_and_add():
                 trailing_eps = info.get('trailingEps', 0)
                 
                 if pbr is not None and mc is not None:
-                    # 時価総額 100億円〜1兆円, PBR 0.2倍〜5.0倍 に緩和
-                    if (10_000_000_000 <= mc <= 1_000_000_000_000) and (0.2 <= pbr <= 5.0) and (forward_pe > 0 or trailing_eps > 0):
-                        candidates.append({
-                            "code": code,
-                            "pbr": pbr,
-                            "dividend": dividend,
-                            "drop_pct": abs(deviation), # ロジック整合性のため、乖離の広さを"drop_pct"として扱う
-                            "deviation": deviation,
-                            "rsi": rsi,
-                            "current_price": current_price,
-                            "mc": mc
-                        })
+                    # 1. デイトレ激熱ライン
+                    is_day_trade = (deviation <= -7 and rsi <= 35)
+                    # 3. スイング超割安ライン（PBR0.6以下、高配当）
+                    is_swing_value = (pbr <= 0.6 and (dividend is not None and dividend >= 0.035))
+                    
+                    if is_day_trade or is_swing_value:
+                        if (10_000_000_000 <= mc <= 1_000_000_000_000) and (0.1 <= pbr <= 5.0) and (forward_pe > 0 or trailing_eps > 0):
+                            candidates.append({
+                                "code": code,
+                                "pbr": pbr,
+                                "dividend": dividend,
+                                "drop_pct": abs(deviation),
+                                "deviation": deviation,
+                                "rsi": rsi,
+                                "current_price": current_price,
+                                "mc": mc
+                            })
         except Exception:
             continue
             
