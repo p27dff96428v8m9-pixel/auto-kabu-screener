@@ -931,18 +931,23 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         
                         deviation = (last_price - sma25) / sma25 * 100
                         
-                        if deviation <= -3 and rsi <= 50:
-                            if 10_000_000_000 <= mc <= 1_000_000_000_000 and 0.2 <= pbr <= 5.0 and (forward_pe > 0 or trailing_eps > 0):
-                                candidates.append({
-                                    "code": s_code,
-                                    "pbr": pbr,
-                                    "dividend": dividend,
-                                    "drop_pct": abs(deviation),
-                                    "deviation": deviation,
-                                    "rsi": rsi,
-                                    "last_price": last_price,
-                                    "mc": mc
-                                })
+                        # どちらかの条件（デイトレorスイング）に該当しそうか荒く判定
+                        if deviation <= -3 and rsi <= 45:
+                            if 10_000_000_000 <= mc <= 1_000_000_000_000 and 0.1 <= pbr <= 5.0 and (forward_pe > 0 or trailing_eps > 0):
+                                is_day_trade = (deviation <= -7 and rsi <= 35)
+                                is_swing_value = (pbr <= 0.6 and (dividend is not None and dividend >= 0.035))
+                                
+                                if is_day_trade or is_swing_value:
+                                    candidates.append({
+                                        "code": s_code,
+                                        "pbr": pbr,
+                                        "dividend": dividend,
+                                        "drop_pct": abs(deviation),
+                                        "deviation": deviation,
+                                        "rsi": rsi,
+                                        "last_price": last_price,
+                                        "mc": mc
+                                    })
                     except Exception:
                         pass
                 
