@@ -366,13 +366,13 @@ def auto_screen_and_add():
         best_win_rate = -1
         best_profit = -999999
         
-        for buy_pct in range(2, 42, 6):
+        for buy_pct in [0, 1, 2, 3]: # デイトレ最適化: 買い目標を浅く（0〜3%下）設定
             sim_buy = current_price * (1 - buy_pct/100)
-            for tp_pct in range(2, 32, 6):
+            for tp_pct in range(2, 22, 2): # 利確目標を細かく (2%〜20%)
                 sim_tp = sim_buy * (1 + tp_pct/100)
                 if sim_tp <= current_price * 1.01: continue
                 
-                for sl_pct in range(2, 32, 6):
+                for sl_pct in range(2, 16, 2): # 損切りライン (2%〜14%)
                     sim_sl = sim_buy * (1 - sl_pct/100)
                     t_trades, w_rate, e_val, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
                     
