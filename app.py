@@ -989,15 +989,15 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         best_win_rate = -1
                         best_profit = -999999
                         
-                        for buy_pct in range(2, 42, 4):  # 高速化のため4%刻み
+                        for buy_pct in [0, 1, 2, 3]:  # デイトレ最適化: 買い目標を浅く（0〜3%下）設定
                             sim_buy = current_price * (1 - buy_pct/100)
-                            for tp_pct in range(2, 32, 4):
+                            for tp_pct in range(2, 22, 2): # 利確目標を細かく (2%〜20%)
                                 sim_tp = sim_buy * (1 + tp_pct/100)
                                 # 【重要修復】利確目標が今の株価より低いと、追加後すぐに「利確達成」になってしまうのを防ぐ
                                 if sim_tp <= current_price * 1.01:
                                     continue
                                     
-                                for sl_pct in range(2, 32, 4):
+                                for sl_pct in range(2, 16, 2): # 損切りライン (2%〜14%)
                                     sim_sl = sim_buy * (1 - sl_pct/100)
                                     t_trades, w_rate, e_val, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
                                     if t_trades >= 2:
