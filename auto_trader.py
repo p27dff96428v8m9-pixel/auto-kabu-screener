@@ -290,7 +290,7 @@ def auto_screen_and_add():
         
         try:
             current_price = float(df['Close'].iloc[-1])
-            if current_price < 100 or current_price > 1000: continue
+            if current_price < 100: continue
             
             sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
             delta = df['Close'].diff()
@@ -302,7 +302,7 @@ def auto_screen_and_add():
             deviation = (current_price - sma25) / sma25 * 100
             
             # どちらかの条件（デイトレorスイング）に該当しそうか荒く判定
-            if deviation <= -3 and rsi <= 45:
+            if deviation <= 0 and rsi <= 55:
                 ticker_obj = yf.Ticker(t_code)
                 info = ticker_obj.info
                 pbr = info.get('priceToBook', 0)
@@ -313,12 +313,12 @@ def auto_screen_and_add():
                 
                 if pbr is not None and mc is not None:
                     # 1. デイトレ激熱ライン
-                    is_day_trade = (deviation <= -7 and rsi <= 35)
+                    is_day_trade = (deviation <= -3 and rsi <= 45)
                     # 3. スイング超割安ライン（PBR0.6以下、高配当）
-                    is_swing_value = (pbr <= 0.6 and (dividend is not None and dividend >= 0.035))
+                    is_swing_value = (pbr <= 0.8 and (dividend is not None and dividend >= 0.03))
                     
-                    if is_day_trade or is_swing_value:
-                        if (10_000_000_000 <= mc <= 1_000_000_000_000) and (0.1 <= pbr <= 5.0) and (forward_pe > 0 or trailing_eps > 0):
+                    if is_day_trade or is_swing_value or (deviation <= -5 and forward_pe > 0):
+                        if (10_000_000_000 <= mc <= 2_000_000_000_000) and (0.1 <= pbr <= 5.0):
                             candidates.append({
                                 "code": code,
                                 "pbr": pbr,
@@ -392,18 +392,25 @@ def auto_screen_and_add():
             deviation = cand.get('deviation', 0)
             rsi = cand.get('rsi', 0)
 
+            import random
+            ai_texts = [
+                f"【急反発狙い】25日線乖離 {deviation:.1f}%、現在RSI {rsi:.1f}。過去データ勝率{best_win_rate:.0f}%の強いサポート水準。",
+                f"【リバウンド妙味】RSIが{rsi:.1f}まで低下。過去2年で勝率{best_win_rate:.0f}%を誇る反発期待ライン。",
+                f"【押し目買い推奨】直近の売り超過（乖離{deviation:.1f}%）。統計的勝率{best_win_rate:.0f}%の優位なポイント。"
+            ]
             ai_color = "orange"
-            ai_text = f"【デイトレ特化】25日乖離 {deviation:.1f}%、RSI {rsi:.1f}到達。勝率{best_win_rate:.0f}%の超短期反発ライン。"
+            ai_text = random.choice(ai_texts)
             
-            if 1.0 <= pbr <= 1.5:
+            if pbr > 0 and pbr <= 1.5:
                 ai_color = "yellow"
-                ai_text = f"【仕手化排除/割安】PBR {pbr:.2f}倍と堅実。大底RSI {rsi:.1f}。勝率{best_win_rate:.0f}%の固いポイント。"
-            elif c_div is not None and c_div > 0.035:
+                ai_text = f"【割安/バリュー】PBR {pbr:.2f}倍と割安水準。RSI {rsi:.1f}で底入れ感。過去勝率{best_win_rate:.0f}%。"
+            elif c_div is not None and c_div >= 0.03:
                 ai_color = "green"
-                ai_text = f"【反発/高配当】配当利回り{c_div*100:.1f}%が下支え。乖離{deviation:.1f}% 統計勝率{best_win_rate:.0f}%。"
+                ai_text = f"【高配当/下支え】配当利回り{c_div*100:.1f}%の安心感。異常乖離{deviation:.1f}%からのリバウンド（勝率{best_win_rate:.0f}%）に期待。"
             elif c_mc > 100_000_000_000:
                 ai_color = "blue"
-                ai_text = f"【中大型/業績良好】時価総額1千億超え＆業績堅調による安心感で買いが入りやすい。勝率{best_win_rate:.0f}%。"
+                mc_oku = c_mc / 1_0000_0000
+                ai_text = f"【大型主力/資金流入期待】時価総額{mc_oku:,.0f}億円の主力株。テクニカル反発（勝率{best_win_rate:.0f}%）が意識されやすい。"
                 
             x_text = (
                 f"コード【{s_code}】\n"
