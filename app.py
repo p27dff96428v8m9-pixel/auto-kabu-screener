@@ -386,30 +386,30 @@ function doPost(e) {
     var nameBgColor = '';
     
     for(var j=0; j<h.length; j++){
-      var colName = String(h[j]).replace(/[\\u200b\\s]/g, '');
+      var colName = String(h[j]).replace(/[\u200b\s]/g, '');
       var colStr = String(h[j]);
       if(colName === 'コード') newRow[j] = data.code;
       else if(colName === '銘柄名') {
-        var baseFormula = '=IMPORTXML("https://finance.yahoo.co.jp/quote/"&'+codeLetter+rowIdx+', "//h1")';
+        var baseFormula = '=IFERROR(GOOGLEFINANCE('+codeLetter+rowIdx+'&".T", "name"), "取得エラー")';
         if (data.current_price) {
-          var p = Number(data.current_price) * 100;
+          var p = Number(data.current_price);
           var emoji = '';
-          if(p <= 100000) { emoji = '①🟢'; nameBgColor = '#d9ead3'; }
-          else if(p <= 300000) { emoji = '③🟡'; nameBgColor = '#fff2cc'; }
-          else if(p <= 500000) { emoji = '⑤🟠'; nameBgColor = '#fce5cd'; }
-          else if(p <= 1000000) { emoji = '⑩🔴'; nameBgColor = '#f4cccc'; }
-          else { emoji = '💯🟥'; nameBgColor = '#ea9999'; }
+          if(p <= 1000) { emoji = '🟢'; nameBgColor = '#d9ead3'; }
+          else if(p <= 3000) { emoji = '🟡'; nameBgColor = '#fff2cc'; }
+          else if(p <= 5000) { emoji = '🟠'; nameBgColor = '#fce5cd'; }
+          else if(p <= 10000) { emoji = '🔴'; nameBgColor = '#f4cccc'; }
+          else { emoji = '💀'; nameBgColor = '#ea9999'; }
           newRow[j] = '="' + emoji + ' "&' + baseFormula;
         } else {
           newRow[j] = baseFormula;
         }
         nameColIdx = j + 1;
       }
-      else if(colName === '現在値') newRow[j] = '=VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")) + (0 * 1771905277482)';
+      else if(colName === '現在値') newRow[j] = '=IFERROR(GOOGLEFINANCE('+codeLetter+rowIdx+'&".T", "price"), VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")))';
       else if(colStr.indexOf('出来高') >= 0 && colName !== '出来高急増') newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
       else if(colName === '出来高急増') newRow[j] = false;
-      else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+')'; rrColIdx = j + 1; }
-      else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=IFERROR('+rrColL+rowIdx+' * (0.1 / (('+tpColL+rowIdx+'-'+cColL+rowIdx+')/'+cColL+rowIdx+')), 0)'; scoreColIdx = j + 1; }
+      else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=IFERROR(('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/('+buyColL+rowIdx+'-'+slColL+rowIdx+'), 0)'; rrColIdx = j + 1; }
+      else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=IFERROR(('+rrColL+rowIdx+') * (1 / (('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/'+buyColL+rowIdx+')), 0)'; scoreColIdx = j + 1; }
       else if(colName === '買い目標') newRow[j] = data.buy;
       else if(colName === '利確目標') newRow[j] = data.tp;
       else if(colName === '損切り') newRow[j] = data.sl;
@@ -417,7 +417,7 @@ function doPost(e) {
       else if(colName === 'X配信テキスト') newRow[j] = data.x_post_text || '';
       else if(colStr.indexOf('note用') >= 0 || colName === 'note用下書き') newRow[j] = data.note_text || '';
       else if(colName === 'SNS配信済') newRow[j] = false;
-      else if(colName === \'判定\') newRow[j] = \'監視中\';
+      else if(colName === '判定') newRow[j] = '=IF('+cColL+rowIdx+'<='+buyColL+rowIdx+', "買い目標到達", "監視中")';
     }
     sheet.appendRow(newRow);
     var addedRowNumber = sheet.getLastRow();
@@ -1022,18 +1022,25 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                             deviation = cand.get('deviation', 0)
                             rsi = cand.get('rsi', 0)
                             
+                            import random
+                            ai_texts = [
+                                f"【急反発狙い】25日線乖離 {deviation:.1f}%、現在RSI {rsi:.1f}。過去データ勝率{best_win_rate:.0f}%の強いサポート水準。",
+                                f"【リバウンド妙味】RSIが{rsi:.1f}まで低下。過去2年で勝率{best_win_rate:.0f}%を誇る反発期待ライン。",
+                                f"【押し目買い推奨】直近の売り超過（乖離{deviation:.1f}%）。統計的勝率{best_win_rate:.0f}%の優位なポイント。"
+                            ]
                             ai_color = "orange"
-                            ai_text = f"【デイトレ特化】25日乖離 {deviation:.1f}%、RSI {rsi:.1f}到達。勝率{best_win_rate:.0f}%の超短期反発ライン。"
+                            ai_text = random.choice(ai_texts)
                             
-                            if 1.0 <= pbr <= 1.5:
+                            if pbr > 0 and pbr <= 1.5:
                                 ai_color = "yellow"
-                                ai_text = f"【仕手化排除/割安】PBR {pbr:.2f}倍と堅実。大底RSI {rsi:.1f}。勝率{best_win_rate:.0f}%の固いポイント。"
-                            elif c_div is not None and c_div > 0.035:
+                                ai_text = f"【割安/バリュー】PBR {pbr:.2f}倍と割安水準。RSI {rsi:.1f}で底入れ感。過去勝率{best_win_rate:.0f}%。"
+                            elif c_div is not None and c_div >= 0.03:
                                 ai_color = "green"
-                                ai_text = f"【反発/高配当】配当利回り{c_div*100:.1f}%が下支え。乖離{deviation:.1f}% 統計勝率{best_win_rate:.0f}%。"
+                                ai_text = f"【高配当/下支え】配当利回り{c_div*100:.1f}%の安心感。異常乖離{deviation:.1f}%からのリバウンド（勝率{best_win_rate:.0f}%）に期待。"
                             elif c_mc > 100_000_000_000:
                                 ai_color = "blue"
-                                ai_text = f"【中大型/業績良好】時価総額1千億超え＆業績堅調による安心感で買いが入りやすい。勝率{best_win_rate:.0f}%。"
+                                mc_oku = c_mc / 1_0000_0000
+                                ai_text = f"【大型主力/資金流入期待】時価総額{mc_oku:,.0f}億円の主力株。テクニカル反発（勝率{best_win_rate:.0f}%）が意識されやすい。"
                             
                             payload = {
                                 "action": "add_new",
