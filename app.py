@@ -352,13 +352,13 @@ function doPost(e) {
   var buyColL = 'D', tpColL = 'E', slColL = 'F', rrColL = 'J', scoreColL = 'K', cColL = 'C';
   for (var j = 0; j < h.length; j++) {
     var colN = String(h[j]).replace(/[\u200b\s]/g, '');
-    if (colN === 'コード') codeIdx = j;
-    else if (colN === '買い目標') buyColL = getColLetter(j);
-    else if (colN === '利確目標') tpColL = getColLetter(j);
-    else if (colN === '損切り') slColL = getColLetter(j);
+    if (colN.indexOf('コード') >= 0) codeIdx = j;
+    else if (colN.indexOf('買い目標') >= 0) buyColL = getColLetter(j);
+    else if (colN.indexOf('利確目標') >= 0) tpColL = getColLetter(j);
+    else if (colN.indexOf('損切り') >= 0) slColL = getColLetter(j);
     else if (String(h[j]).indexOf('リスクリワード') >= 0) rrColL = getColLetter(j);
     else if (String(h[j]).indexOf('投資効率スコア') >= 0) scoreColL = getColLetter(j);
-    else if (colN === '現在値') cColL = getColLetter(j);
+    else if (colN.indexOf('現在値') >= 0) cColL = getColLetter(j);
   }
   var codeLetter = getColLetter(codeIdx);
   
@@ -386,8 +386,8 @@ function doPost(e) {
     for(var j=0; j<h.length; j++){
       var colName = String(h[j]).replace(/[\\u200b\\s]/g, '');
       var colStr = String(h[j]);
-      if(colName === 'コード') newRow[j] = data.code;
-      else if(colName === '銘柄名') {
+      if(colName.indexOf('コード') >= 0) newRow[j] = data.code;
+      else if(colName.indexOf('銘柄名') >= 0) {
         newRow[j] = '=IMPORTXML("https://finance.yahoo.co.jp/quote/"&'+codeLetter+rowIdx+', "//h1")';
         if (data.current_price) {
           var p = Number(data.current_price);
@@ -399,19 +399,19 @@ function doPost(e) {
         }
         nameColIdx = j + 1;
       }
-      else if(colName === '現在値') newRow[j] = '=ROUND(VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")))';
-      else if(colStr.indexOf('出来高') >= 0 && colName !== '出来高急増') newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
-      else if(colName === '出来高急増') newRow[j] = false;
+      else if(colName.indexOf('現在値') >= 0) newRow[j] = '=ROUND(VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")))';
+      else if(colStr.indexOf('出来高') >= 0 && colName.indexOf('出来高急増') < 0) newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
+      else if(colName.indexOf('出来高急増') >= 0) newRow[j] = false;
       else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=ROUND(('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/('+buyColL+rowIdx+'-'+slColL+rowIdx+'), 1)'; rrColIdx = j + 1; }
       else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=ROUND(('+rrColL+rowIdx+') * (0.1 / (('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/'+buyColL+rowIdx+')), 1)'; scoreColIdx = j + 1; }
-      else if(colName === '買い目標') newRow[j] = Math.round(data.buy);
-      else if(colName === '利確目標') newRow[j] = Math.round(data.tp);
-      else if(colName === '損切り') newRow[j] = Math.round(data.sl);
+      else if(colName.indexOf('買い目標') >= 0) newRow[j] = Math.round(data.buy);
+      else if(colName.indexOf('利確目標') >= 0) newRow[j] = Math.round(data.tp);
+      else if(colName.indexOf('損切り') >= 0) newRow[j] = Math.round(data.sl);
       else if(colStr.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
-      else if(colName === 'X配信テキスト') newRow[j] = data.x_post_text || '';
-      else if(colStr.indexOf('note用') >= 0 || colName === 'note用下書き') newRow[j] = data.note_text || '';
-      else if(colName === 'SNS配信済') newRow[j] = false;
-      else if(colName === '判定') newRow[j] = '=IFERROR(IF(VALUE('+cColL+rowIdx+')<=VALUE('+buyColL+rowIdx+'), "買い目標到達", "監視中"), "監視中")';
+      else if(colName.indexOf('X配信テキスト') >= 0) newRow[j] = data.x_post_text || '';
+      else if(colStr.indexOf('note用') >= 0 || colName.indexOf('note用下書き') >= 0) newRow[j] = data.note_text || '';
+      else if(colName.indexOf('SNS配信済') >= 0) newRow[j] = false;
+      else if(colName.indexOf('判定') >= 0) newRow[j] = '=IFERROR(IF(VALUE('+cColL+rowIdx+')<=VALUE('+buyColL+rowIdx+'), "買い目標到達", "監視中"), "監視中")';
     }
     sheet.appendRow(newRow);
     var addedRowNumber = sheet.getLastRow();
@@ -476,10 +476,10 @@ function doPost(e) {
         if(data.volume_surge) {
           for(var c=0; c<h.length; c++){
             var colNameStr = String(h[c]).replace(/[\\u200b\\s]/g, '');
-            if(String(h[c]).indexOf('出来高') >= 0 && colNameStr !== '出来高急増'){
+            if(String(h[c]).indexOf('出来高') >= 0 && colNameStr.indexOf('出来高急増') < 0){
               sheet.getRange(i + 1, c + 1).setBackground('#ffff00');
             }
-            if(colNameStr === '出来高急増') {
+            if(colNameStr.indexOf('出来高急増') >= 0) {
               var tr = sheet.getRange(i + 1, c + 1);
               tr.insertCheckboxes();
               tr.check();
@@ -488,9 +488,12 @@ function doPost(e) {
           }
           return ContentService.createTextOutput("success_vol_surge");
         }
-        if(h.indexOf('買い目標') >= 0) sheet.getRange(i + 1, h.indexOf('買い目標') + 1).setValue(data.buy);
-        if(h.indexOf('利確目標') >= 0) sheet.getRange(i + 1, h.indexOf('利確目標') + 1).setValue(data.tp);
-        if(h.indexOf('損切り') >= 0) sheet.getRange(i + 1, h.indexOf('損切り') + 1).setValue(data.sl);
+        for (var c = 0; c < h.length; c++) {
+          var colN = String(h[c]).replace(/[\\u200b\\s]/g, '');
+          if (colN.indexOf('買い目標') >= 0) sheet.getRange(i + 1, c + 1).setValue(data.buy);
+          if (colN.indexOf('利確目標') >= 0) sheet.getRange(i + 1, c + 1).setValue(data.tp);
+          if (colN.indexOf('損切り') >= 0) sheet.getRange(i + 1, c + 1).setValue(data.sl);
+        }
         return ContentService.createTextOutput("success");
       }
     }
