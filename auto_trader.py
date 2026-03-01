@@ -290,7 +290,7 @@ def auto_screen_and_add():
         
         try:
             current_price = float(df['Close'].iloc[-1])
-            if current_price < 100: continue
+            if current_price < 100 or current_price > 1000: continue
             
             sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
             delta = df['Close'].diff()
@@ -392,25 +392,18 @@ def auto_screen_and_add():
             deviation = cand.get('deviation', 0)
             rsi = cand.get('rsi', 0)
 
-            import random
-            ai_texts = [
-                f"【急反発狙い】25日線乖離 {deviation:.1f}%、現在RSI {rsi:.1f}。過去データ勝率{best_win_rate:.0f}%の強いサポート水準。",
-                f"【リバウンド妙味】RSIが{rsi:.1f}まで低下。過去2年で勝率{best_win_rate:.0f}%を誇る反発期待ライン。",
-                f"【押し目買い推奨】直近の売り超過（乖離{deviation:.1f}%）。統計的勝率{best_win_rate:.0f}%の優位なポイント。"
-            ]
             ai_color = "orange"
-            ai_text = random.choice(ai_texts)
+            ai_text = f"【デイトレ特化】25日乖離 {deviation:.1f}%、RSI {rsi:.1f}到達。勝率{best_win_rate:.0f}%の超短期反発ライン。"
             
-            if pbr > 0 and pbr <= 1.5:
+            if 1.0 <= pbr <= 1.5:
                 ai_color = "yellow"
-                ai_text = f"【割安/バリュー】PBR {pbr:.2f}倍と割安水準。RSI {rsi:.1f}で底入れ感。過去勝率{best_win_rate:.0f}%。"
-            elif c_div is not None and c_div >= 0.03:
+                ai_text = f"【仕手化排除/割安】PBR {pbr:.2f}倍と堅実。大底RSI {rsi:.1f}。勝率{best_win_rate:.0f}%の固いポイント。"
+            elif c_div is not None and c_div > 0.035:
                 ai_color = "green"
-                ai_text = f"【高配当/下支え】配当利回り{c_div*100:.1f}%の安心感。異常乖離{deviation:.1f}%からのリバウンド（勝率{best_win_rate:.0f}%）に期待。"
+                ai_text = f"【反発/高配当】配当利回り{c_div*100:.1f}%が下支え。乖離{deviation:.1f}% 統計勝率{best_win_rate:.0f}%。"
             elif c_mc > 100_000_000_000:
                 ai_color = "blue"
-                mc_oku = c_mc / 1_0000_0000
-                ai_text = f"【大型主力/資金流入期待】時価総額{mc_oku:,.0f}億円の主力株。テクニカル反発（勝率{best_win_rate:.0f}%）が意識されやすい。"
+                ai_text = f"【中大型/業績良好】時価総額1千億超え＆業績堅調による安心感で買いが入りやすい。勝率{best_win_rate:.0f}%。"
                 
             x_text = (
                 f"コード【{s_code}】\n"
