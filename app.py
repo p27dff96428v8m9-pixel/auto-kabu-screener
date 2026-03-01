@@ -415,7 +415,7 @@ function doPost(e) {
       else if(colName === 'X配信テキスト') newRow[j] = data.x_post_text || '';
       else if(colStr.indexOf('note用') >= 0 || colName === 'note用下書き') newRow[j] = data.note_text || '';
       else if(colName === 'SNS配信済') newRow[j] = false;
-      else if(colName === '判定') newRow[j] = '=IF('+cColL+rowIdx+'<'+slColL+rowIdx+', "🚨底割れ待ち ("&ROUND(('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+'),1)&")", IF(AND('+cColL+rowIdx+'>='+slColL+rowIdx+', ('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+')>=3), "🔥リバ買い条件達成！ ("&ROUND(('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+'),1)&")", ' + '"👀監視中 ("&IFERROR(ROUND(('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+'),1), "-")&")"))';
+      else if(colName === \'判定\') newRow[j] = \'監視中\';
     }
     sheet.appendRow(newRow);
     var addedRowNumber = sheet.getLastRow();
