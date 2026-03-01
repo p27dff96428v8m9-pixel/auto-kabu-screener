@@ -301,8 +301,8 @@ def auto_screen_and_add():
             
             deviation = (current_price - sma25) / sma25 * 100
             
-            # どちらかの条件（デイトレorスイング）に該当しそうか荒く判定
-            if deviation <= 0 and rsi <= 55:
+            # 3-6銘柄発見を目指し、さらに条件を緩めます
+            if deviation <= 5 and rsi <= 65:
                 ticker_obj = yf.Ticker(t_code)
                 info = ticker_obj.info
                 pbr = info.get('priceToBook', 0)
@@ -312,13 +312,11 @@ def auto_screen_and_add():
                 trailing_eps = info.get('trailingEps', 0)
                 
                 if pbr is not None and mc is not None:
-                    # 1. デイトレ激熱ライン
-                    is_day_trade = (deviation <= -3 and rsi <= 45)
-                    # 3. スイング超割安ライン（PBR0.6以下、高配当）
-                    is_swing_value = (pbr <= 0.8 and (dividend is not None and dividend >= 0.03))
+                    is_day_trade = (deviation <= 0 and rsi <= 55)
+                    is_swing_value = (pbr <= 1.2 and (dividend is not None and dividend >= 0.02))
                     
-                    if is_day_trade or is_swing_value or (deviation <= -5 and forward_pe > 0):
-                        if (10_000_000_000 <= mc <= 2_000_000_000_000) and (0.1 <= pbr <= 5.0):
+                    if is_day_trade or is_swing_value or (deviation <= -3 and forward_pe > 0):
+                        if (10_000_000_000 <= mc <= 3_000_000_000_000) and (0.1 <= pbr <= 6.0):
                             candidates.append({
                                 "code": code,
                                 "pbr": pbr,
@@ -387,7 +385,7 @@ def auto_screen_and_add():
                             best_profit = e_val
                             best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
                             
-        if best_params is not None and best_win_rate >= 65:
+        if best_params is not None and best_win_rate >= 55: # 勝率基準をさらに緩和
             # AI分析風テキスト
             deviation = cand.get('deviation', 0)
             rsi = cand.get('rsi', 0)
