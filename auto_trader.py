@@ -290,7 +290,7 @@ def auto_screen_and_add():
         
         try:
             current_price = float(df['Close'].iloc[-1])
-            if current_price < 100 or current_price > 1000: continue
+            if current_price < 100: continue
             
             sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
             delta = df['Close'].diff()
