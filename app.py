@@ -931,17 +931,17 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         sma25 = float(hist['SMA25'].iloc[-1])
                         rsi = float(hist['RSI'].iloc[-1])
                         
-                        if last_price < 100 or last_price > 1000: continue
+                        if last_price < 100: continue
                         
                         deviation = (last_price - sma25) / sma25 * 100
                         
                         # どちらかの条件（デイトレorスイング）に該当しそうか荒く判定
-                        if deviation <= -3 and rsi <= 45:
-                            if 10_000_000_000 <= mc <= 1_000_000_000_000 and 0.1 <= pbr <= 5.0 and (forward_pe > 0 or trailing_eps > 0):
-                                is_day_trade = (deviation <= -7 and rsi <= 35)
-                                is_swing_value = (pbr <= 0.6 and (dividend is not None and dividend >= 0.035))
+                        if deviation <= 0 and rsi <= 55:
+                            if 10_000_000_000 <= mc <= 2_000_000_000_000 and 0.1 <= pbr <= 5.0:
+                                is_day_trade = (deviation <= -3 and rsi <= 45)
+                                is_swing_value = (pbr <= 0.8 and (dividend is not None and dividend >= 0.03))
                                 
-                                if is_day_trade or is_swing_value:
+                                if is_day_trade or is_swing_value or (deviation <= -5 and forward_pe > 0):
                                     candidates.append({
                                         "code": s_code,
                                         "pbr": pbr,
