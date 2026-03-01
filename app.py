@@ -406,8 +406,8 @@ function doPost(e) {
       else if(colName === '現在値') newRow[j] = '=VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")) + (0 * 1771905277482)';
       else if(colStr.indexOf('出来高') >= 0 && colName !== '出来高急増') newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
       else if(colName === '出来高急増') newRow[j] = false;
-      else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/('+buyColL+rowIdx+'-'+slColL+rowIdx+')'; rrColIdx = j + 1; }
-      else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=IFERROR('+rrColL+rowIdx+' * (0.1 / (('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/'+buyColL+rowIdx+')), 0)'; scoreColIdx = j + 1; }
+      else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+')'; rrColIdx = j + 1; }
+      else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=IFERROR('+rrColL+rowIdx+' * (0.1 / (('+tpColL+rowIdx+'-'+cColL+rowIdx+')/'+cColL+rowIdx+')), 0)'; scoreColIdx = j + 1; }
       else if(colName === '買い目標') newRow[j] = data.buy;
       else if(colName === '利確目標') newRow[j] = data.tp;
       else if(colName === '損切り') newRow[j] = data.sl;
