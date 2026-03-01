@@ -388,34 +388,30 @@ function doPost(e) {
       var colStr = String(h[j]);
       if(colName === 'コード') newRow[j] = data.code;
       else if(colName === '銘柄名') {
-        var baseFormula = '=IMPORTXML("https://finance.yahoo.co.jp/quote/"&'+codeLetter+rowIdx+', "//h1")';
+        newRow[j] = '=IMPORTXML("https://finance.yahoo.co.jp/quote/"&'+codeLetter+rowIdx+', "//h1")';
         if (data.current_price) {
-          var p = Number(data.current_price) * 100;
-          var emoji = '';
-          if(p <= 100000) { emoji = '①🟢'; nameBgColor = '#d9ead3'; }
-          else if(p <= 300000) { emoji = '③🟡'; nameBgColor = '#fff2cc'; }
-          else if(p <= 500000) { emoji = '⑤🟠'; nameBgColor = '#fce5cd'; }
-          else if(p <= 1000000) { emoji = '⑩🔴'; nameBgColor = '#f4cccc'; }
-          else { emoji = '💯🟥'; nameBgColor = '#ea9999'; }
-          newRow[j] = '="' + emoji + ' "&' + baseFormula;
-        } else {
-          newRow[j] = baseFormula;
+          var p = Number(data.current_price);
+          if(p <= 1000) { nameBgColor = '#d9ead3'; }
+          else if(p <= 3000) { nameBgColor = '#fff2cc'; }
+          else if(p <= 5000) { nameBgColor = '#fce5cd'; }
+          else if(p <= 10000) { nameBgColor = '#f4cccc'; }
+          else { nameBgColor = '#ea9999'; }
         }
         nameColIdx = j + 1;
       }
-      else if(colName === '現在値') newRow[j] = '=VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")) + (0 * 1771905277482)';
+      else if(colName === '現在値') newRow[j] = '=ROUND(VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")))';
       else if(colStr.indexOf('出来高') >= 0 && colName !== '出来高急増') newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
       else if(colName === '出来高急増') newRow[j] = false;
-      else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+')'; rrColIdx = j + 1; }
-      else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=IFERROR('+rrColL+rowIdx+' * (0.1 / (('+tpColL+rowIdx+'-'+cColL+rowIdx+')/'+cColL+rowIdx+')), 0)'; scoreColIdx = j + 1; }
-      else if(colName === '買い目標') newRow[j] = data.buy;
-      else if(colName === '利確目標') newRow[j] = data.tp;
-      else if(colName === '損切り') newRow[j] = data.sl;
+      else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=ROUND(('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/('+buyColL+rowIdx+'-'+slColL+rowIdx+'), 1)'; rrColIdx = j + 1; }
+      else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=ROUND(('+rrColL+rowIdx+') * (0.1 / (('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/'+buyColL+rowIdx+')), 1)'; scoreColIdx = j + 1; }
+      else if(colName === '買い目標') newRow[j] = Math.round(data.buy);
+      else if(colName === '利確目標') newRow[j] = Math.round(data.tp);
+      else if(colName === '損切り') newRow[j] = Math.round(data.sl);
       else if(colStr.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName === 'X配信テキスト') newRow[j] = data.x_post_text || '';
       else if(colStr.indexOf('note用') >= 0 || colName === 'note用下書き') newRow[j] = data.note_text || '';
       else if(colName === 'SNS配信済') newRow[j] = false;
-      else if(colName === \'判定\') newRow[j] = \'監視中\';
+      else if(colName === '判定') newRow[j] = '=IFERROR(IF(VALUE('+cColL+rowIdx+')<=VALUE('+buyColL+rowIdx+'), "買い目標到達", "監視中"), "監視中")';
     }
     sheet.appendRow(newRow);
     var addedRowNumber = sheet.getLastRow();
@@ -933,13 +929,13 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         
                         deviation = (last_price - sma25) / sma25 * 100
                         
-                        # どちらかの条件（デイトレorスイング）に該当しそうか荒く判定
-                        if deviation <= 0 and rsi <= 55:
-                            if 10_000_000_000 <= mc <= 2_000_000_000_000 and 0.1 <= pbr <= 5.0:
-                                is_day_trade = (deviation <= -3 and rsi <= 45)
-                                is_swing_value = (pbr <= 0.8 and (dividend is not None and dividend >= 0.03))
+                        # 3-6銘柄発見を目指し、さらに条件を緩めます
+                        if deviation <= 5 and rsi <= 65:
+                            if 10_000_000_000 <= mc <= 3_000_000_000_000 and 0.1 <= pbr <= 6.0:
+                                is_day_trade = (deviation <= 0 and rsi <= 55)
+                                is_swing_value = (pbr <= 1.2 and (dividend is not None and dividend >= 0.02))
                                 
-                                if is_day_trade or is_swing_value or (deviation <= -5 and forward_pe > 0):
+                                if is_day_trade or is_swing_value or (deviation <= -3 and forward_pe > 0):
                                     candidates.append({
                                         "code": s_code,
                                         "pbr": pbr,
@@ -1015,7 +1011,7 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         
                         # ======= [一定の安全ライン（勝率65%以上）があれば採用] =======
                         # 勝率の合格ラインを70%→65%に少し緩和し、候補を増やします
-                        if best_params is not None and best_win_rate >= 65:
+                        if (best_params is not None and best_win_rate >= 55): # 勝率基準をさらに緩和
                             # AI分析風の動的テキスト生成
                             deviation = cand.get('deviation', 0)
                             rsi = cand.get('rsi', 0)
