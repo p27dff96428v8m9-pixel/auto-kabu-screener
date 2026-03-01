@@ -349,14 +349,16 @@ function doPost(e) {
   }
   
   var codeIdx = 0;
-  var buyColL = 'D', tpColL = 'E', slColL = 'F', rrColL = 'J';
+  var buyColL = 'D', tpColL = 'E', slColL = 'F', rrColL = 'J', scoreColL = 'K', cColL = 'C';
   for (var j = 0; j < h.length; j++) {
-    var colN = String(h[j]).replace(/[\\u200b\\s]/g, '');
+    var colN = String(h[j]).replace(/[\u200b\s]/g, '');
     if (colN === 'コード') codeIdx = j;
     else if (colN === '買い目標') buyColL = getColLetter(j);
     else if (colN === '利確目標') tpColL = getColLetter(j);
     else if (colN === '損切り') slColL = getColLetter(j);
     else if (String(h[j]).indexOf('リスクリワード') >= 0) rrColL = getColLetter(j);
+    else if (String(h[j]).indexOf('投資効率スコア') >= 0) scoreColL = getColLetter(j);
+    else if (colN === '現在値') cColL = getColLetter(j);
   }
   var codeLetter = getColLetter(codeIdx);
   
@@ -407,13 +409,13 @@ function doPost(e) {
       else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/('+buyColL+rowIdx+'-'+slColL+rowIdx+')'; rrColIdx = j + 1; }
       else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=IFERROR('+rrColL+rowIdx+' * (0.1 / (('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/'+buyColL+rowIdx+')), 0)'; scoreColIdx = j + 1; }
       else if(colName === '買い目標') newRow[j] = data.buy;
-      else if(colName === '利確目標') newRow[j] = '=IF(OR(COUNTIF(I'+rowIdx+',"*成長*"),COUNTIF(I'+rowIdx+',"*リバウンド*")), C'+rowIdx+'*1.15, C'+rowIdx+'*1.1)';
-      else if(colName === '損切り') newRow[j] = '=IF(OR(COUNTIF(I'+rowIdx+',"*成長*"),COUNTIF(I'+rowIdx+',"*リバウンド*")), C'+rowIdx+'*0.9, C'+rowIdx+'*0.95)';
+      else if(colName === '利確目標') newRow[j] = data.tp;
+      else if(colName === '損切り') newRow[j] = data.sl;
       else if(colStr.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName === 'X配信テキスト') newRow[j] = data.x_post_text || '';
       else if(colStr.indexOf('note用') >= 0 || colName === 'note用下書き') newRow[j] = data.note_text || '';
       else if(colName === 'SNS配信済') newRow[j] = false;
-      else if(colName === '判定') newRow[j] = '監視中';
+      else if(colName === '判定') newRow[j] = '=IF('+cColL+rowIdx+'<'+slColL+rowIdx+', "🚨底割れ待ち ("&ROUND(('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+'),1)&")", IF(AND('+cColL+rowIdx+'>='+slColL+rowIdx+', ('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+')>=3), "🔥リバ買い条件達成！ ("&ROUND(('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+'),1)&")", ' + '"👀監視中 ("&IFERROR(ROUND(('+tpColL+rowIdx+'-'+cColL+rowIdx+')/('+cColL+rowIdx+'-'+slColL+rowIdx+'),1), "-")&")"))';
     }
     sheet.appendRow(newRow);
     var addedRowNumber = sheet.getLastRow();
