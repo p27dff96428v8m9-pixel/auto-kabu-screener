@@ -409,8 +409,8 @@ function doPost(e) {
       else if(colName.indexOf('損切り') >= 0) newRow[j] = Math.round(data.sl);
       else if(colStr.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName.indexOf('X配信テキスト') >= 0) newRow[j] = data.x_post_text || '';
-      else if(colStr.indexOf('note用') >= 0 || colName.indexOf('note用下書き') >= 0) newRow[j] = data.note_text || '';
-      else if(colName.indexOf('SNS配信済') >= 0) newRow[j] = false;
+      else if(colStr.indexOf('ホームページ') >= 0 || colName.indexOf('ホームページへの自動記載') >= 0) newRow[j] = data.hp_text || '';
+      else if(colName.indexOf('SNS配信済') >= 0) newRow[j] = data.sns_done || false;
       else if(colName.indexOf('判定') >= 0) newRow[j] = '=IFERROR(IF(VALUE('+cColL+rowIdx+')<=VALUE('+buyColL+rowIdx+'), "買い目標到達", "監視中"), "監視中")';
     }
     sheet.appendRow(newRow);
@@ -501,7 +501,7 @@ function doPost(e) {
   return ContentService.createTextOutput("not found");
 }
 ```""")
-                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbxGbwij8O01FujK_N8id_YFNRldbp6GnafohaRmzbDiyJK8JJLdY8NOaqVDmB3tp-wG/exec")
+                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbVl8GFev2nnVB9IigegBdJpZo7nA9i4gpGLFb13ykAA920h59KOK4zejbUzvxBSVWf/exec")
                         if st.button("🚀 Webhook経由でスプレッドシートを更新！"):
                             if webhook_url:
                                 with st.spinner("スプレッドシートへ送信中..."):
@@ -588,7 +588,7 @@ batch_update_method = st.radio("一括処理の方法を選択", ["Google Apps S
 
 if batch_update_method == "Google Apps Script (Webhook) を使う":
     st.info("※ この機能を使用するには、GASのコードが**「削除 (delete) アクション」対応版（上の単独更新欄に表示されている最新コード）**である必要があります。念の為、現在の単独更新欄にあるGASコードを再コピーして再度デプロイしなおすことを推奨します。")
-    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbxGbwij8O01FujK_N8id_YFNRldbp6GnafohaRmzbDiyJK8JJLdY8NOaqVDmB3tp-wG/exec")
+    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbVl8GFev2nnVB9IigegBdJpZo7nA9i4gpGLFb13ykAA920h59KOK4zejbUzvxBSVWf/exec")
     
     if st.button("🚀 ウェブ上の全銘柄を一括実行！"):
         if not batch_webhook_url:
@@ -777,7 +777,7 @@ st.subheader("🤖 リアルタイム監視 ＆ 新規スクリーニング (全
 st.markdown("監視中の全銘柄の現在価格と出来高をチェックし、**利確または損切りに達した銘柄を全自動で削除＆勝率集計**します。\nさらに、削除されて枠が空いた分だけ、指定条件（PBR1〜2倍、時価総額500億〜2000億、直近10%下落等）に合致する銘柄を**自動で探し出し、独自計算式と色分けを設定してスプレッドシートに追加**します。")
 
 st.info("※ この機能は「GAS (Webhook)」を利用します。上の新しいコード例をGASにデプロイしてURLを入力してください。")
-live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbxGbwij8O01FujK_N8id_YFNRldbp6GnafohaRmzbDiyJK8JJLdY8NOaqVDmB3tp-wG/exec")
+live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbVl8GFev2nnVB9IigegBdJpZo7nA9i4gpGLFb13ykAA920h59KOK4zejbUzvxBSVWf/exec")
 
 if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行"):
     if not live_webhook_url or not live_webhook_url.startswith("http"):
@@ -1039,6 +1039,10 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                                 mc_oku = c_mc / 1_0000_0000
                                 ai_text = f"【大型主力/資金流入期待】時価総額{mc_oku:,.0f}億円の主力株。テクニカル反発（勝率{best_win_rate:.0f}%）が意識されやすい。"
                             
+                            # SNS・ホームページ用テキストの生成
+                            x_text = f"コード【{s_code}】\n現在値: {current_price:.0f}円\n目安の拾い場は{int(best_params['Buy'])}円付近\n過去勝率: {best_win_rate:.0f}%\n"
+                            hp_draft = f"【本日の厳選AI分析】\nコード: {s_code}\n株価: {current_price:.0f}円\nAI考察: {ai_text}\n買い目標: {int(best_params['Buy'])}円\n利確目標: {int(best_params['TakeProfit'])}円\n損切り: {int(best_params['StopLoss'])}円"
+
                             payload = {
                                 "action": "add_new",
                                 "code": str(s_code),
@@ -1047,7 +1051,10 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                                 "ai_color": ai_color,
                                 "buy": int(best_params['Buy']),
                                 "tp": int(best_params['TakeProfit']),
-                                "sl": int(best_params['StopLoss'])
+                                "sl": int(best_params['StopLoss']),
+                                "x_post_text": x_text,
+                                "hp_text": hp_draft,
+                                "sns_done": True # 手動追加でも一旦完了扱い
                             }
                             res = requests.post(live_webhook_url, json=payload)
                             if res.status_code == 200:
