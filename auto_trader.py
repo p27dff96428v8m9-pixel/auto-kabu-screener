@@ -37,11 +37,11 @@ if not WEBHOOK_URL:
     logging.error("WEBHOOK_URL が設定されていません。終了します。")
     sys.exit(1)
 
-def post_to_twitter(base_text):
+def post_to_twitter(base_text, link_url=None):
     """Geminiで文章を推敲し、Xに自動投稿する関数"""
     if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET]):
         logging.info("Twitterアカウントの環境変数が設定されていないため、ポストをスキップします。")
-        return
+        return base_text
         
     final_text = base_text
     
@@ -63,7 +63,7 @@ def post_to_twitter(base_text):
                 "AI考察\n"
                 "テクニカル的にかなりの売られ過ぎ水準。\n\n"
                 "拾い場、損切、利確が知りたい方はこちらへ\n"
-                "(noteのリンクを貼る予定地)\n\n"
+                "(ホームページのリンクはこちら)\n\n"
                 "※投資は自己責任で。 #日本株 #デイトレ\n\n"
                 f"【元のテキスト】\n{base_text}"
             )
@@ -77,7 +77,14 @@ def post_to_twitter(base_text):
         except Exception as e:
             logging.error(f"Gemini APIでのテキスト生成に失敗: {e}")
             
-    # 2. X (Twitter) への送信処理
+    # 2. リンクの流し込み
+    if link_url:
+        final_text = final_text.replace("(ホームページのリンクはこちら)", link_url)
+    elif "(ホームページのリンクはこちら)" in final_text:
+        # リンクがない場合はリンク行を削除
+        final_text = final_text.replace("(ホームページのリンクはこちら)", "").strip()
+
+    # 3. X (Twitter) への送信処理
     try:
         t_client = tweepy.Client(
             consumer_key=TWITTER_API_KEY,
@@ -89,24 +96,26 @@ def post_to_twitter(base_text):
         logging.info("Twitterへの自動投稿に成功しました！")
     except Exception as e:
         logging.error(f"Twitterへの自動投稿に失敗: {e}")
+        
+    return final_text
 
-def post_to_wordpress(title, note_draft):
+def post_to_wordpress(title, hp_draft):
     """WordPressのXML-RPCを使って記事を自動投稿(有料部分をcodoc化)する関数"""
     if not all([WP_URL, WP_USERNAME, WP_APP_PASSWORD]):
         logging.info("WordPressの環境変数が設定されていないため、投稿をスキップします。")
         return None
         
-    # note_draft の中身をcodocショートコードで囲む
+    # hp_draft の中身をcodocショートコードで囲む
     split_keyword = "👇ここから先は有料エリアとなります"
-    if split_keyword in note_draft:
-        parts = note_draft.split(split_keyword, 1)
+    if split_keyword in hp_draft:
+        parts = hp_draft.split(split_keyword, 1)
         public_text = parts[0].strip()
         premium_text = split_keyword + "\n" + parts[1].strip()
         # [codoc]ショートコードで囲む
         content = f"{public_text}\n\n[codoc]\n{premium_text}\n[/codoc]"
         content = content.replace("\n", "<br>")
     else:
-        content = note_draft.replace("\n", "<br>")
+        content = hp_draft.replace("\n", "<br>")
         
     import xmlrpc.client
     
@@ -198,7 +207,7 @@ def check_portfolio_status():
         c_buy = col_idx.get('買い目標', -1)
         c_tp = col_idx.get('利確目標', -1)
         c_sl = col_idx.get('損切り', -1)
-        
+        # GAS example: else if(colName.indexOf('SNS配信済') >= 0) newRow[j] = data.sns_done || false;
         if c_code == -1: return
         
         removed_count = 0
@@ -419,7 +428,7 @@ def auto_screen_and_add():
                 f"過去勝率: {best_win_rate:.0f}%\n"
             )
             
-            note_draft = (
+            hp_draft = (
                 f"【本日の厳選ピックアップ銘柄】\n"
                 f"銘柄コード: {s_code}\n"
                 f"現在の株価: {current_price:.0f}円\n\n"
@@ -436,26 +445,36 @@ def auto_screen_and_add():
                 f"※本記事は過去データに基づく統計的分析です。投資は自己責任でお願いいたします。"
             )
             
-            # note用記事のAIによる推敲（よりリッチに・自然に）
+            # ホームページ用記事のAIによる推敲（よりリッチに・自然に）
             if genai and GEMINI_API_KEY:
                 try:
-                    client_note = genai.Client(api_key=GEMINI_API_KEY)
-                    prompt_note = (
-                        "以下の草案を元に、noteの有料部分（300円）として購読者が満足できるような、"
+                    client_hp = genai.Client(api_key=GEMINI_API_KEY)
+                    prompt_hp = (
+                        "以下の草案を元に、ホームページの有料コンテンツとして購読者が満足できるような、"
                         "丁寧でプロ風の分析記事テキストに推敲してください。"
                         "絵文字などを適格に使い、見出しを含めて読みやすいレイアウトにしてください。\n"
                         "※具体的な「買い場」「利確」「損切」の数値や「勝率」は絶対にそのまま残してください。\n\n"
-                        f"【草案】\n{note_draft}"
+                        f"【草案】\n{hp_draft}"
                     )
-                    res_note = client_note.models.generate_content(
+                    res_hp = client_hp.models.generate_content(
                         model='gemini-2.5-flash',
-                        contents=prompt_note
+                        contents=prompt_hp
                     )
-                    if res_note.text:
-                        note_draft = res_note.text.strip()
-                        logging.info("Geminiによるnote記事推敲が成功しました。")
+                    if res_hp.text:
+                        hp_draft = res_hp.text.strip()
+                        logging.info("Geminiによるホームページ記事推敲が成功しました。")
                 except Exception as e:
-                    logging.error(f"Gemini APIでのnote記事生成に失敗: {e}")
+                    logging.error(f"Gemini APIでのホームページ記事生成に失敗: {e}")
+            
+            # 100%完全自動モード: WordPressへ記事を自動投稿
+            wp_title = f"【本日の厳選AI分析】{s_code} の買い場と利確ライン（勝率{best_win_rate:.0f}%）"
+            wp_post_url = post_to_wordpress(wp_title, hp_draft)
+            
+            # SNSへの自動投稿（WordPressへのリンクを含む）
+            if wp_post_url:
+                x_text = post_to_twitter(x_text, link_url=wp_post_url)
+            else:
+                x_text = post_to_twitter(x_text)
             
             payload = {
                 "action": "add_new",
@@ -467,7 +486,8 @@ def auto_screen_and_add():
                 "sl": int(best_params['StopLoss']),
                 "current_price": float(current_price),
                 "x_post_text": x_text,
-                "note_text": note_draft
+                "hp_text": hp_draft,
+                "sns_done": True # SNS/Homepage 配信完了
             }
             
             try:
@@ -475,17 +495,6 @@ def auto_screen_and_add():
                 if res.status_code == 200:
                     logging.info(f"成功: {s_code} を追加しました (勝率: {best_win_rate:.1f}%)")
                     added_count += 1
-                    
-                    # 100%完全自動モード: WordPressへ記事を自動投稿
-                    # ※WP設定が済んでいなければスキップされるだけです
-                    wp_title = f"【本日の厳選AI分析】{s_code} の買い場と利確ライン（勝率{best_win_rate:.0f}%）"
-                    wp_post_url = post_to_wordpress(wp_title, note_draft)
-                    
-                    # ユーザーの要望により、一時的にTwitter自動投稿を停止中（テスト期間）
-                    # 下記は将来再開したい時、note用からWP用リンクに書き換えたものです
-                    # if wp_post_url:
-                    #     x_text = x_text.replace("(noteのリンクを貼る予定地)", wp_post_url)
-                    # post_to_twitter(x_text)
                     
             except Exception as e:
                 logging.error(f"スプレッドシートへの通信エラー ({s_code}): {e}")
