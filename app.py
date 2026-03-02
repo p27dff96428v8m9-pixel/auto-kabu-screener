@@ -501,7 +501,7 @@ function doPost(e) {
   return ContentService.createTextOutput("not found");
 }
 ```""")
-                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbVl8GFev2nnVB9IigegBdJpZo7nA9i4gpGLFb13ykAA920h59KOK4zejbUzvxBSVWf/exec")
+                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbzHQtchQJDuFdYVJbmagluXJ-uqS7-lgAD72G4reSaMnrySknlE466nxFspWisXM8xh/exec")
                         if st.button("🚀 Webhook経由でスプレッドシートを更新！"):
                             if webhook_url:
                                 with st.spinner("スプレッドシートへ送信中..."):
@@ -588,7 +588,7 @@ batch_update_method = st.radio("一括処理の方法を選択", ["Google Apps S
 
 if batch_update_method == "Google Apps Script (Webhook) を使う":
     st.info("※ この機能を使用するには、GASのコードが**「削除 (delete) アクション」対応版（上の単独更新欄に表示されている最新コード）**である必要があります。念の為、現在の単独更新欄にあるGASコードを再コピーして再度デプロイしなおすことを推奨します。")
-    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbVl8GFev2nnVB9IigegBdJpZo7nA9i4gpGLFb13ykAA920h59KOK4zejbUzvxBSVWf/exec")
+    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbzHQtchQJDuFdYVJbmagluXJ-uqS7-lgAD72G4reSaMnrySknlE466nxFspWisXM8xh/exec")
     
     if st.button("🚀 ウェブ上の全銘柄を一括実行！"):
         if not batch_webhook_url:
@@ -777,7 +777,7 @@ st.subheader("🤖 リアルタイム監視 ＆ 新規スクリーニング (全
 st.markdown("監視中の全銘柄の現在価格と出来高をチェックし、**利確または損切りに達した銘柄を全自動で削除＆勝率集計**します。\nさらに、削除されて枠が空いた分だけ、指定条件（PBR1〜2倍、時価総額500億〜2000億、直近10%下落等）に合致する銘柄を**自動で探し出し、独自計算式と色分けを設定してスプレッドシートに追加**します。")
 
 st.info("※ この機能は「GAS (Webhook)」を利用します。上の新しいコード例をGASにデプロイしてURLを入力してください。")
-live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbVl8GFev2nnVB9IigegBdJpZo7nA9i4gpGLFb13ykAA920h59KOK4zejbUzvxBSVWf/exec")
+live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbzHQtchQJDuFdYVJbmagluXJ-uqS7-lgAD72G4reSaMnrySknlE466nxFspWisXM8xh/exec")
 
 if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行"):
     if not live_webhook_url or not live_webhook_url.startswith("http"):
