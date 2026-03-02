@@ -5,12 +5,12 @@ import numpy as np
 import plotly.graph_objects as go
 from datetime import timedelta
 import time
+import requests
+import json
+import os
 
 st.set_page_config(page_title="FX 勝率特化ダッシュボード", layout="wide", page_icon="📈")
 
-# ==========================================
-# 究極の高勝率ロジック (RSI極値 + ボリンジャーバンド2.5σ)
-# ==========================================
 def calculate_indicators(df):
     if len(df) < 30:
         df['RSI'] = 50
@@ -46,6 +46,57 @@ def calculate_indicators(df):
     df['Strong_Sell'] = (df['High'] >= df['UpperBB']) & (df['RSI'] > 75)
     
     return df
+
+# ==========================================
+# AI決定モード (Gemini 2.5 Flash 分析)
+# ==========================================
+def get_ai_prediction(df, ticker_name, api_key):
+    if not api_key:
+        return "neutral", "APIキーが入力されていません。"
+    
+    # 指定されたGemini 2.5 FlashのURL
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    
+    # 直近30足のデータを要約
+    recent_df = df.tail(30).copy()
+    data_summary = recent_df[['Open', 'High', 'Low', 'Close', 'RSI']].to_string()
+    
+    prompt = f"""
+    あなたは凄腕のプロFXトレーダーです。以下の過去データを分析し、
+    今の瞬間の「買い」「売り」「待機(中立)」をプロの視点で決定してください。
+    
+    通貨ペア: {ticker_name}
+    時間足: 4時間足
+    直近のデータ:
+    {data_summary}
+    
+    【ルール】
+    1. 結果を JSON形式で出力してください。
+    2. キーは "decision" (buy/sell/neutral) と "reason" (日本語の解説) にしてください。
+    3. 勝率に自信がない場合は "neutral" を選んでください。
+    """
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'})
+        response.raise_for_status()
+        res_data = response.json()
+        
+        # レスポンスからテキスト部分を取り出す
+        text_content = res_data['candidates'][0]['content']['parts'][0]['text']
+        res_json = json.loads(text_content)
+        
+        return res_json.get("decision", "neutral"), res_json.get("reason", "分析失敗")
+    except Exception as e:
+        return "neutral", f"AI分析エラー: {e}"
 
 # ==========================================
 # 全通貨ペア一括シグナル判定 (高速版)
@@ -265,6 +316,17 @@ selected_name = list(CURRENCY_PAIRS.keys())[radio_options.index(selected_display
 st.session_state.selected_pair = selected_name
 ticker = CURRENCY_PAIRS[selected_name]
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("🤖 AI決定モード")
+use_ai = st.sidebar.toggle("AI分析を有効にする")
+gemini_key = ""
+if use_ai:
+    # 既存のシークレット等から取得を試みる
+    default_key = os.environ.get("GEMINI_API_KEY", "")
+    gemini_key = st.sidebar.text_input("Gemini API Key", type="password", value=default_key)
+    if not gemini_key:
+        st.sidebar.warning("分析にはAPIキーが必要です。")
+
 # 期間と足の設定（4時間足で固定）
 period = "60d" 
 interval = "4h"
@@ -331,6 +393,28 @@ else:
                                  text=["⬇️ 売り"] * len(bear_signs_idx), textposition="top center",
                                  textfont=dict(color="#ff0000", size=15, weight='bold'),
                                  name='売りサイン'))
+                                 
+    # AI判断のプロット
+    ai_decision = "neutral"
+    ai_reason = ""
+    if use_ai and gemini_key:
+        if st.sidebar.button("🤖 AIに今すぐ判断を仰ぐ"):
+            with st.spinner("Gemini 2.5 Flash が相場を分析中..."):
+                ai_decision, ai_reason = get_ai_prediction(df, selected_name, gemini_key)
+                st.session_state.ai_decision = ai_decision
+                st.session_state.ai_reason = ai_reason
+        
+        ai_decision = st.session_state.get('ai_decision', 'neutral')
+        ai_reason = st.session_state.get('ai_reason', 'サイドバーのボタンを押して分析を開始してください。')
+        
+        if ai_decision != "neutral":
+            color = "#00ff00" if ai_decision == "buy" else "#ff3333"
+            symbol = "star"
+            fig.add_trace(go.Scatter(x=[df.index[-1]], y=[current_price], mode='markers+text',
+                                     marker=dict(symbol=symbol, size=25, color=color, line=dict(color="white", width=2)),
+                                     text=[f"AI: {ai_decision.upper()}"] , textposition="top center",
+                                     textfont=dict(color=color, size=16, weight='bold'),
+                                     name='AI判定'))
                                  
     # 勝敗のプロット
     win_x = [rt[1] for rt in outcomes_record if 'win' in rt[0]]
@@ -451,3 +535,13 @@ else:
             st.warning("⚠️ **【売り準備アラート】**: \nRSIが買われすぎ水準に近づいています。バンドの上限にタッチしたら売りの準備をしてください。")
         else:
             st.info("☆☆☆☆☆ **【完全様子見】**: \n現在は価格が通常レンジ内で推移しています。確実な勝率を叩き出すため、極値に達するまで一切手を出さずに待機してください。勝率を落とす最大の原因は『待てないこと』です。")
+            
+    if use_ai:
+        st.markdown("---")
+        st.subheader("🤖 Gemini 2.5 Flash AI分析レポート")
+        if ai_decision == "buy":
+            st.success(f"🚀 **AI判定: 買い (BUY)**\n\n{ai_reason}")
+        elif ai_decision == "sell":
+            st.error(f"💥 **AI判定: 売り (SELL)**\n\n{ai_reason}")
+        else:
+            st.info(f"⏸ **AI判定: 様子見 (NEUTRAL)**\n\n{ai_reason}")
