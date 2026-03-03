@@ -400,8 +400,7 @@ function doPost(e) {
         nameColIdx = j + 1;
       }
       else if(colName.indexOf('現在値') >= 0) newRow[j] = '=ROUND(VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'YMlKec fxKbKc\\']"),1), "[^0-9.]", "")))';
-      else if(colStr.indexOf('出来高') >= 0 && colName.indexOf('出来高急増') < 0) newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
-      else if(colName.indexOf('出来高急増') >= 0) newRow[j] = false;
+      else if(colStr.indexOf('出来高') >= 0) newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/"&'+codeLetter+rowIdx+'&":TYO","//div[@class=\\'P6K39c\\']"),5),"K",""),"M",""),".","")*10, 0)';
       else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=ROUND(('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/('+buyColL+rowIdx+'-'+slColL+rowIdx+'), 1)'; rrColIdx = j + 1; }
       else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=ROUND(('+rrColL+rowIdx+') * (0.1 / (('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/'+buyColL+rowIdx+')), 1)'; scoreColIdx = j + 1; }
       else if(colName.indexOf('買い目標') >= 0) newRow[j] = Math.round(data.buy);
@@ -501,7 +500,7 @@ function doPost(e) {
   return ContentService.createTextOutput("not found");
 }
 ```""")
-                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbzHQtchQJDuFdYVJbmagluXJ-uqS7-lgAD72G4reSaMnrySknlE466nxFspWisXM8xh/exec")
+                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbxBdKQUe9PUYkh9U7B8b4xmioblp4F2BQv59vI8zlXVeIGX9dtk10RFdhWZOzUxxQEm/exec")
                         if st.button("🚀 Webhook経由でスプレッドシートを更新！"):
                             if webhook_url:
                                 with st.spinner("スプレッドシートへ送信中..."):
@@ -588,7 +587,7 @@ batch_update_method = st.radio("一括処理の方法を選択", ["Google Apps S
 
 if batch_update_method == "Google Apps Script (Webhook) を使う":
     st.info("※ この機能を使用するには、GASのコードが**「削除 (delete) アクション」対応版（上の単独更新欄に表示されている最新コード）**である必要があります。念の為、現在の単独更新欄にあるGASコードを再コピーして再度デプロイしなおすことを推奨します。")
-    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbzHQtchQJDuFdYVJbmagluXJ-uqS7-lgAD72G4reSaMnrySknlE466nxFspWisXM8xh/exec")
+    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbxBdKQUe9PUYkh9U7B8b4xmioblp4F2BQv59vI8zlXVeIGX9dtk10RFdhWZOzUxxQEm/exec")
     
     if st.button("🚀 ウェブ上の全銘柄を一括実行！"):
         if not batch_webhook_url:
@@ -777,7 +776,7 @@ st.subheader("🤖 リアルタイム監視 ＆ 新規スクリーニング (全
 st.markdown("監視中の全銘柄の現在価格と出来高をチェックし、**利確または損切りに達した銘柄を全自動で削除＆勝率集計**します。\nさらに、削除されて枠が空いた分だけ、指定条件（PBR1〜2倍、時価総額500億〜2000億、直近10%下落等）に合致する銘柄を**自動で探し出し、独自計算式と色分けを設定してスプレッドシートに追加**します。")
 
 st.info("※ この機能は「GAS (Webhook)」を利用します。上の新しいコード例をGASにデプロイしてURLを入力してください。")
-live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbzHQtchQJDuFdYVJbmagluXJ-uqS7-lgAD72G4reSaMnrySknlE466nxFspWisXM8xh/exec")
+live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbxBdKQUe9PUYkh9U7B8b4xmioblp4F2BQv59vI8zlXVeIGX9dtk10RFdhWZOzUxxQEm/exec")
 
 if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行"):
     if not live_webhook_url or not live_webhook_url.startswith("http"):
@@ -983,7 +982,14 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                         c_mc = cand['mc']
                         
                         
-                        st.write(f"🔄 **{s_code}** (25日乖離: {cand.get('deviation', 0):.1f}%, RSI: {cand.get('rsi', 0):.1f}) の勝率を極限まで高めています...")
+                        # 銘柄名を取得
+                        try:
+                            t_obj = yf.Ticker(f"{s_code}.T")
+                            ticker_name = t_obj.info.get('shortName') or t_obj.info.get('longName') or s_code
+                        except:
+                            ticker_name = s_code
+                            
+                        st.write(f"🔄 **{ticker_name} ({s_code})** (25日乖離: {cand.get('deviation', 0):.1f}%, RSI: {cand.get('rsi', 0):.1f}) の勝率を極限まで高めています...")
                         
                         # 勝率を限界まで高める2年分バックテスト
                         hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
@@ -1040,8 +1046,28 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                                 ai_text = f"【大型主力/資金流入期待】時価総額{mc_oku:,.0f}億円の主力株。テクニカル反発（勝率{best_win_rate:.0f}%）が意識されやすい。"
                             
                             # SNS・ホームページ用テキストの生成
-                            x_text = f"コード【{s_code}】\n現在値: {current_price:.0f}円\n目安の拾い場は{int(best_params['Buy'])}円付近\n過去勝率: {best_win_rate:.0f}%\n"
-                            hp_draft = f"【本日の厳選AI分析】\nコード: {s_code}\n株価: {current_price:.0f}円\nAI考察: {ai_text}\n買い目標: {int(best_params['Buy'])}円\n利確目標: {int(best_params['TakeProfit'])}円\n損切り: {int(best_params['StopLoss'])}円"
+                            x_text = f"銘柄名: {ticker_name} コード: {s_code} 現在値: {int(current_price)}円 目安: {int(best_params['Buy'])}円 勝率: {best_win_rate:.0f}%"
+                            hp_draft = f"【本日の厳選AI分析】\n銘柄名: {ticker_name}\nコード: {s_code}\n株価: {current_price:.0f}円\nAI考察: {ai_text}\n買い目標: {int(best_params['Buy'])}円\n利確目標: {int(best_params['TakeProfit'])}円\n損切り: {int(best_params['StopLoss'])}円"
+
+                            # WordPress投稿（ホームページ追加）
+                            import xmlrpc.client
+                            try:
+                                wp_url = os.environ.get("WP_URL")
+                                wp_user = os.environ.get("WP_USERNAME")
+                                wp_pw = os.environ.get("WP_APP_PASSWORD")
+                                
+                                if wp_url and wp_user and wp_pw:
+                                    xmlrpc_url = f"{wp_url}/xmlrpc.php"
+                                    server = xmlrpc.client.ServerProxy(xmlrpc_url)
+                                    content_struct = {
+                                        'post_title': f"【本日の厳選銘柄】{ticker_name} ({s_code})",
+                                        'post_content': hp_draft.replace("\n", "<br>"),
+                                        'post_status': 'publish'
+                                    }
+                                    server.wp.newPost(1, wp_user, wp_pw, content_struct)
+                                    st.write(f"  └ ✅ ホームページ（WordPress）に記事を投稿しました。")
+                            except:
+                                pass
 
                             payload = {
                                 "action": "add_new",
@@ -1054,7 +1080,10 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                                 "sl": int(best_params['StopLoss']),
                                 "x_post_text": x_text,
                                 "hp_text": hp_draft,
-                                "sns_done": True # 手動追加でも一旦完了扱い
+                                "sns_done": True, # 手動追加でも一旦完了扱い
+                                "sheet_sns": "SNS配信済",
+                                "sheet_x": "X配信テキスト",
+                                "sheet_hp": "ホームページへの自動記載"
                             }
                             res = requests.post(live_webhook_url, json=payload)
                             if res.status_code == 200:
