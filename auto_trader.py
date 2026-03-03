@@ -7,6 +7,7 @@ import logging
 import os
 import tweepy
 from datetime import datetime
+import sys
 
 try:
     from google import genai
@@ -50,18 +51,17 @@ def post_to_twitter(base_text, link_url=None):
         try:
             client = genai.Client(api_key=GEMINI_API_KEY)
             prompt = (
-                "以下の【元のテキスト】を元に、Twitter(X)のツイート文面を作成してください。\n"
-                "絶対に以下の【希望のフォーマット】を崩さないようにしつつ、「〇〇商事」の部分を、"
-                "与えられた銘柄コードから正しい日本の企業名（短縮名・馴染みのある名前）に書き換えてください。\n"
+                "絶対に以下の【希望のフォーマット】を崩さないようにしつつ、記事の内容を元に、"
+                "正しい日本の企業名や株価などを抽出して、{{NAME}} などのプレースホルダーを書き換えてください。\n"
                 "※Twitterの140文字（全角）制限に必ず収まるように、文字数を極力節約しつつ、指定の改行（空行）をキープしてください。\n\n"
                 "【希望のフォーマット】\n"
                 "【資金が少ないけど投資したい】\n"
                 "【どの株を買うか迷っている】\n"
                 "そんな方へ✨AI厳選の\n"
                 "【本日の10万円以内で買える株】を紹介！\n\n"
-                "銘柄名: 〇〇商事 (1234) 現在値: 50,000円 AI勝率: 80%💡\n"
+                "銘柄名: {{NAME}} ({{CODE}}) 現在値: {{PRICE}}円 AI勝率: {{WINRATE}}%💡\n"
                 "AI考察\n"
-                "テクニカル的にかなりの売られ過ぎ水準。\n\n"
+                "{{ANALYSIS}}\n\n"
                 "拾い場、損切、利確が知りたい方はこちらへ\n"
                 "(ホームページのリンクはこちら)\n\n"
                 "※投資は自己責任で。 #日本株 #デイトレ\n\n"
@@ -207,7 +207,7 @@ def check_portfolio_status():
         c_buy = col_idx.get('買い目標', -1)
         c_tp = col_idx.get('利確目標', -1)
         c_sl = col_idx.get('損切り', -1)
-        # GAS example: else if(colName.indexOf('SNS配信済') >= 0) newRow[j] = data.sns_done || false;
+        
         if c_code == -1: return
         
         removed_count = 0
@@ -220,38 +220,28 @@ def check_portfolio_status():
             code = str(row[c_code]).strip()
             if not code or code == 'None': continue
             
-            # 各値を取得 (カンマが含まれている場合の対策)
+            # 各値を取得
             try:
                 buy_val = float(str(row[c_buy]).replace(',', '').strip()) if c_buy != -1 and str(row[c_buy]).strip() else None
                 tp_val = float(str(row[c_tp]).replace(',', '').strip()) if c_tp != -1 and str(row[c_tp]).strip() else None
                 sl_val = float(str(row[c_sl]).replace(',', '').strip()) if c_sl != -1 and str(row[c_sl]).strip() else None
             except ValueError:
-                continue # 数値に変換できない値が入っている行はスキップ
+                continue
             
             # 株価データを取得して判定
             try:
                 hist = yf.Ticker(f"{code}.T").history(period="1mo")
                 if hist.empty: continue
                 
-                last_close = float(hist['Close'].iloc[-1])
                 last_high = float(hist['High'].iloc[-1])
                 last_low = float(hist['Low'].iloc[-1])
-                
-                # エントリー判定用に過去1ヶ月の安値を参照
                 hist_low = float(hist['Low'].min())
-                
-                vol_surge = False
-                if len(hist) >= 5:
-                    avg_vol = hist['Volume'].iloc[:-1].mean()
-                    if hist['Volume'].iloc[-1] > avg_vol * 3:
-                        vol_surge = True
                 
                 entered_flag = False
                 if buy_val and hist_low <= buy_val:
                     entered_flag = True
                 
                 action = None
-                # その日の高値が利確を達成、または安値が損切を下回った場合
                 if tp_val and last_high >= tp_val:
                     action = "hit_tp" if entered_flag else "delete"
                 elif sl_val and last_low <= sl_val:
@@ -262,9 +252,13 @@ def check_portfolio_status():
                     requests.post(WEBHOOK_URL, json=req_p)
                     removed_count += 1
                     logging.info(f"{code}: {action} により削除しました")
-                elif vol_surge:
-                    req_p = {"action": "update", "code": str(code), "volume_surge": True, "buy": buy_val, "tp": tp_val, "sl": sl_val}
-                    requests.post(WEBHOOK_URL, json=req_p)
+                else:
+                    # 出来高急増チェック
+                    if len(hist) >= 5:
+                        avg_vol = hist['Volume'].iloc[:-1].mean()
+                        if hist['Volume'].iloc[-1] > avg_vol * 3:
+                            req_p = {"action": "update", "code": str(code), "volume_surge": True}
+                            requests.post(WEBHOOK_URL, json=req_p)
             except Exception as e:
                 logging.error(f"{code} のチェック中エラー: {e}")
                 
@@ -276,26 +270,19 @@ def auto_screen_and_add():
     """全自動スクリーニングと有望銘柄の追加"""
     logging.info("--- 全自動スクリーニングと有望銘柄の追加開始 ---")
     
-    # 日経225やTOPIXの主要銘柄のティッカーリスト（サンプルとして200銘柄程度を想定）
-    # 実際は日本の代表的なコードをリストアップします。
-    # APIの負荷を下げるため、ランダムに50銘柄程度を抽出してテスト
-    # ここでは1300番台〜9900番台の一部をサンプリングします。
     import random
     all_codes = [str(c) for c in range(1300, 9999)]
-    target_codes = random.sample(all_codes, 600) # デイトレ仕様のため少し多めに
+    target_codes = random.sample(all_codes, 600)
     
     ticker_str = " ".join([f"{c}.T" for c in target_codes])
-    # 25日移動平均やRSI算出のため3ヶ月取得
     data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True)
     
     candidates = []
-    
     for code in target_codes:
         t_code = f"{code}.T"
         if not hasattr(data.columns, 'levels') or t_code not in data.columns.levels[0]: continue
-        
         df = data[t_code]
-        if df.empty or len(df) < 30: continue # 25日計算のため余裕を持たせる
+        if df.empty or len(df) < 30: continue
         
         try:
             current_price = float(df['Close'].iloc[-1])
@@ -307,174 +294,70 @@ def auto_screen_and_add():
             loss = -delta.clip(upper=0).rolling(window=14).mean()
             rs = gain / loss
             rsi = 100 - (100 / (1 + rs)).iloc[-1]
-            
             deviation = (current_price - sma25) / sma25 * 100
             
-            # 3-6銘柄発見を目指し、さらに条件を緩めます
             if deviation <= 5 and rsi <= 65:
                 ticker_obj = yf.Ticker(t_code)
                 info = ticker_obj.info
                 pbr = info.get('priceToBook', 0)
-                dividend = info.get('dividendYield', 0)
                 mc = info.get('marketCap', 0)
-                forward_pe = info.get('forwardPE', 0)
-                trailing_eps = info.get('trailingEps', 0)
-                
-                if pbr is not None and mc is not None:
-                    is_day_trade = (deviation <= 0 and rsi <= 55)
-                    is_swing_value = (pbr <= 1.2 and (dividend is not None and dividend >= 0.02))
-                    
-                    if is_day_trade or is_swing_value or (deviation <= -3 and forward_pe > 0):
-                        if (10_000_000_000 <= mc <= 3_000_000_000_000) and (0.1 <= pbr <= 6.0):
-                            candidates.append({
-                                "code": code,
-                                "pbr": pbr,
-                                "dividend": dividend,
-                                "drop_pct": abs(deviation),
-                                "deviation": deviation,
-                                "rsi": rsi,
-                                "current_price": current_price,
-                                "mc": mc
-                            })
-        except Exception:
-            continue
+                if pbr is not None and mc is not None and (10_000_000_000 <= mc <= 3_000_000_000_000):
+                    candidates.append({
+                        "code": code, "pbr": pbr, "deviation": deviation, "rsi": rsi, "current_price": current_price, "mc": mc,
+                        "dividend": info.get('dividendYield', 0)
+                    })
+        except: continue
             
-    # 乖離が激しい（マイナスに大きい）順に並び替え
-    candidates = sorted(candidates, key=lambda x: x['drop_pct'], reverse=True)
-    logging.info(f"一次スクリーニングで {len(candidates)} 銘柄を発見")
-    
+    candidates = sorted(candidates, key=lambda x: abs(x['deviation']), reverse=True)
     added_count = 0
-    needed_count = 1 # 毎日1銘柄のみ厳選追加
+    needed_count = 1 
     
-    # 既存の配信済み銘柄を取得（重複排除）
     try:
         res = requests.post(WEBHOOK_URL, json={"action": "get_all"})
-        existing_data = res.json()
-        # 1列目(インデックス0)がコードだと仮定
-        existing_codes = [str(row[0]).replace(' ', '') for row in existing_data if len(row) > 0]
-    except Exception as e:
-        logging.warning(f"既存銘柄の取得に失敗: {e}")
-        existing_codes = []
+        existing_codes = [str(row[0]).replace(' ', '') for row in res.json() if len(row) > 0]
+    except: existing_codes = []
             
     for cand in candidates:
-        if added_count >= needed_count:
-            break
-            
+        if added_count >= needed_count: break
         s_code = cand['code']
-        if str(s_code) in existing_codes:
-            continue
+        if str(s_code) in existing_codes: continue
             
-        pbr = cand['pbr']
-        drop_pct = cand['drop_pct']
-        c_div = cand['dividend']
-        c_mc = cand['mc']
-        current_price = cand['current_price']
-        
-        # 過去2年分の詳しいデータを取得してバックテスト
         hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
         if hist_2y.empty: continue
         
+        current_price = cand['current_price']
         best_params = None
         best_win_rate = -1
-        best_profit = -999999
         
-        for buy_pct in [0, 1, 2, 3]: # デイトレ最適化: 買い目標を浅く（0〜3%下）設定
+        for buy_pct in [0, 1, 2, 3]:
             sim_buy = current_price * (1 - buy_pct/100)
-            for tp_pct in range(2, 22, 2): # 利確目標を細かく (2%〜20%)
+            for tp_pct in range(2, 22, 2):
                 sim_tp = sim_buy * (1 + tp_pct/100)
                 if sim_tp <= current_price * 1.01: continue
-                
-                for sl_pct in range(2, 16, 2): # 損切りライン (2%〜14%)
+                for sl_pct in range(2, 16, 2):
                     sim_sl = sim_buy * (1 - sl_pct/100)
-                    t_trades, w_rate, e_val, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
-                    
-                    if t_trades >= 2:
-                        if w_rate > best_win_rate or (w_rate == best_win_rate and e_val > best_profit):
-                            best_win_rate = w_rate
-                            best_profit = e_val
-                            best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
+                    t_trades, w_rate, _, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
+                    if t_trades >= 2 and w_rate > best_win_rate:
+                        best_win_rate = w_rate
+                        best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
                             
-        if best_params is not None and best_win_rate >= 55: # 勝率基準をさらに緩和
-            # AI分析風テキスト
-            deviation = cand.get('deviation', 0)
-            rsi = cand.get('rsi', 0)
-
-            import random
-            ai_texts = [
-                f"【急反発狙い】25日線乖離 {deviation:.1f}%、現在RSI {rsi:.1f}。過去データ勝率{best_win_rate:.0f}%の強いサポート水準。",
-                f"【リバウンド妙味】RSIが{rsi:.1f}まで低下。過去2年で勝率{best_win_rate:.0f}%を誇る反発期待ライン。",
-                f"【押し目買い推奨】直近の売り超過（乖離{deviation:.1f}%）。統計的勝率{best_win_rate:.0f}%の優位なポイント。"
-            ]
-            ai_color = "orange"
-            ai_text = random.choice(ai_texts)
-            
-            if pbr > 0 and pbr <= 1.5:
-                ai_color = "yellow"
-                ai_text = f"【割安/バリュー】PBR {pbr:.2f}倍と割安水準。RSI {rsi:.1f}で底入れ感。過去勝率{best_win_rate:.0f}%。"
-            elif c_div is not None and c_div >= 0.03:
-                ai_color = "green"
-                ai_text = f"【高配当/下支え】配当利回り{c_div*100:.1f}%の安心感。異常乖離{deviation:.1f}%からのリバウンド（勝率{best_win_rate:.0f}%）に期待。"
-            elif c_mc > 100_000_000_000:
-                ai_color = "blue"
-                mc_oku = c_mc / 1_0000_0000
-                ai_text = f"【大型主力/資金流入期待】時価総額{mc_oku:,.0f}億円の主力株。テクニカル反発（勝率{best_win_rate:.0f}%）が意識されやすい。"
+        if best_params is not None and best_win_rate >= 55:
+            # 銘柄名を取得
+            try:
+                ticker_obj = yf.Ticker(f"{s_code}.T")
+                ticker_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
+            except:
+                ticker_name = s_code
                 
-            x_text = (
-                f"コード【{s_code}】\n"
-                f"現在値: {current_price:.0f}円\n"
-                f"目安の拾い場は{int(best_params['Buy'])}円付近\n"
-                f"損切は{int(best_params['StopLoss'])}円\n"
-                f"利確は{int(best_params['TakeProfit'])}円\n"
-                f"過去勝率: {best_win_rate:.0f}%\n"
-            )
+            ai_text = f"【AI判定】過去勝率{best_win_rate:.0f}%。テクニカル反発期待。"
+            ai_color = "orange"
             
-            hp_draft = (
-                f"【本日の厳選ピックアップ銘柄】\n"
-                f"銘柄コード: {s_code}\n"
-                f"現在の株価: {current_price:.0f}円\n\n"
-                f"👇ここから先は有料エリアとなります（テクニカル分析とトレード戦略）👇\n"
-                f"==============================\n"
-                f"【テクニカル分析】\n"
-                f"25日移動平均線からの乖離率: {deviation:.1f}%\n"
-                f"RSI: {rsi:.1f}\n"
-                f"AI考察: {ai_text}\n\n"
-                f"【具体的なトレード戦略（過去勝率{best_win_rate:.0f}%）】\n"
-                f"✅ エントリー目安（買い場）: {int(best_params['Buy'])}円付近\n"
-                f"🎯 利確目標: {int(best_params['TakeProfit'])}円\n"
-                f"🛡️ 損切りライン: {int(best_params['StopLoss'])}円\n\n"
-                f"※本記事は過去データに基づく統計的分析です。投資は自己責任でお願いいたします。"
-            )
+            x_text = f"銘柄名: {ticker_name} コード: {s_code} 現在値: {int(current_price)}円 目安: {int(best_params['Buy'])}円 勝率: {best_win_rate:.0f}%"
+            hp_draft = f"【本日の厳選AI分析】\n銘柄名: {ticker_name}\nコード: {s_code}\n株価: {int(current_price)}円\nAI考察: {ai_text}\n買い目標: {int(best_params['Buy'])}円\n利確目標: {int(best_params['TakeProfit'])}円\n損切り: {int(best_params['StopLoss'])}円"
             
-            # ホームページ用記事のAIによる推敲（よりリッチに・自然に）
-            if genai and GEMINI_API_KEY:
-                try:
-                    client_hp = genai.Client(api_key=GEMINI_API_KEY)
-                    prompt_hp = (
-                        "以下の草案を元に、ホームページの有料コンテンツとして購読者が満足できるような、"
-                        "丁寧でプロ風の分析記事テキストに推敲してください。"
-                        "絵文字などを適格に使い、見出しを含めて読みやすいレイアウトにしてください。\n"
-                        "※具体的な「買い場」「利確」「損切」の数値や「勝率」は絶対にそのまま残してください。\n\n"
-                        f"【草案】\n{hp_draft}"
-                    )
-                    res_hp = client_hp.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt_hp
-                    )
-                    if res_hp.text:
-                        hp_draft = res_hp.text.strip()
-                        logging.info("Geminiによるホームページ記事推敲が成功しました。")
-                except Exception as e:
-                    logging.error(f"Gemini APIでのホームページ記事生成に失敗: {e}")
-            
-            # 100%完全自動モード: WordPressへ記事を自動投稿
-            wp_title = f"【本日の厳選AI分析】{s_code} の買い場と利確ライン（勝率{best_win_rate:.0f}%）"
-            wp_post_url = post_to_wordpress(wp_title, hp_draft)
-            
-            # SNSへの自動投稿（WordPressへのリンクを含む）
-            if wp_post_url:
-                x_text = post_to_twitter(x_text, link_url=wp_post_url)
-            else:
-                x_text = post_to_twitter(x_text)
+            wp_post_url = post_to_wordpress(f"【厳選AI分析】{ticker_name} ({s_code})", hp_draft)
+            if wp_post_url: x_text = post_to_twitter(x_text, link_url=wp_post_url)
+            else: x_text = post_to_twitter(x_text)
             
             payload = {
                 "action": "add_new",
@@ -487,28 +370,24 @@ def auto_screen_and_add():
                 "current_price": float(current_price),
                 "x_post_text": x_text,
                 "hp_text": hp_draft,
-                "sns_done": True # SNS/Homepage 配信完了
+                "sns_done": True,
+                "sheet_sns": "SNS配信済",
+                "sheet_x": "X配信テキスト",
+                "sheet_hp": "ホームページへの自動記載"
             }
-            
             try:
                 res = requests.post(WEBHOOK_URL, json=payload)
                 if res.status_code == 200:
-                    logging.info(f"成功: {s_code} を追加しました (勝率: {best_win_rate:.1f}%)")
+                    logging.info(f"成功: {s_code} を追加し新シートに振り分けました")
                     added_count += 1
-                    
             except Exception as e:
-                logging.error(f"スプレッドシートへの通信エラー ({s_code}): {e}")
+                logging.error(f"エラー ({s_code}): {e}")
                 
-    logging.info(f"--- 全自動スクリーニング完了 ({added_count} 銘柄追加) ---")
-    
-    # 最後に更新ログを書き込む
+    logging.info(f"完了 ({added_count} 銘柄)")
     try:
-        from datetime import timezone, timedelta
-        jst = timezone(timedelta(hours=+9), 'JST')
-        now_str = datetime.now(jst).strftime("%Y/%m/%d %H:%M")
-        requests.post(WEBHOOK_URL, json={"action": "log_time", "time": now_str, "count": added_count})
-    except Exception:
-        pass
+        jst_now = datetime.now().strftime("%Y/%m/%d %H:%M")
+        requests.post(WEBHOOK_URL, json={"action": "log_time", "time": jst_now, "count": added_count})
+    except: pass
 
 if __name__ == "__main__":
     check_portfolio_status()
