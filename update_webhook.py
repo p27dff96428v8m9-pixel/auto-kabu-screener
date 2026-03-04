@@ -29,7 +29,7 @@ else:
         pass
 
 # 2. GitHub Actionsの開発裏側システム (Secrets) のURLを上書きする
-TOKEN = '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'
+TOKEN = os.environ.get('GITHUB_TOKEN')
 REPO_NAME = 'auto-kabu-screener'
 GITHUB_API = 'https://api.github.com'
 HEADERS = {
