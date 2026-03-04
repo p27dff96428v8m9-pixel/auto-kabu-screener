@@ -52,10 +52,11 @@ def get_ai_prediction_cached(data_summary, ticker_name, api_key):
     
     【分析のルール】
     1. **安定性重視**: 1〜2本のローソク足の動きで判断をコロコロ変えないでください。
-    2. **トレンド把握**: 直近100本のデータから、現在の大きな「流れ（上昇・下落・レンジ）」を特定してください。
-    3. **エントリー基準**: 明確なトレンドの方向、または強力なレジサポ転換を考慮し、プロとして必ず「buy（買い）」または「sell（売り）」のいずれかを選択してください。
-    4. **絶対ルール**: 「様子見（neutral）」は禁止です。データから最も可能性が高い方向を必ず断定してください。
-    5. **解説**: 日本語で、なぜその判断に至ったか論理的に詳しく説明してください。
+    2. **ターゲットの明示**: エントリーした場合の「具体的な利確ターゲット価格」と「損切り価格」を現在の価格水準を考慮して算出してください。
+    3. **トレンド把握**: 直近100本のデータから、現在の大きな「流れ（上昇・下落・レンジ）」を特定してください。
+    4. **エントリー基準**: 明確なトレンドの方向、または強力なレジサポ転換を考慮し、プロとして必ず「buy（買い）」または「sell（売り）」のいずれかを選択してください。
+    5. **絶対ルール**: 「様子見（neutral）」は禁止です。データから最も可能性が高い方向を必ず断定してください。
+    6. **解説**: 日本語で、なぜその判断に至ったか、なぜそのターゲット価格にしたのかを論理的に詳しく説明してください。
     
     通貨ペア: {ticker_name}
     現在の足: 4時間足
@@ -66,6 +67,8 @@ def get_ai_prediction_cached(data_summary, ticker_name, api_key):
     必ず以下のJSON形式でのみ回答してください。
     {{
       "decision": "buy" | "sell",
+      "target_price": 0.0000,
+      "stop_loss": 0.0000,
       "reason": "詳細な解説"
     }}
     """
@@ -85,9 +88,19 @@ def get_ai_prediction_cached(data_summary, ticker_name, api_key):
         res_data = response.json()
         text_content = res_data['candidates'][0]['content']['parts'][0]['text']
         res_json = json.loads(text_content)
-        return res_json.get("decision", "buy"), res_json.get("reason", "分析失敗")
+        return {
+            "decision": res_json.get("decision", "buy"),
+            "target": res_json.get("target_price", 0),
+            "stop": res_json.get("stop_loss", 0),
+            "reason": res_json.get("reason", "分析失敗")
+        }
     except Exception as e:
-        return "buy", f"AI分析エラー: {e} (注: モデル名 'gemini-2.5-flash' が有効か確認してください)"
+        return {
+            "decision": "buy",
+            "target": 0,
+            "stop": 0,
+            "reason": f"AI分析エラー: {e}"
+        }
 
 def get_ai_prediction(df, ticker_name, api_key):
     if not api_key:
@@ -163,8 +176,12 @@ st.sidebar.markdown("---")
 all_signals = check_all_pair_signals(CURRENCY_PAIRS)
 st.sidebar.markdown("---")
 
-# ラジオボタンの選択肢（安定のため、名前のみをリストにする）
+# ラジオボタンの選択肢
 radio_options = list(CURRENCY_PAIRS.keys())
+
+# ブラウザのリロード対策: クエリパラメータから取得
+if "p" in st.query_params and st.query_params["p"] in radio_options:
+    st.session_state.selected_pair = st.query_params["p"]
 
 selected_idx = 0
 current_p = st.session_state.get('selected_pair', radio_options[0])
@@ -173,6 +190,11 @@ if current_p in radio_options:
 
 # AIの状態をリセットするコールバック関数
 def reset_ai_state():
+    # ウィジェットのキーから選択された値を取得
+    new_val = st.session_state.currency_selector_fixed
+    st.session_state.selected_pair = new_val
+    st.query_params["p"] = new_val # URLに保存
+    
     st.session_state.ai_decision = "neutral"
     st.session_state.ai_reason = "通貨ペアが変更されました。AI分析を自動的に開始します..."
 
@@ -220,12 +242,19 @@ interval = "4h"
 # メイン画面
 # ==========================================
 st.title(f"🤖 {selected_name} - AI完全特化 分析ダッシュボード")
-st.markdown("従来の鉄板ロジックをAIが吸収・進化。Gemini 2.0 Flashが、チャートの全データを多角的に分析し、次の一手を断定します。")
+st.markdown("従来の鉄板ロジックをAIが吸収・進化。Gemini 2.5 Flashが、チャートの全データを多角的に分析し、次の一手を断定します。")
+
+# ==========================================
+# データ取得 (キャッシュ付き)
+# ==========================================
+@st.cache_data(ttl=3600)  # 1時間はデータを保持
+def get_data_cached(ticker, period, interval):
+    t = yf.Ticker(ticker)
+    return t.history(period=period, interval=interval)
 
 # データの取得（キャッシュを活用してAPI負荷を軽減）
 with st.spinner(f"{selected_name}のデータを取得中..."):
-    t = yf.Ticker(ticker)
-    df = t.history(period=period, interval=interval)
+    df = get_data_cached(ticker, period, interval)
     
 if df.empty:
     st.error("データを取得できませんでした。休場時間、あるいはティッカーが無効の可能性があります。")
@@ -271,12 +300,16 @@ else:
                 st.cache_data.clear()
             
             with st.spinner("Gemini 2.5 Flash が相場を分析中..."):
-                ai_decision, ai_reason = get_ai_prediction(df, selected_name, gemini_key)
-                st.session_state.ai_decision = ai_decision
-                st.session_state.ai_reason = ai_reason
+                ai_data = get_ai_prediction(df, selected_name, gemini_key)
+                st.session_state.ai_decision = ai_data["decision"]
+                st.session_state.ai_reason = ai_data["reason"]
+                st.session_state.ai_target = ai_data["target"]
+                st.session_state.ai_stop = ai_data["stop"]
         
         ai_decision = st.session_state.get('ai_decision', 'neutral')
         ai_reason = st.session_state.get('ai_reason', 'サイドバーのボタンを押して分析を開始してください。')
+        ai_target = st.session_state.get('ai_target', 0)
+        ai_stop = st.session_state.get('ai_stop', 0)
         
         if ai_decision != "neutral":
             color = "#00ff00" if ai_decision == "buy" else "#ff3333"
@@ -286,6 +319,14 @@ else:
                                      text=[f"AI: {ai_decision.upper()}"] , textposition="top center",
                                      textfont=dict(color=color, size=16, weight='bold'),
                                      name='AI判定'))
+            
+            # ターゲットと損切りの水平線
+            if ai_target > 0:
+                fig.add_hline(y=ai_target, line_dash="dot", line_color="#00ff00", 
+                              annotation_text=f"AI Target: {ai_target:.4f}", annotation_position="bottom right")
+            if ai_stop > 0:
+                fig.add_hline(y=ai_stop, line_dash="dot", line_color="#ff3333", 
+                              annotation_text=f"AI Stop: {ai_stop:.4f}", annotation_position="top right")
                                  
     # 勝敗のプロット
     win_x = [rt[1] for rt in outcomes_record if 'win' in rt[0]]
@@ -365,10 +406,20 @@ else:
     if use_ai:
         st.markdown("---")
         st.subheader("🤖 Gemini 2.5 Flash AI分析レポート")
-        if ai_decision == "buy":
-            st.success(f"🚀 **AI判定: 買い (BUY)**\n\n{ai_reason}")
-        else:
-            st.error(f"💥 **AI判定: 売り (SELL)**\n\n{ai_reason}")
+        
+        col_res1, col_res2 = st.columns([1, 1])
+        with col_res1:
+            if ai_decision == "buy":
+                st.success(f"🚀 **AI判定: 買い (BUY)**")
+                st.metric("🎯 利確ターゲット", f"{ai_target:.4f}")
+                st.metric("🛡️ 損切り目安", f"{ai_stop:.4f}", delta=f"{ai_stop - current_price:.4f}", delta_color="inverse")
+            else:
+                st.error(f"💥 **AI判定: 売り (SELL)**")
+                st.metric("🎯 利確ターゲット", f"{ai_target:.4f}")
+                st.metric("🛡️ 損切り目安", f"{ai_stop:.4f}", delta=f"{ai_stop - current_price:.4f}")
+        
+        with col_res2:
+            st.markdown(f"**【分析根拠】**\n\n{ai_reason}")
 
     # ==========================================
     # 分析パネル
