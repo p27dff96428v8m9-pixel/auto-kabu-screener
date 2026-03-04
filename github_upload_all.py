@@ -1,8 +1,13 @@
 import os
 import requests
 import base64
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
-TOKEN = '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'
+TOKEN = os.environ.get('GITHUB_TOKEN')
 REPO_NAME = 'auto-kabu-screener'
 GITHUB_API = 'https://api.github.com'
 HEADERS = {
