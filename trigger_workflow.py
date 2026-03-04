@@ -1,6 +1,7 @@
 import requests
 
-TOKEN = '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'
+import os
+TOKEN = os.environ.get('GITHUB_TOKEN')
 REPO_NAME = 'auto-kabu-screener'
 GITHUB_API = 'https://api.github.com'
 HEADERS = {
