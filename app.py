@@ -349,7 +349,7 @@ function doPost(e) {
   }
   
   var codeIdx = 0;
-  var buyColL = 'D', tpColL = 'E', slColL = 'F', rrColL = 'J', scoreColL = 'K', cColL = 'C';
+  var buyColL = 'D', tpColL = 'E', slColL = 'F', rrColL = 'J', scoreColL = 'K', cColL = 'C', aiColL = 'I';
   for (var j = 0; j < h.length; j++) {
     var colN = String(h[j]).replace(/[\u200b\s]/g, '');
     if (colN.indexOf('コード') >= 0) codeIdx = j;
@@ -359,6 +359,7 @@ function doPost(e) {
     else if (String(h[j]).indexOf('リスクリワード') >= 0) rrColL = getColLetter(j);
     else if (String(h[j]).indexOf('投資効率スコア') >= 0) scoreColL = getColLetter(j);
     else if (colN.indexOf('現在値') >= 0) cColL = getColLetter(j);
+    else if (colN.indexOf('AI分析') >= 0) aiColL = getColLetter(j);
   }
   var codeLetter = getColLetter(codeIdx);
   
@@ -404,8 +405,8 @@ function doPost(e) {
       else if(colStr.indexOf('リスクリワード') >= 0) { newRow[j] = '=ROUND(('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/('+buyColL+rowIdx+'-'+slColL+rowIdx+'), 1)'; rrColIdx = j + 1; }
       else if(colStr.indexOf('投資効率スコア') >= 0) { newRow[j] = '=ROUND(('+rrColL+rowIdx+') * (0.1 / (('+tpColL+rowIdx+'-'+buyColL+rowIdx+')/'+buyColL+rowIdx+')), 1)'; scoreColIdx = j + 1; }
       else if(colName.indexOf('買い目標') >= 0) newRow[j] = Math.round(data.buy);
-      else if(colName.indexOf('利確目標') >= 0) newRow[j] = Math.round(data.tp);
-      else if(colName.indexOf('損切り') >= 0) newRow[j] = Math.round(data.sl);
+      else if(colName.indexOf('利確目標') >= 0) newRow[j] = '=IF(OR(COUNTIF('+aiColL+rowIdx+',"*成長*"),COUNTIF('+aiColL+rowIdx+',"*リバウンド*")), '+cColL+rowIdx+'*1.15, '+cColL+rowIdx+'*1.1)';
+      else if(colName.indexOf('損切り') >= 0) newRow[j] = '=IF(OR(COUNTIF('+aiColL+rowIdx+',"*成長*"),COUNTIF('+aiColL+rowIdx+',"*リバウンド*")), '+cColL+rowIdx+'*0.9, '+cColL+rowIdx+'*0.95)';
       else if(colStr.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName.indexOf('X配信テキスト') >= 0) newRow[j] = data.x_post_text || '';
       else if(colStr.indexOf('ホームページ') >= 0 || colName.indexOf('ホームページへの自動記載') >= 0) newRow[j] = data.hp_text || '';
@@ -443,31 +444,6 @@ function doPost(e) {
   
   for (var i = 1; i < values.length; i++) {
     if (String(values[i][codeIdx]).replace(/[\\s]/g, '') == String(data.code).replace(/[\\s]/g, '')) {
-      if (data.action === "hit_tp" || data.action === "hit_sl") {
-        var colName = (data.action === "hit_tp") ? '🏆 利確回数' : '🩸 損切回数';
-        var bgCol = (data.action === "hit_tp") ? '#d9ead3' : '#f4cccc';
-        var fontCol = (data.action === "hit_tp") ? '#274e13' : '#a61c00';
-        var existingCol = -1;
-        for (var c=0; c<h.length; c++) {
-          if (String(h[c]).indexOf(colName.replace(/[🏆🩸\\s]/g,'')) >= 0) { existingCol = c; break; }
-        }
-        
-        var targetCol = (existingCol < 0) ? h.length + 1 : existingCol + 1;
-        
-        var headerRange = sheet.getRange(1, targetCol);
-        headerRange.setValue(colName);
-        headerRange.setBackground(bgCol);
-        headerRange.setFontWeight('bold');
-        headerRange.setHorizontalAlignment('center');
-        
-        var valRange = sheet.getRange(2, targetCol);
-        var curVal = Number(valRange.getValue()) || 0;
-        valRange.setValue(curVal + 1);
-        valRange.setFontSize(28).setFontWeight('bold').setHorizontalAlignment('center').setFontColor(fontCol);
-        
-        sheet.deleteRow(i + 1);
-        return ContentService.createTextOutput(data.action);
-      }
       if (data.action === "delete") {
         sheet.deleteRow(i + 1);
         return ContentService.createTextOutput("deleted");
@@ -500,7 +476,7 @@ function doPost(e) {
   return ContentService.createTextOutput("not found");
 }
 ```""")
-                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbxBdKQUe9PUYkh9U7B8b4xmioblp4F2BQv59vI8zlXVeIGX9dtk10RFdhWZOzUxxQEm/exec")
+                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbx7Yyd6hCBBEpMzS0petOLaJ3D9cZKYp_MrcUbZ2vfq7mCZ8Pr2RUkqPQT_6EFgplI5/exec")
                         if st.button("🚀 Webhook経由でスプレッドシートを更新！"):
                             if webhook_url:
                                 with st.spinner("スプレッドシートへ送信中..."):
@@ -587,7 +563,7 @@ batch_update_method = st.radio("一括処理の方法を選択", ["Google Apps S
 
 if batch_update_method == "Google Apps Script (Webhook) を使う":
     st.info("※ この機能を使用するには、GASのコードが**「削除 (delete) アクション」対応版（上の単独更新欄に表示されている最新コード）**である必要があります。念の為、現在の単独更新欄にあるGASコードを再コピーして再度デプロイしなおすことを推奨します。")
-    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbxBdKQUe9PUYkh9U7B8b4xmioblp4F2BQv59vI8zlXVeIGX9dtk10RFdhWZOzUxxQEm/exec")
+    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbgoNtmZX8E6ac2D8tXhV5T_qWJZIJBMPyqomLS6H3ISqQ-oCWnaHkJOCoC8nXTG2Ud/exec")
     
     if st.button("🚀 ウェブ上の全銘柄を一括実行！"):
         if not batch_webhook_url:
@@ -773,10 +749,10 @@ else:
 # ======= 8. リアルタイム監視＆スクリーニング追加 =======
 st.divider()
 st.subheader("🤖 リアルタイム監視 ＆ 新規スクリーニング (全自動売買管理)")
-st.markdown("監視中の全銘柄の現在価格と出来高をチェックし、**利確または損切りに達した銘柄を全自動で削除＆勝率集計**します。\nさらに、削除されて枠が空いた分だけ、指定条件（PBR1〜2倍、時価総額500億〜2000億、直近10%下落等）に合致する銘柄を**自動で探し出し、独自計算式と色分けを設定してスプレッドシートに追加**します。")
+st.markdown("監視中の全銘柄の現在価格をチェックし、**買い目標から大幅に乖離した銘柄（上方に+15% または 下方に-10%）を自動で削除**します。\n銘柄が削除されて枠が空いた分（最大50銘柄）だけ、新しい有望銘柄を自動で探し出し、スプレッドシートに追加します。")
 
 st.info("※ この機能は「GAS (Webhook)」を利用します。上の新しいコード例をGASにデプロイしてURLを入力してください。")
-live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbxBdKQUe9PUYkh9U7B8b4xmioblp4F2BQv59vI8zlXVeIGX9dtk10RFdhWZOzUxxQEm/exec")
+live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbgoNtmZX8E6ac2D8tXhV5T_qWJZIJBMPyqomLS6H3ISqQ-oCWnaHkJOCoC8nXTG2Ud/exec")
 
 if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行"):
     if not live_webhook_url or not live_webhook_url.startswith("http"):
@@ -819,27 +795,17 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                             vol_surge = True
                     
                     action = None
-                    entered_flag = False
-                    if buy_val and hist_low <= buy_val:
-                        entered_flag = True # 過去1ヶ月の間に一度でも買い目標以下になったか（＝指値が刺さったか）
-                        
-                    if tp_val and last_close >= tp_val:
-                        if entered_flag:
-                            action = "hit_tp"
-                            st.write(f"🎯 **{code}**: 利確目標 ({tp_val}円) に到達しました！ -> 利確カウント＆削除")
-                        else:
+                    if buy_val:
+                        dev_pct = (last_close - buy_val) / buy_val * 100
+                        if dev_pct > 15:
                             action = "delete"
-                            st.write(f"🗑️ **{code}**: 買い目標({buy_val}円)に届かずに利確目標({tp_val}円)へ到達しました。未エントリーのためノーカウントで監視削除します。")
-                    elif sl_val and last_close <= sl_val:
-                        if entered_flag:
-                            action = "hit_sl"
-                            st.write(f"🩸 **{code}**: 損切ライン ({sl_val}円) に到達しました... -> 損切カウント＆削除")
-                        else:
+                            st.write(f"🗑️ **{code}**: 価格が上昇し、買い目標を大幅に上回ったため（乖離 +{dev_pct:.1f}%）、監視を終了します。")
+                        elif dev_pct < -10:
                             action = "delete"
-                            st.write(f"🗑️ **{code}**: 買い目標に届かずに損切ラインへ到達しました。未エントリーのためノーカウントで監視削除します。")
+                            st.write(f"🗑️ **{code}**: 買い目標を大幅に下抜け、損切りラインを超えたため（乖離 {dev_pct:.1f}%）、削除します。")
                     
-                    if action:
-                        payload = {"action": action, "code": str(code)}
+                    if action == "delete":
+                        payload = {"action": "delete", "code": str(code)}
                         res = requests.post(live_webhook_url, json=payload)
                         if res.status_code == 200:
                             removed_count += 1
