@@ -20,7 +20,8 @@ files_to_upload = [
     'app.py', 'auto_trader.py', 'fx_dashboard.py', 'requirements.txt',
     'price_action_analyzer.py', 'register_keys.py', 'trigger_workflow.py',
     'update_webhook.py', 'start_dashboard.bat', 'test_webhook.py',
-    'check_sheets.py', 'github_upload_all.py'
+    'check_sheets.py', 'github_upload_all.py',
+    '.github/workflows/daily_screener.yml'
 ]
 
 for file_path in files_to_upload:
