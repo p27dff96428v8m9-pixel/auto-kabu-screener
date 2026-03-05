@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI株分析 - 10万円以内で始める日本株投資</title>
+    <meta name="description" content="AIが毎日厳選した10万円以内で買える日本株の分析レポート。テクニカル指標とバックテストに基づく有望銘柄を無料で紹介。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2332;
+            --bg-card-hover: #1f2b3d;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: #1e293b;
+            --gradient-1: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --gradient-2: linear-gradient(135deg, #06b6d4, #10b981);
+            --gradient-hero: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-hero);
+            padding: 80px 20px 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .hero-content { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; }
+
+        .hero-badge {
+            display: inline-block;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--accent-blue);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .hero h1 {
+            font-size: clamp(28px, 5vw, 48px);
+            font-weight: 900;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+            line-height: 1.3;
+        }
+
+        .hero p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .hero-stat {
+            text-align: center;
+        }
+
+        .hero-stat-value {
+            font-size: 28px;
+            font-weight: 900;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Container */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .icon {
+            font-size: 28px;
+        }
+
+        /* Post Card */
+        .post-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .post-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--gradient-1);
+        }
+
+        .post-card:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .post-date {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .post-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.4;
+        }
+
+        .post-meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .tag-price {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .tag-winrate {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .tag-code {
+            background: rgba(139, 92, 246, 0.15);
+            color: var(--accent-purple);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .post-content {
+            color: var(--text-secondary);
+            font-size: 15px;
+            white-space: pre-wrap;
+            line-height: 1.9;
+        }
+
+        .post-content h2, .post-content h3 {
+            color: var(--text-primary);
+            margin: 20px 0 10px;
+        }
+
+        /* Data Table */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .data-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .data-item-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-item-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .data-item-value.green { color: var(--accent-green); }
+        .data-item-value.blue { color: var(--accent-blue); }
+        .data-item-value.amber { color: var(--accent-amber); }
+        .data-item-value.red { color: var(--accent-red); }
+
+        /* No post */
+        .no-post {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .no-post .icon { font-size: 48px; margin-bottom: 16px; }
+
+        /* Disclaimer */
+        .disclaimer {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-top: 40px;
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+
+        .disclaimer-title {
+            color: var(--accent-amber);
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .hero { padding: 60px 16px 40px; }
+            .hero-stats { gap: 24px; }
+            .post-card { padding: 20px; }
+            .data-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .post-card { animation: fadeIn 0.5s ease-out; }
+    </style>
+</head>
+<body>
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">🤖 AI Powered Stock Analysis</div>
+            <h1>10万円以内で始める<br>AI厳選 日本株レポート</h1>
+            <p>毎日市場クローズ後、AIがテクニカル指標とバックテストで有望銘柄を自動分析。10万円以内で投資できる銘柄のみを厳選してお届けします。</p>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-value">¥100,000</div>
+                    <div class="hero-stat-label">投資上限</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value" id="total-posts">-</div>
+                    <div class="hero-stat-label">累計レポート数</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">毎日更新</div>
+                    <div class="hero-stat-label">月〜金 16:15</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="container">
+        <div class="section-title">
+            <span class="icon">📊</span>
+            最新のAI分析レポート
+        </div>
+
+        <div id="posts-container">
+            <div class="no-post">
+                <div class="icon">⏳</div>
+                <p>レポートを読み込んでいます...</p>
+            </div>
+        </div>
+
+        <div class="disclaimer">
+            <div class="disclaimer-title">⚠️ 投資に関する免責事項</div>
+            当サイトの情報はAIによる自動分析であり、投資助言ではありません。
+            掲載された勝率は過去のバックテスト結果に基づくもので、将来の成績を保証するものではありません。
+            投資判断は必ずご自身の責任で行ってください。元本割れのリスクがあります。
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>© 2026 AI株分析 - Powered by Gemini AI & GitHub Actions</p>
+        <p style="margin-top: 8px;">毎日自動更新 | データソース: Yahoo Finance</p>
+    </footer>
+
+    <script>
+    // posts.json からデータを読み込んで表示
+    async function loadPosts() {
+        const container = document.getElementById('posts-container');
+        try {
+            const response = await fetch('posts.json');
+            if (!response.ok) throw new Error('No posts yet');
+            const posts = await response.json();
+
+            document.getElementById('total-posts').textContent = posts.length;
+
+            if (posts.length === 0) {
+                container.innerHTML = `
+                    <div class="no-post">
+                        <div class="icon">📭</div>
+                        <p>まだレポートがありません。次回の自動更新をお待ちください。</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = posts.map(post => `
+                <article class="post-card">
+                    <div class="post-date">📅 ${post.date}</div>
+                    <h2 class="post-title">${post.title}</h2>
+                    <div class="post-meta">
+                        <span class="tag tag-code">📌 ${post.code}</span>
+                        <span class="tag tag-price">💰 ${post.price}円 (100株: ${post.unit_price}円)</span>
+                        <span class="tag tag-winrate">📈 勝率: ${post.win_rate}%</span>
+                    </div>
+                    <div class="data-grid">
+                        <div class="data-item">
+                            <div class="data-item-label">現在値</div>
+                            <div class="data-item-value">${post.price}円</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-item-label">買い目標</div>
+                            <div class="data-item-value green">${post.buy}円</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-item-label">利確目標</div>
+                            <div class="data-item-value blue">${post.tp}円</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-item-label">損切りライン</div>
+                            <div class="data-item-value red">${post.sl}円</div>
+                        </div>
+                    </div>
+                    <div class="post-content">${post.content}</div>
+                </article>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `
+                <div class="no-post">
+                    <div class="icon">📭</div>
+                    <p>まだレポートがありません。次回の自動更新（平日16:15）をお待ちください。</p>
+                </div>`;
+            document.getElementById('total-posts').textContent = '0';
+        }
+    }
+
+    loadPosts();
+    </script>
+</body>
+</html>
