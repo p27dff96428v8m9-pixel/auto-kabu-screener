@@ -29,10 +29,15 @@ TWITTER_API_SECRET = os.environ.get("TWITTER_API_SECRET")
 TWITTER_ACCESS_TOKEN = os.environ.get("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_SECRET = os.environ.get("TWITTER_ACCESS_SECRET")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
 WP_URL = os.environ.get("WP_URL")
 WP_USERNAME = os.environ.get("WP_USERNAME")
 WP_APP_PASSWORD = os.environ.get("WP_APP_PASSWORD")
+
+# GitHub Pages設定
+GITHUB_REPO = "p27dff96428v8m9-pixel/auto-kabu-screener"
+GITHUB_PAGES_URL = f"https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener"
 
 # ==========================================
 # 価格フィルタ設定
@@ -296,6 +301,86 @@ def post_to_wordpress(title, hp_content):
         return None
 
 
+def post_to_github_pages(ticker_name, code, current_price, buy_price, tp_price, sl_price, win_rate, article_content):
+    """GitHub Pagesのposts.jsonに記事を追加する（常に成功する安定した方法）"""
+    if not GITHUB_TOKEN:
+        logging.warning("GITHUB_TOKENが設定されていないため、GitHub Pages投稿をスキップします。")
+        return None
+    
+    import base64
+    
+    headers = {
+        'Authorization': f'token {GITHUB_TOKEN}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    
+    today = datetime.now().strftime("%Y年%m月%d日")
+    today_key = datetime.now().strftime("%Y-%m-%d")
+    
+    # 新しい記事データ
+    new_post = {
+        "date": today,
+        "date_key": today_key,
+        "title": f"{ticker_name}（{code}）",
+        "code": code,
+        "name": ticker_name,
+        "price": int(current_price),
+        "unit_price": f"{int(current_price * 100):,}",
+        "buy": int(buy_price),
+        "tp": int(tp_price),
+        "sl": int(sl_price),
+        "win_rate": f"{win_rate:.0f}",
+        "content": article_content.replace('\n', '<br>')
+    }
+    
+    try:
+        # 1. 既存のposts.jsonを取得
+        file_url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/docs/posts.json'
+        r = requests.get(file_url, headers=headers)
+        
+        if r.status_code == 200:
+            existing_sha = r.json()['sha']
+            existing_content = base64.b64decode(r.json()['content']).decode('utf-8')
+            try:
+                posts = json.loads(existing_content)
+            except:
+                posts = []
+        else:
+            existing_sha = None
+            posts = []
+        
+        # 2. 同じ日付のポストがある場合は置き換え、なければ先頭に追加
+        posts = [p for p in posts if p.get('date_key') != today_key]
+        posts.insert(0, new_post)
+        
+        # 最大30件に制限
+        posts = posts[:30]
+        
+        # 3. posts.jsonをアップロード
+        new_content = json.dumps(posts, ensure_ascii=False, indent=2)
+        encoded = base64.b64encode(new_content.encode('utf-8')).decode('utf-8')
+        
+        payload = {
+            'message': f'Add post: {ticker_name} ({code}) - {today}',
+            'content': encoded
+        }
+        if existing_sha:
+            payload['sha'] = existing_sha
+        
+        r = requests.put(file_url, headers=headers, json=payload)
+        
+        if r.status_code in [200, 201]:
+            page_url = GITHUB_PAGES_URL
+            logging.info(f"GitHub Pages投稿成功！: {page_url}")
+            return page_url
+        else:
+            logging.error(f"GitHub Pages投稿失敗: {r.status_code} {r.text[:200]}")
+            return None
+    except Exception as e:
+        logging.error(f"GitHub Pages投稿エラー: {e}")
+        return None
+
+
 def run_backtest(df, buy_price, tp_price, sl_price):
     """勝率のバックテスト関数"""
     trades = []
@@ -553,16 +638,26 @@ def auto_screen_and_add():
                 dividend=cand.get('dividend')
             )
             
-            # ===== 2. WordPressに投稿 =====
+            # ===== 2. GitHub Pagesに投稿（メイン・常に安定） =====
+            pages_url = post_to_github_pages(
+                ticker_name, s_code, current_price,
+                best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
+                best_win_rate, hp_article
+            )
+            
+            # ===== 2b. WordPress投稿も試行（オプション・サーバーが生きてれば） =====
             wp_title = f"【{datetime.now().strftime('%m/%d')} AI厳選】{ticker_name}（{s_code}）- 10万円以内で始める注目株"
             wp_post_url = post_to_wordpress(wp_title, hp_article)
             
-            if wp_post_url:
-                logging.info(f"WordPress投稿成功: {wp_post_url}")
-            else:
-                logging.warning("WordPress投稿が失敗しました。Twitter投稿はリンクなしで続行します。")
+            # ホームページのリンク: GitHub Pages優先、WordPressはフォールバック
+            homepage_url = pages_url or wp_post_url
             
-            # ===== 3. Twitterに投稿（WP投稿の成否に関係なく必ず実行） =====
+            if homepage_url:
+                logging.info(f"ホームページ投稿成功: {homepage_url}")
+            else:
+                logging.warning("ホームページ投稿がすべて失敗しました。Twitter投稿はリンクなしで続行します。")
+            
+            # ===== 3. Twitterに投稿（HP投稿の成否に関係なく必ず実行） =====
             x_base_text = (
                 f"📈10万円以内で買える注目株✨\n\n"
                 f"{ticker_name}（{s_code}）\n"
@@ -572,7 +667,7 @@ def auto_screen_and_add():
                 f"(リンク)\n\n"
                 f"#日本株 #少額投資 #AI分析"
             )
-            x_text = post_to_twitter(x_base_text, link_url=wp_post_url)
+            x_text = post_to_twitter(x_base_text, link_url=homepage_url)
             
             # ===== 4. スプレッドシートに追加 =====
             payload = {
