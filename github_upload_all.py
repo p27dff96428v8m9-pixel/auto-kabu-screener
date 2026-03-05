@@ -21,7 +21,8 @@ files_to_upload = [
     'price_action_analyzer.py', 'register_keys.py', 'trigger_workflow.py',
     'update_webhook.py', 'start_dashboard.bat', 'test_webhook.py',
     'check_sheets.py', 'github_upload_all.py',
-    '.github/workflows/daily_screener.yml'
+    '.github/workflows/daily_screener.yml',
+    'docs/index.html', 'docs/posts.json'
 ]
 
 for file_path in files_to_upload:
