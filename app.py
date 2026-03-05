@@ -409,8 +409,8 @@ function doPost(e) {
       else if(colName.indexOf('リスクリワード') >= 0) { newRow[j] = '=ROUND((' + tpColL + rowIdx + '-' + buyColL + rowIdx + ')/(' + buyColL + rowIdx + '-' + slColL + rowIdx + '), 1)'; rrColIdx = j + 1; }
       else if(colName.indexOf('投資効率スコア') >= 0) { newRow[j] = '=ROUND((' + rrColL + rowIdx + ') * (0.1 / ((' + tpColL + rowIdx + '-' + buyColL + rowIdx + ')/' + buyColL + rowIdx + ')), 1)'; scoreColIdx = j + 1; }
       else if(colName.indexOf('買い目標') >= 0) newRow[j] = Math.round(data.buy);
-      else if(colName.indexOf('利確目標') >= 0) newRow[j] = '=IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*1.15, ' + buyColL + rowIdx + '*1.1)';
-      else if(colName.indexOf('損切り') >= 0) newRow[j] = '=IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*0.9, ' + buyColL + rowIdx + '*0.95)';
+      else if(colName.indexOf('利確目標') >= 0) newRow[j] = '=ROUND(IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*1.15, ' + buyColL + rowIdx + '*1.1))';
+      else if(colName.indexOf('損切り') >= 0) newRow[j] = '=ROUND(IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*0.9, ' + buyColL + rowIdx + '*0.95))';
       else if(colName.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName.indexOf('X配信テキスト') >= 0) newRow[j] = data.x_post_text || '';
       else if(colName.indexOf('ホームページ') >= 0 || colName.indexOf('ホームページへの自動記載') >= 0) newRow[j] = data.hp_text || '';
@@ -461,14 +461,15 @@ function doPost(e) {
       } else if (data.action === "update" || !data.action) {
         for (var c = 0; c < h.length; c++) {
           var colN = String(h[c]).replace(/[\u200b\s]/g, '');
-          if (colN.indexOf('買い目標') >= 0 && data.buy !== undefined) sheet.getRange(i + 1, c + 1).setValue(data.buy);
-          if (colN.indexOf('利確目標') >= 0 && data.tp !== undefined) sheet.getRange(i + 1, c + 1).setValue(data.tp);
-          if (colN.indexOf('損切り') >= 0 && data.sl !== undefined) sheet.getRange(i + 1, c + 1).setValue(data.sl);
+          if (colN.indexOf('買い目標') >= 0 && data.buy !== undefined) sheet.getRange(i + 1, c + 1).setValue(Math.round(data.buy));
+          if (colN.indexOf('利確目標') >= 0 && data.tp !== undefined) sheet.getRange(i + 1, c + 1).setValue(Math.round(data.tp));
+          if (colN.indexOf('損切り') >= 0 && data.sl !== undefined) sheet.getRange(i + 1, c + 1).setValue(Math.round(data.sl));
         }
         return ContentService.createTextOutput("success");
       }
     }
   }
+
   return ContentService.createTextOutput("not found");
 }
 ```""")
@@ -559,7 +560,7 @@ batch_update_method = st.radio("一括処理の方法を選択", ["Google Apps S
 
 if batch_update_method == "Google Apps Script (Webhook) を使う":
     st.info("※ この機能を使用するには、GASのコードが**「削除 (delete) アクション」対応版（上の単独更新欄に表示されている最新コード）**である必要があります。念の為、現在の単独更新欄にあるGASコードを再コピーして再度デプロイしなおすことを推奨します。")
-    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbgoNtmZX8E6ac2D8tXhV5T_qWJZIJBMPyqomLS6H3ISqQ-oCWnaHkJOCoC8nXTG2Ud/exec")
+    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbwYdaaV1bDj4Is3Z4e0364frK-Xr_4qVbJKG1a25QYTk4D4kIPBsqu443nVF09MWUid/exec")
     
     if st.button("🚀 ウェブ上の全銘柄を一括実行！"):
         if not batch_webhook_url:
@@ -754,7 +755,7 @@ st.subheader("🤖 リアルタイム監視 ＆ 新規スクリーニング (全
 st.markdown("監視中の全銘柄の現在価格をチェックし、**買い目標から大幅に乖離した銘柄（上方に+15% または 下方に-10%）を自動で削除**します。\n銘柄が削除されて枠が空いた分（最大50銘柄）だけ、新しい有望銘柄を自動で探し出し、スプレッドシートに追加します。")
 
 st.info("※ この機能は「GAS (Webhook)」を利用します。上の新しいコード例をGASにデプロイしてURLを入力してください。")
-live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbgoNtmZX8E6ac2D8tXhV5T_qWJZIJBMPyqomLS6H3ISqQ-oCWnaHkJOCoC8nXTG2Ud/exec")
+live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbwYdaaV1bDj4Is3Z4e0364frK-Xr_4qVbJKG1a25QYTk4D4kIPBsqu443nVF09MWUid/exec")
 
 if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行"):
     if not live_webhook_url or not live_webhook_url.startswith("http"):
