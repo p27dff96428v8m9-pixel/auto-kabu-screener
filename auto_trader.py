@@ -34,38 +34,156 @@ WP_URL = os.environ.get("WP_URL")
 WP_USERNAME = os.environ.get("WP_USERNAME")
 WP_APP_PASSWORD = os.environ.get("WP_APP_PASSWORD")
 
+# ==========================================
+# 価格フィルタ設定
+# ==========================================
+MAX_STOCK_PRICE = 1000  # 1株の価格上限（円）。単元株100株で10万円以内 = 1株1000円以内
+
 if not WEBHOOK_URL:
     logging.error("WEBHOOK_URL が設定されていません。終了します。")
     sys.exit(1)
 
+
+def generate_ai_article(ticker_name, code, current_price, buy_price, tp_price, sl_price, win_rate, pbr=None, dividend=None):
+    """Geminiを使って、魅力的なホームページ記事を自動生成する"""
+    if not genai or not GEMINI_API_KEY:
+        # Geminiが使えない場合のフォールバック
+        return generate_fallback_article(ticker_name, code, current_price, buy_price, tp_price, sl_price, win_rate)
+    
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        
+        today = datetime.now().strftime("%Y年%m月%d日")
+        unit_price = int(current_price * 100)  # 100株の概算投資額
+        
+        extra_info = ""
+        if pbr and pbr > 0:
+            extra_info += f"PBR: {pbr:.2f}倍\n"
+        if dividend and dividend > 0:
+            extra_info += f"配当利回り: {dividend*100:.2f}%\n"
+        
+        prompt = f"""あなたは日本株投資の専門ライターです。以下の銘柄データをもとに、
+投資初心者でもわかりやすく、魅力的で読み応えのある記事を書いてください。
+
+【銘柄データ】
+銘柄名: {ticker_name}
+証券コード: {code}
+現在の株価: {int(current_price)}円（100株で約{unit_price:,}円）
+AI算出 買い目標: {int(buy_price)}円
+AI算出 利確目標: {int(tp_price)}円
+AI算出 損切りライン: {int(sl_price)}円
+過去2年の検証勝率: {win_rate:.0f}%
+{extra_info}
+
+【記事構成 - 必ずこの構成で書くこと】
+
+タイトル: 【{today}のAI厳選銘柄】{ticker_name}（{code}）
+
+1. 🔍 なぜこの銘柄が選ばれたのか（3-4文）
+   - 投資金額が10万円以内で始められることを強調
+   - スクリーニング条件（テクニカル指標）に触れる
+
+2. 📊 AIテクニカル分析の結果（箇条書き）
+   - 現在値、買い目標、利確目標、損切りラインを整理
+   - 勝率の解説
+
+3. 💡 投資のポイント（2-3文）
+   - リスクリワード比に触れる
+   - 初心者へのアドバイス
+
+4. ⚠️ リスクと注意点（2文）
+   - 投資は自己責任
+   - 過去の勝率は将来を保証しない
+
+【ルール】
+- 900〜1200文字程度
+- 専門用語は最低限で、わかりやすく
+- 絵文字を適度に使う
+- 最後に「※本記事はAIによる自動分析です。投資判断は自己責任でお願いします。」を必ず入れる
+"""
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        if response.text:
+            logging.info("Geminiによるホームページ記事生成に成功しました。")
+            return response.text.strip()
+    except Exception as e:
+        logging.error(f"Gemini記事生成エラー: {e}")
+    
+    return generate_fallback_article(ticker_name, code, current_price, buy_price, tp_price, sl_price, win_rate)
+
+
+def generate_fallback_article(ticker_name, code, current_price, buy_price, tp_price, sl_price, win_rate):
+    """Geminiが使えない場合のフォールバック記事"""
+    today = datetime.now().strftime("%Y年%m月%d日")
+    unit_price = int(current_price * 100)
+    rr_ratio = (tp_price - buy_price) / (buy_price - sl_price) if (buy_price - sl_price) > 0 else 0
+    
+    return f"""【{today}のAI厳選銘柄】{ticker_name}（{code}）
+
+🔍 銘柄選定理由
+本日のAIスクリーニングにより、{ticker_name}（証券コード: {code}）が有望銘柄として選出されました。
+現在の株価は{int(current_price)}円で、100株でも約{unit_price:,}円と10万円以内で投資を始められる銘柄です。
+テクニカル指標が買いシグナルを示しており、過去データの検証でも高い勝率を記録しています。
+
+📊 AIテクニカル分析の結果
+・現在値: {int(current_price)}円
+・AI算出 買い目標: {int(buy_price)}円
+・AI算出 利確目標: {int(tp_price)}円（+{((tp_price/buy_price - 1)*100):.1f}%）
+・AI算出 損切りライン: {int(sl_price)}円（-{((1 - sl_price/buy_price)*100):.1f}%）
+・過去2年の検証勝率: {win_rate:.0f}%
+・リスクリワード比: {rr_ratio:.1f}:1
+
+💡 投資のポイント
+リスクリワード比が{rr_ratio:.1f}:1と{'良好' if rr_ratio >= 1.5 else '妥当'}な水準です。
+損切りラインを{int(sl_price)}円に設定し、リスク管理を徹底しましょう。
+少額から始められるので、投資初心者の方にもおすすめの銘柄です。
+
+👇ここから先は有料エリアとなります
+
+📈 エントリー戦略の詳細
+買い目標の{int(buy_price)}円付近まで下落した場合にエントリーを検討します。
+利確目標は{int(tp_price)}円で、損切りは{int(sl_price)}円を割り込んだ場合に実行します。
+
+⚠️ リスクと注意点
+投資は元本保証ではなく、損失が生じる可能性があります。
+過去の勝率は将来の成績を保証するものではありません。必ずご自身の判断と責任で投資を行ってください。
+
+※本記事はAIによる自動分析です。投資判断は自己責任でお願いします。"""
+
+
 def post_to_twitter(base_text, link_url=None):
     """Geminiで文章を推敲し、Xに自動投稿する関数"""
     if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET]):
-        logging.info("Twitterアカウントの環境変数が設定されていないため、ポストをスキップします。")
+        logging.warning("Twitterの環境変数が不足しています。スキップします。")
+        logging.warning(f"  API_KEY: {'設定あり' if TWITTER_API_KEY else '未設定'}")
+        logging.warning(f"  API_SECRET: {'設定あり' if TWITTER_API_SECRET else '未設定'}")
+        logging.warning(f"  ACCESS_TOKEN: {'設定あり' if TWITTER_ACCESS_TOKEN else '未設定'}")
+        logging.warning(f"  ACCESS_SECRET: {'設定あり' if TWITTER_ACCESS_SECRET else '未設定'}")
         return base_text
         
     final_text = base_text
     
-    # 1. Geminiによる文章のブラッシュアップ（AI鍵があれば）
+    # 1. Geminiによるツイート文の生成
     if genai and GEMINI_API_KEY:
         try:
             client = genai.Client(api_key=GEMINI_API_KEY)
             prompt = (
-                "絶対に以下の【希望のフォーマット】を崩さないようにしつつ、記事の内容を元に、"
-                "正しい日本の企業名や株価などを抽出して、{{NAME}} などのプレースホルダーを書き換えてください。\n"
-                "※Twitterの140文字（全角）制限に必ず収まるように、文字数を極力節約しつつ、指定の改行（空行）をキープしてください。\n\n"
-                "【希望のフォーマット】\n"
-                "【資金が少ないけど投資したい】\n"
-                "【どの株を買うか迷っている】\n"
-                "そんな方へ✨AI厳選の\n"
-                "【本日の10万円以内で買える株】を紹介！\n\n"
-                "銘柄名: {{NAME}} ({{CODE}}) 現在値: {{PRICE}}円 AI勝率: {{WINRATE}}%💡\n"
-                "AI考察\n"
-                "{{ANALYSIS}}\n\n"
-                "拾い場、損切、利確が知りたい方はこちらへ\n"
-                "(ホームページのリンクはこちら)\n\n"
-                "※投資は自己責任で。 #日本株 #デイトレ\n\n"
-                f"【元のテキスト】\n{base_text}"
+                "以下の株式情報をもとに、X（Twitter）用の投稿文を作成してください。\n"
+                "必ず以下のルールを守ること：\n"
+                "1. 全角140文字以内に収める\n"
+                "2. 絵文字を2〜3個使う\n"
+                "3. 必ず以下の形式を守る\n\n"
+                "【形式】\n"
+                "📈10万円以内で買える注目株✨\n\n"
+                "銘柄名（コード）\n"
+                "現在値: ○○○円\n"
+                "AI分析勝率: ○○%\n\n"
+                "詳しくはブログで👇\n"
+                "(リンク)\n\n"
+                "#日本株 #少額投資 #AI分析\n\n"
+                f"【元の情報】\n{base_text}"
             )
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
@@ -73,16 +191,21 @@ def post_to_twitter(base_text, link_url=None):
             )
             if response.text:
                 final_text = response.text.strip()
-                logging.info("Geminiによる推敲が成功しました。")
+                logging.info("Geminiによるツイート文の推敲が成功しました。")
         except Exception as e:
             logging.error(f"Gemini APIでのテキスト生成に失敗: {e}")
             
-    # 2. リンクの流し込み
+    # 2. リンクの埋め込み
     if link_url:
-        final_text = final_text.replace("(ホームページのリンクはこちら)", link_url)
-    elif "(ホームページのリンクはこちら)" in final_text:
-        # リンクがない場合はリンク行を削除
-        final_text = final_text.replace("(ホームページのリンクはこちら)", "").strip()
+        if "(リンク)" in final_text:
+            final_text = final_text.replace("(リンク)", link_url)
+        elif "(ホームページのリンクはこちら)" in final_text:
+            final_text = final_text.replace("(ホームページのリンクはこちら)", link_url)
+        else:
+            # リンクがテキストにない場合、末尾に追加
+            final_text = final_text.rstrip() + f"\n{link_url}"
+    else:
+        final_text = final_text.replace("(リンク)", "").replace("(ホームページのリンクはこちら)", "").strip()
 
     # 3. X (Twitter) への送信処理
     try:
@@ -93,50 +216,85 @@ def post_to_twitter(base_text, link_url=None):
             access_token_secret=TWITTER_ACCESS_SECRET
         )
         t_client.create_tweet(text=final_text)
-        logging.info("Twitterへの自動投稿に成功しました！")
+        logging.info(f"Twitterへの自動投稿に成功しました！ 文字数: {len(final_text)}")
     except Exception as e:
         logging.error(f"Twitterへの自動投稿に失敗: {e}")
+        # エラー内容を詳しくログ出力
+        if hasattr(e, 'response') and e.response is not None:
+            logging.error(f"  Status: {e.response.status_code}")
+            logging.error(f"  Body: {e.response.text}")
         
     return final_text
 
-def post_to_wordpress(title, hp_draft):
-    """WordPressのXML-RPCを使って記事を自動投稿(有料部分をcodoc化)する関数"""
+
+def post_to_wordpress(title, hp_content):
+    """WordPress REST APIを使って記事を自動投稿する関数
+    (XML-RPCが無効なサーバーでも動作するようREST APIに変更)"""
     if not all([WP_URL, WP_USERNAME, WP_APP_PASSWORD]):
-        logging.info("WordPressの環境変数が設定されていないため、投稿をスキップします。")
+        logging.warning("WordPressの環境変数が不足しています。スキップします。")
+        logging.warning(f"  WP_URL: {'設定あり' if WP_URL else '未設定'}")
+        logging.warning(f"  WP_USERNAME: {'設定あり' if WP_USERNAME else '未設定'}")
+        logging.warning(f"  WP_APP_PASSWORD: {'設定あり' if WP_APP_PASSWORD else '未設定'}")
         return None
-        
-    # hp_draft の中身をcodocショートコードで囲む
+    
+    # 記事の有料エリアをcodocショートコードで囲む
     split_keyword = "👇ここから先は有料エリアとなります"
-    if split_keyword in hp_draft:
-        parts = hp_draft.split(split_keyword, 1)
+    if split_keyword in hp_content:
+        parts = hp_content.split(split_keyword, 1)
         public_text = parts[0].strip()
         premium_text = split_keyword + "\n" + parts[1].strip()
-        # [codoc]ショートコードで囲む
-        content = f"{public_text}\n\n[codoc]\n{premium_text}\n[/codoc]"
-        content = content.replace("\n", "<br>")
+        content_html = public_text.replace("\n", "<br>") + "\n\n[codoc]\n" + premium_text.replace("\n", "<br>") + "\n[/codoc]"
     else:
-        content = hp_draft.replace("\n", "<br>")
-        
-    import xmlrpc.client
+        content_html = hp_content.replace("\n", "<br>")
     
-    # HTTPのまま通信できる旧式のAPI（XML-RPC）を設定
-    xmlrpc_url = f"{WP_URL}/xmlrpc.php"
+    # === 方法1: REST API (推奨) ===
+    rest_url = f"{WP_URL}/wp-json/wp/v2/posts"
     
     try:
+        import base64
+        credentials = base64.b64encode(f"{WP_USERNAME}:{WP_APP_PASSWORD}".encode()).decode()
+        headers = {
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/json"
+        }
+        
+        post_data = {
+            "title": title,
+            "content": content_html,
+            "status": "publish"
+        }
+        
+        response = requests.post(rest_url, json=post_data, headers=headers, timeout=30)
+        
+        if response.status_code in [200, 201]:
+            post_url = response.json().get("link", f"{WP_URL}/?p={response.json().get('id', '')}")
+            logging.info(f"WordPress REST APIで投稿に成功しました！: {post_url}")
+            return post_url
+        else:
+            logging.warning(f"REST API失敗 (status={response.status_code}): {response.text[:200]}")
+            # REST APIが失敗した場合、XML-RPCにフォールバック
+    except Exception as e:
+        logging.warning(f"REST APIエラー: {e}")
+    
+    # === 方法2: XML-RPC (フォールバック) ===
+    try:
+        import xmlrpc.client
+        xmlrpc_url = f"{WP_URL}/xmlrpc.php"
+        
         server = xmlrpc.client.ServerProxy(xmlrpc_url)
         content_struct = {
             'post_title': title,
-            'post_content': content,
+            'post_content': content_html,
             'post_status': 'publish'
         }
-        # wp.newPost (blog_id, username, password, content)
         post_id = server.wp.newPost(1, WP_USERNAME, WP_APP_PASSWORD, content_struct)
         post_url = f"{WP_URL}/?p={post_id}"
-        logging.info(f"WordPressへの自動投稿に成功しました！: {post_url}")
+        logging.info(f"WordPress XML-RPCで投稿に成功しました！: {post_url}")
         return post_url
     except Exception as e:
         logging.error(f"WordPress投稿エラー(XML-RPC): {e}")
         return None
+
 
 def run_backtest(df, buy_price, tp_price, sl_price):
     """勝率のバックテスト関数"""
@@ -175,6 +333,7 @@ def run_backtest(df, buy_price, tp_price, sl_price):
     expected_value = (profit_per_share - loss_per_share) / total_trades if total_trades > 0 else 0
     
     return total_trades, win_rate, expected_value, trades
+
 
 def check_portfolio_status():
     """スプレッドシート上の保有銘柄のデータを取得し、利確・損切・出来高をチェック"""
@@ -252,6 +411,8 @@ def check_portfolio_status():
                     requests.post(WEBHOOK_URL, json=req_p)
                     removed_count += 1
                     logging.info(f"{code}: {action} により削除しました")
+                    # APIへの負荷軽減
+                    time.sleep(1)
                 else:
                     # 出来高急増チェック
                     if len(hist) >= 5:
@@ -266,48 +427,69 @@ def check_portfolio_status():
     except Exception as e:
         logging.error(f"ステータスチェック中に通信エラー: {e}")
 
+
 def auto_screen_and_add():
     """全自動スクリーニングと有望銘柄の追加"""
     logging.info("--- 全自動スクリーニングと有望銘柄の追加開始 ---")
+    logging.info(f"価格フィルタ: 1株 {MAX_STOCK_PRICE}円以下（100株で{MAX_STOCK_PRICE * 100:,}円以内）")
     
     import random
     all_codes = [str(c) for c in range(1300, 9999)]
     target_codes = random.sample(all_codes, 600)
     
-    ticker_str = " ".join([f"{c}.T" for c in target_codes])
-    data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True)
-    
+    # 600銘柄を100銘柄ずつのチャンクに分ける（429エラー対策）
+    chunk_size = 100
     candidates = []
-    for code in target_codes:
-        t_code = f"{code}.T"
-        if not hasattr(data.columns, 'levels') or t_code not in data.columns.levels[0]: continue
-        df = data[t_code]
-        if df.empty or len(df) < 30: continue
+    
+    for i in range(0, len(target_codes), chunk_size):
+        chunk = target_codes[i:i + chunk_size]
+        ticker_str = " ".join([f"{c}.T" for c in chunk])
+        logging.info(f"スクリーニング中: {i} to {i+chunk_size} 銘柄目...")
         
         try:
-            current_price = float(df['Close'].iloc[-1])
-            if current_price < 100: continue
+            data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True, progress=False)
             
-            sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
-            delta = df['Close'].diff()
-            gain = delta.clip(lower=0).rolling(window=14).mean()
-            loss = -delta.clip(upper=0).rolling(window=14).mean()
-            rs = gain / loss
-            rsi = 100 - (100 / (1 + rs)).iloc[-1]
-            deviation = (current_price - sma25) / sma25 * 100
-            
-            if deviation <= 5 and rsi <= 65:
-                ticker_obj = yf.Ticker(t_code)
-                info = ticker_obj.info
-                pbr = info.get('priceToBook', 0)
-                mc = info.get('marketCap', 0)
-                if pbr is not None and mc is not None and (10_000_000_000 <= mc <= 3_000_000_000_000):
-                    candidates.append({
-                        "code": code, "pbr": pbr, "deviation": deviation, "rsi": rsi, "current_price": current_price, "mc": mc,
-                        "dividend": info.get('dividendYield', 0)
-                    })
-        except: continue
-            
+            for code in chunk:
+                t_code = f"{code}.T"
+                if t_code not in data.columns.levels[0]: continue
+                df = data[t_code]
+                if df.empty or len(df) < 30: continue
+                try:
+                    current_price = float(df['Close'].iloc[-1])
+                    
+                    # ===== 価格フィルタ: 10万円以内で100株買える銘柄のみ =====
+                    if current_price < 100:
+                        continue  # 極端に安い銘柄は除外
+                    if current_price > MAX_STOCK_PRICE:
+                        continue  # 1株1000円超 = 100株で10万円超なので除外
+                    # ===============================================
+                    
+                    sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
+                    delta = df['Close'].diff()
+                    gain = delta.clip(lower=0).rolling(window=14).mean()
+                    loss = -delta.clip(upper=0).rolling(window=14).mean()
+                    rs = gain / loss
+                    rsi = 100 - (100 / (1 + rs)).iloc[-1]
+                    deviation = (current_price - sma25) / sma25 * 100
+                    
+                    if deviation <= 5 and rsi <= 65:
+                        ticker_obj = yf.Ticker(t_code)
+                        info = ticker_obj.info
+                        pbr = info.get('priceToBook', 0)
+                        mc = info.get('marketCap', 0)
+                        if pbr is not None and mc is not None and (10_000_000_000 <= mc <= 3_000_000_000_000):
+                            candidates.append({
+                                "code": code, "pbr": pbr, "deviation": deviation, "rsi": rsi, "current_price": current_price, "mc": mc,
+                                "dividend": info.get('dividendYield', 0)
+                            })
+                except: continue
+        except Exception as e:
+            logging.error(f"チャンク取得エラー: {e}")
+        
+        # チャンクごとに少し休憩
+        time.sleep(2)
+    
+    logging.info(f"価格フィルタ通過候補: {len(candidates)} 銘柄（すべて1株{MAX_STOCK_PRICE}円以下）")
     candidates = sorted(candidates, key=lambda x: abs(x['deviation']), reverse=True)
     added_count = 0
     needed_count = 1 
@@ -326,6 +508,12 @@ def auto_screen_and_add():
         if hist_2y.empty: continue
         
         current_price = cand['current_price']
+        
+        # 最終確認: 10万円以下であることを再チェック
+        if current_price > MAX_STOCK_PRICE:
+            logging.warning(f"{s_code}: 現在値{int(current_price)}円 > 上限{MAX_STOCK_PRICE}円。スキップ。")
+            continue
+        
         best_params = None
         best_win_rate = -1
         
@@ -348,17 +536,45 @@ def auto_screen_and_add():
                 ticker_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
             except:
                 ticker_name = s_code
+            
+            logging.info(f"有望銘柄発見: {ticker_name}({s_code}) 現在値:{int(current_price)}円 (100株で{int(current_price*100):,}円) 勝率:{best_win_rate:.0f}%")
                 
-            ai_text = f"【AI判定】過去勝率{best_win_rate:.0f}%。テクニカル反発期待。"
-            ai_color = "orange"
+            # AI考察テキスト
+            rr_ratio = (best_params['TakeProfit'] - best_params['Buy']) / (best_params['Buy'] - best_params['StopLoss']) if (best_params['Buy'] - best_params['StopLoss']) > 0 else 0
+            ai_text = f"【AI判定】過去2年の検証勝率{best_win_rate:.0f}%。テクニカル反発期待。RR比: {rr_ratio:.1f}:1"
+            ai_color = "orange" if best_win_rate < 70 else "green"
             
-            x_text = f"銘柄名: {ticker_name} コード: {s_code} 現在値: {int(current_price)}円 目安: {int(best_params['Buy'])}円 勝率: {best_win_rate:.0f}%"
-            hp_draft = f"【本日の厳選AI分析】\n銘柄名: {ticker_name}\nコード: {s_code}\n株価: {int(current_price)}円\nAI考察: {ai_text}\n買い目標: {int(best_params['Buy'])}円\n利確目標: {int(best_params['TakeProfit'])}円\n損切り: {int(best_params['StopLoss'])}円"
+            # ===== 1. ホームページ記事を生成 =====
+            hp_article = generate_ai_article(
+                ticker_name, s_code, current_price,
+                best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
+                best_win_rate, 
+                pbr=cand.get('pbr'),
+                dividend=cand.get('dividend')
+            )
             
-            wp_post_url = post_to_wordpress(f"【厳選AI分析】{ticker_name} ({s_code})", hp_draft)
-            if wp_post_url: x_text = post_to_twitter(x_text, link_url=wp_post_url)
-            else: x_text = post_to_twitter(x_text)
+            # ===== 2. WordPressに投稿 =====
+            wp_title = f"【{datetime.now().strftime('%m/%d')} AI厳選】{ticker_name}（{s_code}）- 10万円以内で始める注目株"
+            wp_post_url = post_to_wordpress(wp_title, hp_article)
             
+            if wp_post_url:
+                logging.info(f"WordPress投稿成功: {wp_post_url}")
+            else:
+                logging.warning("WordPress投稿が失敗しました。Twitter投稿はリンクなしで続行します。")
+            
+            # ===== 3. Twitterに投稿（WP投稿の成否に関係なく必ず実行） =====
+            x_base_text = (
+                f"📈10万円以内で買える注目株✨\n\n"
+                f"{ticker_name}（{s_code}）\n"
+                f"現在値: {int(current_price)}円（100株で{int(current_price*100):,}円）\n"
+                f"AI分析勝率: {best_win_rate:.0f}%\n\n"
+                f"詳しくはブログで👇\n"
+                f"(リンク)\n\n"
+                f"#日本株 #少額投資 #AI分析"
+            )
+            x_text = post_to_twitter(x_base_text, link_url=wp_post_url)
+            
+            # ===== 4. スプレッドシートに追加 =====
             payload = {
                 "action": "add_new",
                 "code": str(s_code),
@@ -369,7 +585,7 @@ def auto_screen_and_add():
                 "sl": int(best_params['StopLoss']),
                 "current_price": float(current_price),
                 "x_post_text": x_text,
-                "hp_text": hp_draft,
+                "hp_text": hp_article,
                 "sns_done": True,
                 "sheet_sns": "SNS配信済",
                 "sheet_x": "X配信テキスト",
@@ -378,16 +594,22 @@ def auto_screen_and_add():
             try:
                 res = requests.post(WEBHOOK_URL, json=payload)
                 if res.status_code == 200:
-                    logging.info(f"成功: {s_code} を追加し新シートに振り分けました")
+                    logging.info(f"成功: {s_code} をスプレッドシートに追加しました")
                     added_count += 1
+                else:
+                    logging.error(f"スプレッドシート追加失敗 ({s_code}): status={res.status_code}")
             except Exception as e:
                 logging.error(f"エラー ({s_code}): {e}")
                 
-    logging.info(f"完了 ({added_count} 銘柄)")
+    logging.info(f"完了 ({added_count} 銘柄追加)")
+    if added_count == 0:
+        logging.warning("今日は条件を満たす銘柄が見つかりませんでした。")
+    
     try:
         jst_now = datetime.now().strftime("%Y/%m/%d %H:%M")
         requests.post(WEBHOOK_URL, json={"action": "log_time", "time": jst_now, "count": added_count})
     except: pass
+
 
 if __name__ == "__main__":
     check_portfolio_status()
