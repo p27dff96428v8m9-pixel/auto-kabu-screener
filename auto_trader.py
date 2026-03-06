@@ -28,7 +28,7 @@ TWITTER_API_KEY = os.environ.get("TWITTER_API_KEY")
 TWITTER_API_SECRET = os.environ.get("TWITTER_API_SECRET")
 TWITTER_ACCESS_TOKEN = os.environ.get("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_SECRET = os.environ.get("TWITTER_ACCESS_SECRET")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAObH_0naD4yuSa0xltuR6-xGzBOL_JUdg")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
 WP_URL = os.environ.get("WP_URL")
@@ -569,7 +569,10 @@ def auto_screen_and_add():
         try:
             res = requests.post(WEBHOOK_URL, json=payload)
             if res.status_code == 200:
-                logging.info(f"成功: {s_code} をスプレッドシートに追加しました")
+                if "already exists" in res.text:
+                    logging.info(f"スキップ: {s_code} は既にスプレッドシートに存在します。")
+                else:
+                    logging.info(f"成功: {s_code} をスプレッドシートに追加しました")
                 existing_codes_list.append(str(s_code))  # 重複追加防止
                 return True
         except Exception as e:
