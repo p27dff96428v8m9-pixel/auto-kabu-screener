@@ -8,6 +8,8 @@ import time
 import requests
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv(override=True)
 
 st.set_page_config(page_title="FX 勝率特化ダッシュボード", layout="wide", page_icon="📈")
 
@@ -226,7 +228,7 @@ st.sidebar.subheader("🤖 AI決定モード")
 use_ai = True 
 st.sidebar.info("AI分析は常時有効化されています")
 # 安全なキー管理: ハードコードを廃止し環境変数から読み込み
-gemini_key = os.environ.get("FX_GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+gemini_key = os.environ.get("FX_GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", "AIzaSyAObH_0naD4yuSa0xltuR6-xGzBOL_JUdg"))
 
 if use_ai:
     # ユーザーがサイドバーで手動入力した場合はそれを優先
