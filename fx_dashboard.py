@@ -519,7 +519,7 @@ st.sidebar.subheader("🤖 AI決定モード")
 # AI分析を常にオンにする（無効化不可）
 use_ai = True 
 st.sidebar.info("AI分析は常時有効化されています")
-gemini_key = "AIzaSyDq0VUftWsWWkumrW8NzSGBS59o3GWLCbo"  # 提供されたAPIキー
+gemini_key = os.environ.get("FX_GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))  # 環境変数から取得
 if use_ai:
     # キー入力を非表示にするか、確認用に残す (提供されたキーを優先)
     input_key = st.sidebar.text_input("Gemini API Key", type="password", value=gemini_key)
