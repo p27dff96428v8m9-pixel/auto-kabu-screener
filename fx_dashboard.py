@@ -178,7 +178,7 @@ st.session_state.selected_pair = selected_name
 ticker = CURRENCY_PAIRS[selected_name]
 
 # API KEY MANAGEMENT
-default_key = "AIzaSyDhyO5ka9EvEqVeHBtB6F43yN4S2m7BXjE"
+default_key = "AIzaSyDq0VUftWsWWkumrW8NzSGBS59o3GWLCbo"
 gemini_key = os.environ.get("FX_GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", default_key))
 input_key = st.sidebar.text_input("Gemini API Key", type="password", value=gemini_key)
 if input_key: gemini_key = input_key
