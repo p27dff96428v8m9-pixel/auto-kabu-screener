@@ -409,13 +409,13 @@ function doPost(e) {
       else if(colName.indexOf('リスクリワード') >= 0) { newRow[j] = '=ROUND((' + tpColL + rowIdx + '-' + buyColL + rowIdx + ')/(' + buyColL + rowIdx + '-' + slColL + rowIdx + '), 1)'; rrColIdx = j + 1; }
       else if(colName.indexOf('投資効率スコア') >= 0) { newRow[j] = '=ROUND((' + rrColL + rowIdx + ') * (0.1 / ((' + tpColL + rowIdx + '-' + buyColL + rowIdx + ')/' + buyColL + rowIdx + ')), 1)'; scoreColIdx = j + 1; }
       else if(colName.indexOf('買い目標') >= 0) newRow[j] = Math.round(data.buy);
-      else if(colName.indexOf('利確目標') >= 0) newRow[j] = '=ROUND(IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*1.15, ' + buyColL + rowIdx + '*1.1))';
-      else if(colName.indexOf('損切り') >= 0) newRow[j] = '=ROUND(IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*0.9, ' + buyColL + rowIdx + '*0.95))';
+      else if(colName.indexOf('利確目標') >= 0) newRow[j] = Math.round(data.tp);
+      else if(colName.indexOf('損切り') >= 0) newRow[j] = Math.round(data.sl);
       else if(colName.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName.indexOf('X配信テキスト') >= 0) newRow[j] = data.x_post_text || '';
       else if(colName.indexOf('ホームページ') >= 0 || colName.indexOf('ホームページへの自動記載') >= 0) newRow[j] = data.hp_text || '';
       else if(colName.indexOf('SNS配信済') >= 0) newRow[j] = data.sns_done || false;
-      else if(colName.indexOf('判定') >= 0) newRow[j] = '=IF(VALUE(' + cColL + rowIdx + ')>=VALUE(' + tpColL + rowIdx + '), "利確達成", IF(VALUE(' + cColL + rowIdx + ')<=VALUE(' + slColL + rowIdx + '), "損切りライン到達", IF(VALUE(' + cColL + rowIdx + ')<=VALUE(' + buyColL + rowIdx + '), "買い目標到達", "監視中")))';
+      else if(colName.indexOf('判定') >= 0) newRow[j] = '=IF(VALUE(' + cColL + rowIdx + ')>=VALUE(' + tpColL + rowIdx + '), "利確達成", IF(VALUE(' + cColL + rowIdx + ')<=VALUE(' + slColL + rowIdx + '), "損切りライン到達", IF(AND(VALUE(' + cColL + rowIdx + ')<=VALUE(' + buyColL + rowIdx + '), VALUE(' + rrColL + rowIdx + ')>=1.5, VALUE(' + scoreColL + rowIdx + ')>=1.5), "★エントリー推奨", IF(VALUE(' + cColL + rowIdx + ')<=VALUE(' + buyColL + rowIdx + '), "買い目標到達", "監視中"))))';
     }
     
     sheet.appendRow(newRow);
