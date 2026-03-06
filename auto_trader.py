@@ -520,7 +520,7 @@ def auto_screen_and_add():
     
     import random
     all_codes = [str(c) for c in range(1300, 9999)]
-    target_codes = random.sample(all_codes, 600)
+    target_codes = random.sample(all_codes, 1200)  # 母数を増やして見つかる確率UP
     
     # 600銘柄を100銘柄ずつのチャンクに分ける（429エラー対策）
     chunk_size = 100
@@ -697,8 +697,108 @@ def auto_screen_and_add():
                 logging.error(f"エラー ({s_code}): {e}")
                 
     logging.info(f"完了 ({added_count} 銘柄追加)")
+    
+    # ===== 見つからなかった場合のリトライ（勝率基準を緩和） =====
+    if added_count == 0 and len(candidates) > 0:
+        logging.warning("勝率55%以上の銘柄が見つからなかったため、基準を40%に緩和して再トライします...")
+        for cand in candidates:
+            if added_count >= needed_count: break
+            s_code = cand['code']
+            if str(s_code) in existing_codes: continue
+            
+            try:
+                hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
+                if hist_2y.empty: continue
+                current_price = cand['current_price']
+                if current_price > MAX_STOCK_PRICE: continue
+                
+                best_params = None
+                best_win_rate = -1
+                
+                for buy_pct in [0, 1, 2, 3, 5, 7]:
+                    sim_buy = current_price * (1 - buy_pct/100)
+                    for tp_pct in range(2, 30, 2):
+                        sim_tp = sim_buy * (1 + tp_pct/100)
+                        if sim_tp <= current_price * 1.01: continue
+                        for sl_pct in range(2, 20, 2):
+                            sim_sl = sim_buy * (1 - sl_pct/100)
+                            t_trades, w_rate, _, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
+                            if t_trades >= 2 and w_rate > best_win_rate:
+                                best_win_rate = w_rate
+                                best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
+                
+                if best_params is not None and best_win_rate >= 40:
+                    try:
+                        ticker_obj = yf.Ticker(f"{s_code}.T")
+                        ticker_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
+                    except:
+                        ticker_name = s_code
+                    
+                    logging.info(f"リトライ成功: {ticker_name}({s_code}) 勝率:{best_win_rate:.0f}%")
+                    rr_ratio = (best_params['TakeProfit'] - best_params['Buy']) / (best_params['Buy'] - best_params['StopLoss']) if (best_params['Buy'] - best_params['StopLoss']) > 0 else 0
+                    ai_text = f"【AI判定】過去2年の検証勝率{best_win_rate:.0f}%。テクニカル反発期待。RR比: {rr_ratio:.1f}:1"
+                    ai_color = "orange" if best_win_rate < 70 else "green"
+                    
+                    hp_article = generate_ai_article(
+                        ticker_name, s_code, current_price,
+                        best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
+                        best_win_rate, pbr=cand.get('pbr'), dividend=cand.get('dividend')
+                    )
+                    pages_url = post_to_github_pages(
+                        ticker_name, s_code, current_price,
+                        best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
+                        best_win_rate, hp_article
+                    )
+                    wp_title = f"【{datetime.now().strftime('%m/%d')} AI厳選】{ticker_name}（{s_code}）- 10万円以内で始める注目株"
+                    wp_post_url = post_to_wordpress(wp_title, hp_article)
+                    homepage_url = pages_url or wp_post_url
+                    
+                    x_base_text = (
+                        f"📈10万円以内で買える注目株✨\n\n"
+                        f"{ticker_name}（{s_code}）\n"
+                        f"現在値: {int(current_price)}円（100株で{int(current_price*100):,}円）\n"
+                        f"AI分析勝率: {best_win_rate:.0f}%\n\n"
+                        f"詳しくはブログで👇\n(リンク)\n\n#日本株 #少額投資 #AI分析"
+                    )
+                    x_text = post_to_twitter(x_base_text, link_url=homepage_url)
+                    
+                    payload = {
+                        "action": "add_new", "code": str(s_code),
+                        "ai_text": ai_text, "ai_color": ai_color,
+                        "buy": int(best_params['Buy']), "tp": int(best_params['TakeProfit']),
+                        "sl": int(best_params['StopLoss']), "current_price": float(current_price),
+                        "x_post_text": x_text, "hp_text": hp_article, "sns_done": True,
+                        "sheet_sns": "SNS配信済", "sheet_x": "X配信テキスト", "sheet_hp": "ホームページへの自動記載"
+                    }
+                    try:
+                        res = requests.post(WEBHOOK_URL, json=payload)
+                        if res.status_code == 200:
+                            logging.info(f"リトライ成功: {s_code} をスプレッドシートに追加")
+                            added_count += 1
+                    except Exception as e:
+                        logging.error(f"リトライ追加エラー ({s_code}): {e}")
+            except Exception as e:
+                logging.error(f"リトライ分析エラー ({s_code}): {e}")
+                continue
+    
+    # ===== それでも見つからなかった場合はホームページに「本日は該当なし」を投稿 =====
     if added_count == 0:
-        logging.warning("今日は条件を満たす銘柄が見つかりませんでした。")
+        logging.warning("今日は条件を満たす銘柄が見つかりませんでした。ホームページに通知を投稿します。")
+        no_result_article = (
+            f"## 【{datetime.now().strftime('%Y年%m月%d日')}のAIスクリーニング結果】\n\n"
+            f"本日のAI自動スクリーニングを実施しましたが、"
+            f"**10万円以内で投資でき、かつバックテスト勝率の基準を満たす銘柄は見つかりませんでした。**\n\n"
+            f"### 📊 本日の市場状況\n\n"
+            f"- スクリーニング対象: 約1,200銘柄からランダム抽出\n"
+            f"- 価格フィルタ: 1株{MAX_STOCK_PRICE}円以下（100株で{MAX_STOCK_PRICE*100:,}円以内）\n"
+            f"- テクニカル条件: 25日移動平均線乖離率5%以内 & RSI65以下\n"
+            f"- バックテスト要件: 過去2年で勝率40%以上\n\n"
+            f"条件に合う銘柄が見つかり次第、次回の更新でお届けします。\n\n"
+            f"**焦らず、良い銘柄を厳選するのがAI投資の強みです。** 🤖"
+        )
+        post_to_github_pages(
+            "本日は該当銘柄なし", "0000", 0, 0, 0, 0, 0, no_result_article
+        )
     
     try:
         jst_now = datetime.now().strftime("%Y/%m/%d %H:%M")
