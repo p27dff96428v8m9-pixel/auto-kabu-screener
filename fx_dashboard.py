@@ -419,7 +419,7 @@ else:
                 st.metric("🛡️ 損切り目安", f"{ai_stop:.4f}", delta=f"{ai_stop - current_price:.4f}")
         
         with col_res2:
-            st.markdown(f"**【分析根拠】**\n\n{ai_reason}")
+            st.info("AIが分析を完了しました。判定結果を確認してください。")
 
     # ==========================================
     # 分析パネル
