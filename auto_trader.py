@@ -518,9 +518,67 @@ def auto_screen_and_add():
     logging.info("--- 全自動スクリーニングと有望銘柄の追加開始 ---")
     logging.info(f"価格フィルタ: 1株 {MAX_STOCK_PRICE}円以下（100株で{MAX_STOCK_PRICE * 100:,}円以内）")
     
+    # 銘柄を処理してスプレッドシート・HP・Twitterに追加するヘルパー関数
+    def process_and_add_stock(cand, best_params, best_win_rate, existing_codes_list):
+        """候補銘柄を全チャネルに投稿・追加する"""
+        s_code = cand['code']
+        current_price = cand['current_price']
+        try:
+            ticker_obj = yf.Ticker(f"{s_code}.T")
+            ticker_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
+        except:
+            ticker_name = s_code
+        
+        logging.info(f"有望銘柄発見: {ticker_name}({s_code}) 現在値:{int(current_price)}円 (100株で{int(current_price*100):,}円) 勝率:{best_win_rate:.0f}%")
+        
+        rr_ratio = (best_params['TakeProfit'] - best_params['Buy']) / (best_params['Buy'] - best_params['StopLoss']) if (best_params['Buy'] - best_params['StopLoss']) > 0 else 0
+        ai_text = f"【AI判定】過去2年の検証勝率{best_win_rate:.0f}%。テクニカル反発期待。RR比: {rr_ratio:.1f}:1"
+        ai_color = "orange" if best_win_rate < 70 else "green"
+        
+        hp_article = generate_ai_article(
+            ticker_name, s_code, current_price,
+            best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
+            best_win_rate, pbr=cand.get('pbr'), dividend=cand.get('dividend')
+        )
+        pages_url = post_to_github_pages(
+            ticker_name, s_code, current_price,
+            best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
+            best_win_rate, hp_article
+        )
+        wp_title = f"【{datetime.now().strftime('%m/%d')} AI厳選】{ticker_name}（{s_code}）- 10万円以内で始める注目株"
+        wp_post_url = post_to_wordpress(wp_title, hp_article)
+        homepage_url = pages_url or wp_post_url
+        
+        x_base_text = (
+            f"📈10万円以内で買える注目株✨\n\n"
+            f"{ticker_name}（{s_code}）\n"
+            f"現在値: {int(current_price)}円（100株で{int(current_price*100):,}円）\n"
+            f"AI分析勝率: {best_win_rate:.0f}%\n\n"
+            f"詳しくはブログで👇\n(リンク)\n\n#日本株 #少額投資 #AI分析"
+        )
+        x_text = post_to_twitter(x_base_text, link_url=homepage_url)
+        
+        payload = {
+            "action": "add_new", "code": str(s_code),
+            "ai_text": ai_text, "ai_color": ai_color,
+            "buy": int(best_params['Buy']), "tp": int(best_params['TakeProfit']),
+            "sl": int(best_params['StopLoss']), "current_price": float(current_price),
+            "x_post_text": x_text, "hp_text": hp_article, "sns_done": True,
+            "sheet_sns": "SNS配信済", "sheet_x": "X配信テキスト", "sheet_hp": "ホームページへの自動記載"
+        }
+        try:
+            res = requests.post(WEBHOOK_URL, json=payload)
+            if res.status_code == 200:
+                logging.info(f"成功: {s_code} をスプレッドシートに追加しました")
+                existing_codes_list.append(str(s_code))  # 重複追加防止
+                return True
+        except Exception as e:
+            logging.error(f"スプレッドシート追加エラー ({s_code}): {e}")
+        return False
+    
     import random
     all_codes = [str(c) for c in range(1300, 9999)]
-    target_codes = random.sample(all_codes, 1200)  # 母数を増やして見つかる確率UP
+    target_codes = random.sample(all_codes, 1500)  # 母数を増やして3銘柄見つかる確率UP
     
     # 600銘柄を100銘柄ずつのチャンクに分ける（429エラー対策）
     chunk_size = 100
@@ -577,134 +635,60 @@ def auto_screen_and_add():
     logging.info(f"価格フィルタ通過候補: {len(candidates)} 銘柄（すべて1株{MAX_STOCK_PRICE}円以下）")
     candidates = sorted(candidates, key=lambda x: abs(x['deviation']), reverse=True)
     added_count = 0
-    needed_count = 1 
+    needed_count = 3  # 毎日最低3銘柄追加
+    added_codes = []  # 今回追加した銘柄コードを追跡
     
     try:
         res = requests.post(WEBHOOK_URL, json={"action": "get_all"})
         existing_codes = [str(row[0]).replace(' ', '') for row in res.json() if len(row) > 0]
     except: existing_codes = []
             
+    # ===== 第1段階: 勝率55%以上（通常基準） =====
+    logging.info(f"--- 第1段階: 勝率55%以上で{needed_count}銘柄を探索 ---")
     for cand in candidates:
         if added_count >= needed_count: break
         s_code = cand['code']
         if str(s_code) in existing_codes: continue
             
-        hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
-        if hist_2y.empty: continue
-        
-        current_price = cand['current_price']
-        
-        # 最終確認: 10万円以下であることを再チェック
-        if current_price > MAX_STOCK_PRICE:
-            logging.warning(f"{s_code}: 現在値{int(current_price)}円 > 上限{MAX_STOCK_PRICE}円。スキップ。")
-            continue
-        
-        best_params = None
-        best_win_rate = -1
-        
-        for buy_pct in [0, 1, 2, 3]:
-            sim_buy = current_price * (1 - buy_pct/100)
-            for tp_pct in range(2, 22, 2):
-                sim_tp = sim_buy * (1 + tp_pct/100)
-                if sim_tp <= current_price * 1.01: continue
-                for sl_pct in range(2, 16, 2):
-                    sim_sl = sim_buy * (1 - sl_pct/100)
-                    t_trades, w_rate, _, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
-                    if t_trades >= 2 and w_rate > best_win_rate:
-                        best_win_rate = w_rate
-                        best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
-                            
-        if best_params is not None and best_win_rate >= 55:
-            # 銘柄名を取得
-            try:
-                ticker_obj = yf.Ticker(f"{s_code}.T")
-                ticker_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
-            except:
-                ticker_name = s_code
+        try:
+            hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
+            if hist_2y.empty: continue
+            current_price = cand['current_price']
+            if current_price > MAX_STOCK_PRICE: continue
             
-            logging.info(f"有望銘柄発見: {ticker_name}({s_code}) 現在値:{int(current_price)}円 (100株で{int(current_price*100):,}円) 勝率:{best_win_rate:.0f}%")
-                
-            # AI考察テキスト
-            rr_ratio = (best_params['TakeProfit'] - best_params['Buy']) / (best_params['Buy'] - best_params['StopLoss']) if (best_params['Buy'] - best_params['StopLoss']) > 0 else 0
-            ai_text = f"【AI判定】過去2年の検証勝率{best_win_rate:.0f}%。テクニカル反発期待。RR比: {rr_ratio:.1f}:1"
-            ai_color = "orange" if best_win_rate < 70 else "green"
+            best_params = None
+            best_win_rate = -1
             
-            # ===== 1. ホームページ記事を生成 =====
-            hp_article = generate_ai_article(
-                ticker_name, s_code, current_price,
-                best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
-                best_win_rate, 
-                pbr=cand.get('pbr'),
-                dividend=cand.get('dividend')
-            )
-            
-            # ===== 2. GitHub Pagesに投稿（メイン・常に安定） =====
-            pages_url = post_to_github_pages(
-                ticker_name, s_code, current_price,
-                best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
-                best_win_rate, hp_article
-            )
-            
-            # ===== 2b. WordPress投稿も試行（オプション・サーバーが生きてれば） =====
-            wp_title = f"【{datetime.now().strftime('%m/%d')} AI厳選】{ticker_name}（{s_code}）- 10万円以内で始める注目株"
-            wp_post_url = post_to_wordpress(wp_title, hp_article)
-            
-            # ホームページのリンク: GitHub Pages優先、WordPressはフォールバック
-            homepage_url = pages_url or wp_post_url
-            
-            if homepage_url:
-                logging.info(f"ホームページ投稿成功: {homepage_url}")
-            else:
-                logging.warning("ホームページ投稿がすべて失敗しました。Twitter投稿はリンクなしで続行します。")
-            
-            # ===== 3. Twitterに投稿（HP投稿の成否に関係なく必ず実行） =====
-            x_base_text = (
-                f"📈10万円以内で買える注目株✨\n\n"
-                f"{ticker_name}（{s_code}）\n"
-                f"現在値: {int(current_price)}円（100株で{int(current_price*100):,}円）\n"
-                f"AI分析勝率: {best_win_rate:.0f}%\n\n"
-                f"詳しくはブログで👇\n"
-                f"(リンク)\n\n"
-                f"#日本株 #少額投資 #AI分析"
-            )
-            x_text = post_to_twitter(x_base_text, link_url=homepage_url)
-            
-            # ===== 4. スプレッドシートに追加 =====
-            payload = {
-                "action": "add_new",
-                "code": str(s_code),
-                "ai_text": ai_text,
-                "ai_color": ai_color,
-                "buy": int(best_params['Buy']),
-                "tp": int(best_params['TakeProfit']),
-                "sl": int(best_params['StopLoss']),
-                "current_price": float(current_price),
-                "x_post_text": x_text,
-                "hp_text": hp_article,
-                "sns_done": True,
-                "sheet_sns": "SNS配信済",
-                "sheet_x": "X配信テキスト",
-                "sheet_hp": "ホームページへの自動記載"
-            }
-            try:
-                res = requests.post(WEBHOOK_URL, json=payload)
-                if res.status_code == 200:
-                    logging.info(f"成功: {s_code} をスプレッドシートに追加しました")
+            for buy_pct in [0, 1, 2, 3]:
+                sim_buy = current_price * (1 - buy_pct/100)
+                for tp_pct in range(2, 22, 2):
+                    sim_tp = sim_buy * (1 + tp_pct/100)
+                    if sim_tp <= current_price * 1.01: continue
+                    for sl_pct in range(2, 16, 2):
+                        sim_sl = sim_buy * (1 - sl_pct/100)
+                        t_trades, w_rate, _, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
+                        if t_trades >= 2 and w_rate > best_win_rate:
+                            best_win_rate = w_rate
+                            best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
+                                
+            if best_params is not None and best_win_rate >= 55:
+                if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
                     added_count += 1
-                else:
-                    logging.error(f"スプレッドシート追加失敗 ({s_code}): status={res.status_code}")
-            except Exception as e:
-                logging.error(f"エラー ({s_code}): {e}")
-                
-    logging.info(f"完了 ({added_count} 銘柄追加)")
+                    added_codes.append(s_code)
+        except Exception as e:
+            logging.error(f"第1段階エラー ({s_code}): {e}")
+            continue
     
-    # ===== 見つからなかった場合のリトライ（勝率基準を緩和） =====
-    if added_count == 0 and len(candidates) > 0:
-        logging.warning("勝率55%以上の銘柄が見つからなかったため、基準を40%に緩和して再トライします...")
+    logging.info(f"第1段階完了: {added_count}/{needed_count}銘柄追加")
+    
+    # ===== 第2段階: 勝率40%以上（緩和基準）+ 探索範囲拡大 =====
+    if added_count < needed_count and len(candidates) > 0:
+        logging.info(f"--- 第2段階: 勝率40%以上に緩和して残り{needed_count - added_count}銘柄を探索 ---")
         for cand in candidates:
             if added_count >= needed_count: break
             s_code = cand['code']
             if str(s_code) in existing_codes: continue
+            if s_code in added_codes: continue
             
             try:
                 hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
@@ -728,58 +712,68 @@ def auto_screen_and_add():
                                 best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
                 
                 if best_params is not None and best_win_rate >= 40:
-                    try:
-                        ticker_obj = yf.Ticker(f"{s_code}.T")
-                        ticker_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
-                    except:
-                        ticker_name = s_code
-                    
-                    logging.info(f"リトライ成功: {ticker_name}({s_code}) 勝率:{best_win_rate:.0f}%")
-                    rr_ratio = (best_params['TakeProfit'] - best_params['Buy']) / (best_params['Buy'] - best_params['StopLoss']) if (best_params['Buy'] - best_params['StopLoss']) > 0 else 0
-                    ai_text = f"【AI判定】過去2年の検証勝率{best_win_rate:.0f}%。テクニカル反発期待。RR比: {rr_ratio:.1f}:1"
-                    ai_color = "orange" if best_win_rate < 70 else "green"
-                    
-                    hp_article = generate_ai_article(
-                        ticker_name, s_code, current_price,
-                        best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
-                        best_win_rate, pbr=cand.get('pbr'), dividend=cand.get('dividend')
-                    )
-                    pages_url = post_to_github_pages(
-                        ticker_name, s_code, current_price,
-                        best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
-                        best_win_rate, hp_article
-                    )
-                    wp_title = f"【{datetime.now().strftime('%m/%d')} AI厳選】{ticker_name}（{s_code}）- 10万円以内で始める注目株"
-                    wp_post_url = post_to_wordpress(wp_title, hp_article)
-                    homepage_url = pages_url or wp_post_url
-                    
-                    x_base_text = (
-                        f"📈10万円以内で買える注目株✨\n\n"
-                        f"{ticker_name}（{s_code}）\n"
-                        f"現在値: {int(current_price)}円（100株で{int(current_price*100):,}円）\n"
-                        f"AI分析勝率: {best_win_rate:.0f}%\n\n"
-                        f"詳しくはブログで👇\n(リンク)\n\n#日本株 #少額投資 #AI分析"
-                    )
-                    x_text = post_to_twitter(x_base_text, link_url=homepage_url)
-                    
-                    payload = {
-                        "action": "add_new", "code": str(s_code),
-                        "ai_text": ai_text, "ai_color": ai_color,
-                        "buy": int(best_params['Buy']), "tp": int(best_params['TakeProfit']),
-                        "sl": int(best_params['StopLoss']), "current_price": float(current_price),
-                        "x_post_text": x_text, "hp_text": hp_article, "sns_done": True,
-                        "sheet_sns": "SNS配信済", "sheet_x": "X配信テキスト", "sheet_hp": "ホームページへの自動記載"
-                    }
-                    try:
-                        res = requests.post(WEBHOOK_URL, json=payload)
-                        if res.status_code == 200:
-                            logging.info(f"リトライ成功: {s_code} をスプレッドシートに追加")
-                            added_count += 1
-                    except Exception as e:
-                        logging.error(f"リトライ追加エラー ({s_code}): {e}")
+                    if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
+                        added_count += 1
+                        added_codes.append(s_code)
             except Exception as e:
-                logging.error(f"リトライ分析エラー ({s_code}): {e}")
+                logging.error(f"第2段階エラー ({s_code}): {e}")
                 continue
+        
+        logging.info(f"第2段階完了: {added_count}/{needed_count}銘柄追加")
+    
+    # ===== 第3段階: 勝率30%以上 + テクニカル条件なしで再スクリーニング =====
+    if added_count < needed_count:
+        logging.info(f"--- 第3段階: テクニカル条件を緩和して残り{needed_count - added_count}銘柄を探索 ---")
+        # 第1段階で価格フィルタだけ通過した全銘柄を対象（テクニカル条件なし）
+        extra_codes = random.sample(all_codes, 500)
+        for i in range(0, len(extra_codes), chunk_size):
+            if added_count >= needed_count: break
+            chunk = extra_codes[i:i + chunk_size]
+            ticker_str = " ".join([f"{c}.T" for c in chunk])
+            try:
+                data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True, progress=False)
+                for code in chunk:
+                    if added_count >= needed_count: break
+                    if str(code) in existing_codes or code in added_codes: continue
+                    t_code = f"{code}.T"
+                    if t_code not in data.columns.levels[0]: continue
+                    df_extra = data[t_code]
+                    if df_extra.empty or len(df_extra) < 20: continue
+                    try:
+                        current_price = float(df_extra['Close'].iloc[-1])
+                        if current_price < 100 or current_price > MAX_STOCK_PRICE: continue
+                        
+                        hist_2y = yf.Ticker(t_code).history(period="2y")
+                        if hist_2y.empty or len(hist_2y) < 60: continue
+                        
+                        best_params = None
+                        best_win_rate = -1
+                        for buy_pct in [0, 1, 2, 3, 5, 7, 10]:
+                            sim_buy = current_price * (1 - buy_pct/100)
+                            for tp_pct in range(2, 32, 2):
+                                sim_tp = sim_buy * (1 + tp_pct/100)
+                                if sim_tp <= current_price * 1.01: continue
+                                for sl_pct in range(2, 22, 2):
+                                    sim_sl = sim_buy * (1 - sl_pct/100)
+                                    t_trades, w_rate, _, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
+                                    if t_trades >= 1 and w_rate > best_win_rate:
+                                        best_win_rate = w_rate
+                                        best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
+                        
+                        if best_params is not None and best_win_rate >= 30:
+                            extra_cand = {
+                                "code": code, "current_price": current_price,
+                                "pbr": None, "dividend": None
+                            }
+                            if process_and_add_stock(extra_cand, best_params, best_win_rate, existing_codes):
+                                added_count += 1
+                                added_codes.append(code)
+                    except: continue
+            except Exception as e:
+                logging.error(f"第3段階チャンクエラー: {e}")
+            time.sleep(2)
+        
+        logging.info(f"第3段階完了: {added_count}/{needed_count}銘柄追加")
     
     # ===== それでも見つからなかった場合はホームページに「本日は該当なし」を投稿 =====
     if added_count == 0:
@@ -789,16 +783,18 @@ def auto_screen_and_add():
             f"本日のAI自動スクリーニングを実施しましたが、"
             f"**10万円以内で投資でき、かつバックテスト勝率の基準を満たす銘柄は見つかりませんでした。**\n\n"
             f"### 📊 本日の市場状況\n\n"
-            f"- スクリーニング対象: 約1,200銘柄からランダム抽出\n"
+            f"- スクリーニング対象: 約2,000銘柄を3段階でフィルタリング\n"
             f"- 価格フィルタ: 1株{MAX_STOCK_PRICE}円以下（100株で{MAX_STOCK_PRICE*100:,}円以内）\n"
-            f"- テクニカル条件: 25日移動平均線乖離率5%以内 & RSI65以下\n"
-            f"- バックテスト要件: 過去2年で勝率40%以上\n\n"
+            f"- テクニカル条件: 段階的に緩和（25日線乖離率・RSI）\n"
+            f"- バックテスト要件: 最低勝率30%以上\n\n"
             f"条件に合う銘柄が見つかり次第、次回の更新でお届けします。\n\n"
             f"**焦らず、良い銘柄を厳選するのがAI投資の強みです。** 🤖"
         )
         post_to_github_pages(
             "本日は該当銘柄なし", "0000", 0, 0, 0, 0, 0, no_result_article
         )
+    else:
+        logging.info(f"本日の最終結果: {added_count}銘柄を追加しました！")
     
     try:
         jst_now = datetime.now().strftime("%Y/%m/%d %H:%M")
