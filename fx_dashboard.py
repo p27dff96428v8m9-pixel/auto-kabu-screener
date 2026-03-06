@@ -225,14 +225,18 @@ st.sidebar.subheader("🤖 AI決定モード")
 # AI分析を常にオンにする（無効化不可）
 use_ai = True 
 st.sidebar.info("AI分析は常時有効化されています")
-gemini_key = "AIzaSyB9bDYRncI91HTf8sDlIYZrh8UyhwwT_P8"  # 提供されたAPIキー
+# 安全なキー管理: ハードコードを廃止し環境変数から読み込み
+gemini_key = os.environ.get("FX_GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+
 if use_ai:
-    # キー入力を非表示にするか、確認用に残す (提供されたキーを優先)
-    input_key = st.sidebar.text_input("Gemini API Key", type="password", value=gemini_key)
+    # ユーザーがサイドバーで手動入力した場合はそれを優先
+    input_key = st.sidebar.text_input("Gemini API Key", type="password", value=gemini_key, help="コード内には保存されません。.envファイルまたはここで設定してください。")
     if input_key:
         gemini_key = input_key
+    
     if not gemini_key:
-        st.sidebar.warning("分析にはAPIキーが必要です。")
+        st.sidebar.warning("⚠️ 分析にはAPIキーが必要ですが、設定されていません。")
+        st.sidebar.info("取得したキーを上に入力するか、.envファイルに FX_GEMINI_API_KEY として設定してください。")
 
 # 期間と足の設定（4時間足で固定）
 period = "60d" 
