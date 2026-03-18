@@ -192,33 +192,51 @@ stop_loss = parse_price(selected_row.get('損切り'))
 def run_backtest(df_hist, strategy_buy, strategy_take_profit, strategy_stop_loss):
     position = False   
     buy_date = None
+    buy_exec_price = 0
     trades = []
     
     for date, row in df_hist.iterrows():
-        low = row['Low']
+        open_p = row['Open']
         high = row['High']
+        low = row['Low']
         
         if not position:
             if low <= strategy_buy:
                 position = True
                 buy_date = date
+                buy_exec_price = min(strategy_buy, open_p)
+                
+                if low <= strategy_stop_loss:
+                    exit_price = min(strategy_stop_loss, open_p) if open_p <= strategy_stop_loss else strategy_stop_loss
+                    trades.append({
+                        '買い日': buy_date.strftime('%Y-%m-%d'),
+                        '売り日': date.strftime('%Y-%m-%d'),
+                        '結果': "損切り 🔴 (同日)",
+                        '損益額': exit_price - buy_exec_price
+                    })
+                    position = False
         else:
             sell_price = None
             reason = ""
             
-            if high >= strategy_take_profit:
+            if open_p >= strategy_take_profit:
+                sell_price = open_p
+                reason = "利益確定 🟢 (窓開け)"
+            elif open_p <= strategy_stop_loss:
+                sell_price = open_p
+                reason = "損切り 🔴 (窓開け)"
+            elif low <= strategy_stop_loss and high >= strategy_take_profit:
+                sell_price = strategy_stop_loss
+                reason = "損切り 🔴 (同日)"
+            elif high >= strategy_take_profit:
                 sell_price = strategy_take_profit
                 reason = "利益確定 🟢"
             elif low <= strategy_stop_loss:
                 sell_price = strategy_stop_loss
                 reason = "損切り 🔴"
-                
-            if low <= strategy_stop_loss and high >= strategy_take_profit:
-                sell_price = strategy_stop_loss
-                reason = "損切り 🔴 (同日)"
 
             if sell_price is not None:
-                profit = sell_price - strategy_buy
+                profit = sell_price - buy_exec_price
                 trades.append({
                     '買い日': buy_date.strftime('%Y-%m-%d'),
                     '売り日': date.strftime('%Y-%m-%d'),
@@ -235,6 +253,51 @@ def run_backtest(df_hist, strategy_buy, strategy_take_profit, strategy_stop_loss
     total_profit = sum(t['損益額'] for t in trades)
     expected_value = total_profit / total_trades
     return total_trades, win_rate, expected_value, trades
+
+def optimize_params_walk_forward(hist, buy_pct_range, tp_pct_range, sl_pct_range):
+    """ウォークフォワードテストを用いて過学習を防ぎつつ最適なパラメータを探索する"""
+    current_price = hist['Close'].iloc[-1]
+    best_params = None
+    best_win_rate = -1
+    best_profit = -999999
+    
+    train_size = int(len(hist) * 0.75)
+    if train_size < 30:
+        return None, -1, -999999
+    train_hist = hist.iloc[:train_size]
+    test_hist = hist.iloc[train_size:]
+    
+    for buy_pct in buy_pct_range:
+        sim_buy = current_price * (1 - buy_pct/100)
+        for tp_pct in tp_pct_range:
+            sim_tp = sim_buy * (1 + tp_pct/100)
+            if sim_tp <= current_price * 1.01:
+                continue
+            for sl_pct in sl_pct_range:
+                sim_sl = sim_buy * (1 - sl_pct/100)
+                
+                t_trades_tr, w_rate_tr, e_val_tr, _ = run_backtest(train_hist, sim_buy, sim_tp, sim_sl)
+                if t_trades_tr >= 2 and w_rate_tr >= 50:
+                    t_trades_te, w_rate_te, e_val_te, _ = run_backtest(test_hist, sim_buy, sim_tp, sim_sl)
+                    
+                    t_trades_all = t_trades_tr + t_trades_te
+                    if t_trades_all > 0:
+                        w_rate_all = ((w_rate_tr * t_trades_tr) + (w_rate_te * t_trades_te)) / t_trades_all
+                        e_val_all = ((e_val_tr * t_trades_tr) + (e_val_te * t_trades_te)) / t_trades_all
+                        
+                        if (t_trades_te == 0 or w_rate_te >= 30):
+                            if w_rate_all > best_win_rate or (w_rate_all == best_win_rate and e_val_all > best_profit):
+                                best_win_rate = w_rate_all
+                                best_profit = e_val_all
+                                best_params = {
+                                    "Buy": sim_buy, 
+                                    "TakeProfit": sim_tp, 
+                                    "StopLoss": sim_sl,
+                                    "Trades": t_trades_all,
+                                    "Expected": e_val_all
+                                }
+                                
+    return best_params, best_win_rate, best_profit
 
 col_run, col_opt = st.columns(2)
 
@@ -279,33 +342,10 @@ else:
                 best_profit = -999999
                 
                 # スキャン範囲を拡大（現在地から -2% ～ -40% まで細かく買い場を探す）
-                for buy_pct in range(2, 42, 2):
-                    sim_buy = current_price * (1 - buy_pct/100)
-                    
-                    # 利確：買い値から +2% ～ +30%
-                    for tp_pct in range(2, 32, 2):
-                        sim_tp = sim_buy * (1 + tp_pct/100)
-                        
-                        # 損切り：買い値から -2% ～ -30%
-                        for sl_pct in range(2, 32, 2):
-                            sim_sl = sim_buy * (1 - sl_pct/100)
-                            
-                            t_trades, w_rate, e_val, _ = run_backtest(hist, sim_buy, sim_tp, sim_sl)
-                            
-                            # まぐれ当たり（1回のトレードのみで100%等）を排除するため、年1回ペース（最低2回）は取引があるものに限定
-                            if t_trades >= 2:
-                                # 勝率がこれまでの最高値を更新したら記録
-                                # もしくは、勝率が同立最高で、期待値（利益）がこれまでのものより大きければ記録
-                                if w_rate > best_win_rate or (w_rate == best_win_rate and e_val > best_profit):
-                                    best_win_rate = w_rate
-                                    best_profit = e_val
-                                    best_params = {
-                                        "Buy": sim_buy,
-                                        "TakeProfit": sim_tp,
-                                        "StopLoss": sim_sl,
-                                        "Trades": t_trades,
-                                        "Expected": e_val
-                                    }
+                buy_range = range(2, 42, 2)
+                tp_range = range(2, 32, 2)
+                sl_range = range(2, 32, 2)
+                best_params, best_win_rate, best_profit = optimize_params_walk_forward(hist, buy_range, tp_range, sl_range)
                 
                 if best_params is not None and best_win_rate > 0:
                     st.success(f"🎉 勝率を限界まで高めた戦略（勝率 {best_win_rate:.1f}%）を発見しました！")
@@ -353,7 +393,6 @@ function doPost(e) {
     return letter;
   }
   
-  var codeIdx = 0;
   var buyColL = 'D', tpColL = 'E', slColL = 'F', rrColL = 'I', scoreColL = 'J', cColL = 'C', aiColL = 'L';
   for (var j = 0; j < h.length; j++) {
     var colN = String(h[j]).replace(/[\u200b\s]/g, '');
@@ -413,16 +452,16 @@ function doPost(e) {
       else if(colName.indexOf('出来高') >= 0) {
         newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/" & ' + codeLetter + rowIdx + ' & ":TYO","//div[@class=\'P6K39c\']"),5),"K",""),"M",""),".","")*10, 0)';
       }
+      else if(colName.indexOf('買い目標') >= 0) newRow[j] = Math.round(data.buy);
+      else if(colName.indexOf('利確目標') >= 0) newRow[j] = '=ROUND(IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*1.15, ' + buyColL + rowIdx + '*1.1))';
+      else if(colName.indexOf('損切り') >= 0) newRow[j] = '=ROUND(IF(OR(COUNTIF(' + aiColL + rowIdx + ',"*成長*"),COUNTIF(' + aiColL + rowIdx + ',"*リバウンド*")), ' + buyColL + rowIdx + '*0.9, ' + buyColL + rowIdx + '*0.95))';
       else if(colName.indexOf('リスクリワード') >= 0) { newRow[j] = '=ROUND((' + tpColL + rowIdx + '-' + buyColL + rowIdx + ')/(' + buyColL + rowIdx + '-' + slColL + rowIdx + '), 1)'; rrColIdx = j + 1; }
       else if(colName.indexOf('投資効率スコア') >= 0) { newRow[j] = '=ROUND((' + rrColL + rowIdx + ') * (0.1 / ((' + tpColL + rowIdx + '-' + buyColL + rowIdx + ')/' + buyColL + rowIdx + ')), 1)'; scoreColIdx = j + 1; }
-      else if(colName.indexOf('買い目標') >= 0) newRow[j] = Math.round(data.buy);
-      else if(colName.indexOf('利確目標') >= 0) newRow[j] = Math.round(data.tp);
-      else if(colName.indexOf('損切り') >= 0) newRow[j] = Math.round(data.sl);
       else if(colName.indexOf('AI分析') >= 0) { newRow[j] = data.ai_text; aiColIdx = j + 1; }
       else if(colName.indexOf('X配信テキスト') >= 0) newRow[j] = data.x_post_text || '';
       else if(colName.indexOf('ホームページ') >= 0 || colName.indexOf('ホームページへの自動記載') >= 0) newRow[j] = data.hp_text || '';
       else if(colName.indexOf('SNS配信済') >= 0) newRow[j] = data.sns_done || false;
-      else if(colName.indexOf('判定') >= 0) newRow[j] = '=IF(VALUE(' + cColL + rowIdx + ')>=VALUE(' + tpColL + rowIdx + '), "利確達成", IF(VALUE(' + cColL + rowIdx + ')<=VALUE(' + slColL + rowIdx + '), "損切りライン到達", IF(AND(VALUE(' + cColL + rowIdx + ')<=VALUE(' + buyColL + rowIdx + '), VALUE(' + rrColL + rowIdx + ')>=1.5, VALUE(' + scoreColL + rowIdx + ')>=1.5), "★エントリー推奨", IF(VALUE(' + cColL + rowIdx + ')<=VALUE(' + buyColL + rowIdx + '), "買い目標到達", "監視中"))))';
+      else if(colName.indexOf('判定') >= 0) newRow[j] = "";
     }
     
     sheet.appendRow(newRow);
@@ -480,7 +519,7 @@ function doPost(e) {
   return ContentService.createTextOutput("not found");
 }
 ```""")
-                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbzs98lwIrUSjQ4BL7yRMT8a_A6SJ4-sj9zACR764wczyWwv4iMbISr2mxwKc8k3azU1/exec")
+                        webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL", type="password", value="https://script.google.com/macros/s/AKfycbyjktLsmbD-kiMKxYdtFuA8QVOX1cQVuXTw1oxVjDTSMul27sGnlcmQXg79btMVerHl/exec")
                         if st.button("🚀 Webhook経由でスプレッドシートを更新！"):
                             if webhook_url:
                                 with st.spinner("スプレッドシートへ送信中..."):
@@ -567,7 +606,7 @@ batch_update_method = st.radio("一括処理の方法を選択", ["Google Apps S
 
 if batch_update_method == "Google Apps Script (Webhook) を使う":
     st.info("※ この機能を使用するには、GASのコードが**「削除 (delete) アクション」対応版（上の単独更新欄に表示されている最新コード）**である必要があります。念の為、現在の単独更新欄にあるGASコードを再コピーして再度デプロイしなおすことを推奨します。")
-    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbzs98lwIrUSjQ4BL7yRMT8a_A6SJ4-sj9zACR764wczyWwv4iMbISr2mxwKc8k3azU1/exec")
+    batch_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (一括処理用)", type="password", key="batch_webhook", value="https://script.google.com/macros/s/AKfycbyjktLsmbD-kiMKxYdtFuA8QVOX1cQVuXTw1oxVjDTSMul27sGnlcmQXg79btMVerHl/exec")
     
     if st.button("🚀 ウェブ上の全銘柄を一括実行！"):
         if not batch_webhook_url:
@@ -595,18 +634,10 @@ if batch_update_method == "Google Apps Script (Webhook) を使う":
                         best_win_rate = -1
                         best_profit = -999999
                         
-                        for buy_pct in range(2, 42, 2):
-                            sim_buy = current_price * (1 - buy_pct/100)
-                            for tp_pct in range(2, 32, 2):
-                                sim_tp = sim_buy * (1 + tp_pct/100)
-                                for sl_pct in range(2, 32, 2):
-                                    sim_sl = sim_buy * (1 - sl_pct/100)
-                                    t_trades, w_rate, e_val, _ = run_backtest(hist, sim_buy, sim_tp, sim_sl)
-                                    if t_trades >= 2:
-                                        if w_rate > best_win_rate or (w_rate == best_win_rate and e_val > best_profit):
-                                            best_win_rate = w_rate
-                                            best_profit = e_val
-                                            best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
+                        buy_range = range(2, 42, 2)
+                        tp_range = range(2, 32, 2)
+                        sl_range = range(2, 32, 2)
+                        best_params, best_win_rate, best_profit = optimize_params_walk_forward(hist, buy_range, tp_range, sl_range)
                         
                         # API(GAS)への負荷を抑えるために1秒待機
                         time.sleep(1)
@@ -691,18 +722,10 @@ else:
                             best_win_rate = -1
                             best_profit = -999999
                             
-                            for buy_pct in range(2, 42, 2):
-                                sim_buy = current_price * (1 - buy_pct/100)
-                                for tp_pct in range(2, 32, 2):
-                                    sim_tp = sim_buy * (1 + tp_pct/100)
-                                    for sl_pct in range(2, 32, 2):
-                                        sim_sl = sim_buy * (1 - sl_pct/100)
-                                        t_trades, w_rate, e_val, _ = run_backtest(hist, sim_buy, sim_tp, sim_sl)
-                                        if t_trades >= 2:
-                                            if w_rate > best_win_rate or (w_rate == best_win_rate and e_val > best_profit):
-                                                best_win_rate = w_rate
-                                                best_profit = e_val
-                                                best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
+                            buy_range = range(2, 42, 2)
+                            tp_range = range(2, 32, 2)
+                            sl_range = range(2, 32, 2)
+                            best_params, best_win_rate, best_profit = optimize_params_walk_forward(hist, buy_range, tp_range, sl_range)
                                                 
                             if best_params is not None and best_win_rate > 70:
                                 results_to_update.append({"code": str(code), "params": best_params})
@@ -762,7 +785,7 @@ st.subheader("🤖 リアルタイム監視 ＆ 新規スクリーニング (全
 st.markdown("監視中の全銘柄の現在価格をチェックし、**買い目標から大幅に乖離した銘柄（上方に+15% または 下方に-10%）を自動で削除**します。\n銘柄が削除されて枠が空いた分（最大50銘柄）だけ、新しい有望銘柄を自動で探し出し、スプレッドシートに追加します。")
 
 st.info("※ この機能は「GAS (Webhook)」を利用します。上の新しいコード例をGASにデプロイしてURLを入力してください。")
-live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbzs98lwIrUSjQ4BL7yRMT8a_A6SJ4-sj9zACR764wczyWwv4iMbISr2mxwKc8k3azU1/exec")
+live_webhook_url = st.text_input("GAS デプロイ済みのウェブアプリURL (監視＆スクリーニング用)", type="password", key="live_webhook", value="https://script.google.com/macros/s/AKfycbyjktLsmbD-kiMKxYdtFuA8QVOX1cQVuXTw1oxVjDTSMul27sGnlcmQXg79btMVerHl/exec")
 
 if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行"):
     st.cache_data.clear()
@@ -842,12 +865,13 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
 
             target_holdings = 50
             current_holdings = len(valid_df) - removed_count
-            needed_count = target_holdings - current_holdings
+            # 最低3銘柄は追加するように目標を設定
+            needed_count = max(3, target_holdings - current_holdings)
             
             if needed_count > 0:
                 st.write("---")
-                st.write(f"### 🔍 2. 新規銘柄のスクリーニング (不足 {needed_count} 枠)")
-                st.write(f"現在の監視銘柄数: {current_holdings} / 目標: {target_holdings}")
+                st.write(f"### 🔍 2. 新規銘柄のスクリーニング (目標追加数: {needed_count})")
+                st.write(f"現在の監視銘柄数: {current_holdings} / ターゲット: {target_holdings}")
                 
                 # さらに母数を増やし、東証プライム・スタンダードの主要銘柄を約200銘柄に拡張
                 sample_tickers = [
@@ -876,214 +900,165 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                 for i, s_code in enumerate(sample_tickers):
                     progress_pct = int(((i + 1) / total_samples) * 100)
                     progress_bar_2.progress((i + 1) / total_samples)
-                    progress_text_2.text(f"一次スクリーニング中 (時価総額・PBR条件確認): {i+1} / {total_samples} 件 ({progress_pct}%)")
+                    progress_text_2.text(f"上昇トレンド・押し目スクリーニング中: {i+1} / {total_samples} 件 ({progress_pct}%)")
                     
                     if s_code in df['コード'].values:
                         continue
                     try:
                         ticker = yf.Ticker(f"{s_code}.T")
                         info = ticker.info
-                        hist = ticker.history(period="3mo")
-                        if hist.empty or pd.isna(info.get('marketCap')) or len(hist) < 30:
-                            continue
-                            
+                        # トレンド判定のため6ヶ月分のデータを取得
+                        hist_6m = ticker.history(period="6mo")
+                        if len(hist_6m) < 75: continue
+                        
+                        # テクニカル指標計算
+                        close = hist_6m['Close']
+                        sma25 = close.rolling(window=25).mean().iloc[-1]
+                        sma75 = close.rolling(window=75).mean().iloc[-1]
+                        prev_sma75 = close.rolling(window=75).mean().iloc[-5]
+                        
+                        last_p = float(close.iloc[-1])
                         mc = info.get('marketCap', 0)
-                        pbr = info.get('priceToBook', 0)
-                        dividend = info.get('dividendYield', 0)
-                        forward_pe = info.get('forwardPE', 0)
-                        trailing_eps = info.get('trailingEps', 0)
                         
-                        hist['SMA25'] = hist['Close'].rolling(window=25).mean()
-                        delta = hist['Close'].diff()
-                        gain = delta.clip(lower=0).rolling(window=14).mean()
-                        loss = -delta.clip(upper=0).rolling(window=14).mean()
-                        rs = gain / loss
-                        hist['RSI'] = 100 - (100 / (1 + rs))
+                        # 【戦略変更】: 上昇トレンド（75日線より上で、75日線が上向き）を必須条件に
+                        is_uptrend = (last_p > sma75) and (sma75 > prev_sma75)
                         
-                        last_price = float(hist['Close'].iloc[-1])
-                        sma25 = float(hist['SMA25'].iloc[-1])
-                        rsi = float(hist['RSI'].iloc[-1])
-                        
-                        if last_price < 100: continue
-                        
-                        deviation = (last_price - sma25) / sma25 * 100
-                        
-                        # 3-6銘柄発見を目指し、さらに条件を緩めます
-                        if deviation <= 5 and rsi <= 65:
-                            if 10_000_000_000 <= mc <= 3_000_000_000_000 and 0.1 <= pbr <= 6.0:
-                                is_day_trade = (deviation <= 0 and rsi <= 55)
-                                is_swing_value = (pbr <= 1.2 and (dividend is not None and dividend >= 0.02))
-                                
-                                if is_day_trade or is_swing_value or (deviation <= -3 and forward_pe > 0):
-                                    candidates.append({
-                                        "code": s_code,
-                                        "pbr": pbr,
-                                        "dividend": dividend,
-                                        "drop_pct": abs(deviation),
-                                        "deviation": deviation,
-                                        "rsi": rsi,
-                                        "last_price": last_price,
-                                        "mc": mc
-                                    })
+                        if is_uptrend and last_p >= 100:
+                            # 乖離率計算
+                            deviation = (last_p - sma25) / sma25 * 100
+                            
+                            # 押し目（25日線から-5% 〜 +5%程度）を狙う
+                            if -5 <= deviation <= 5:
+                                candidates.append({
+                                    "code": s_code,
+                                    "pbr": info.get('priceToBook', 0),
+                                    "dividend": info.get('dividendYield', 0),
+                                    "deviation": deviation,
+                                    "last_price": last_p,
+                                    "mc": mc
+                                })
                     except Exception:
                         pass
-                
-                # 下落率が大きい順（大きく売られている順）に並び替え
-                candidates = sorted(candidates, key=lambda x: x['drop_pct'], reverse=True)
-                progress_text_2.text(f"✅ 一次スクリーニング完了: {len(candidates)}件の候補を発見")
-                
-                if not candidates:
-                    st.warning("⚠️ 条件に全く合致する銘柄が見つかりませんでした。別の日に再度お試しください。")
-                else:
-                    st.write("---")
-                    st.write("### 💻 3. 候補銘柄の勝率最適化 (AIバックテスト)")
-                    added_count = 0
+                for cand in candidates:
+                    s_code = cand['code']
+                    pbr = cand['pbr']
+                    c_div = cand['dividend']
+                    c_mc = cand['mc']
                     
-                    progress_bar_3 = st.progress(0)
-                    progress_text_3 = st.empty()
-                    total_cands = len(candidates)
                     
-                    for i, cand in enumerate(candidates):
-                        progress_pct = int(((i + 1) / total_cands) * 100)
-                        progress_bar_3.progress((i + 1) / total_cands)
-                        progress_text_3.text(f"最適ライン探索中 (勝率70%以上の条件を探しています): {i+1} / {total_cands} 銘柄 ({progress_pct}%)")
+                    # 銘柄名を取得
+                    try:
+                        t_obj = yf.Ticker(f"{s_code}.T")
+                        ticker_name = t_obj.info.get('shortName') or t_obj.info.get('longName') or s_code
+                    except:
+                        ticker_name = s_code
                         
-                        if added_count >= needed_count:
-                            progress_text_3.text("✅ 必要な数の銘柄を追加完了しました！(100%)")
-                            break
+                    st.write(f"🔄 **{ticker_name} ({s_code})** (25日乖離: {cand.get('deviation', 0):.1f}%, RSI: {cand.get('rsi', 0):.1f}) の勝率を極限まで高めています...")
+                    
+                    # 勝率を限界まで高める2年分バックテスト
+                    hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
+                    if hist_2y.empty:
+                        continue
                         
-                        s_code = cand['code']
-                        pbr = cand['pbr']
-                        drop_pct = cand['drop_pct']
-                        c_div = cand['dividend']
-                        c_mc = cand['mc']
+                    current_price = hist_2y['Close'].iloc[-1]
+                    best_params = None
+                    best_win_rate = -1
+                    best_profit = -999999
+                    
+                    buy_range = [0, 1, 2, 3]
+                    tp_range = range(2, 22, 2)
+                    sl_range = range(2, 16, 2)
+                    best_params, best_win_rate, best_profit = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
+                    
+                    # ======= [一定の安全ライン（勝率65%以上）があれば採用] =======
+                    # 勝率の合格ラインを70%→65%に少し緩和し、候補を増やします
+                    if (best_params is not None and best_win_rate >= 55): # 勝率基準をさらに緩和
+                        # AI分析風の動的テキスト生成
+                        deviation = cand.get('deviation', 0)
+                        rsi = cand.get('rsi', 0)
                         
-                        
-                        # 銘柄名を取得
-                        try:
-                            t_obj = yf.Ticker(f"{s_code}.T")
-                            ticker_name = t_obj.info.get('shortName') or t_obj.info.get('longName') or s_code
-                        except:
-                            ticker_name = s_code
-                            
-                        st.write(f"🔄 **{ticker_name} ({s_code})** (25日乖離: {cand.get('deviation', 0):.1f}%, RSI: {cand.get('rsi', 0):.1f}) の勝率を極限まで高めています...")
-                        
-                        # 勝率を限界まで高める2年分バックテスト
-                        hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
-                        if hist_2y.empty:
-                            continue
-                            
-                        current_price = hist_2y['Close'].iloc[-1]
-                        best_params = None
-                        best_win_rate = -1
-                        best_profit = -999999
-                        
-                        for buy_pct in [0, 1, 2, 3]:  # デイトレ最適化: 買い目標を浅く（0〜3%下）設定
-                            sim_buy = current_price * (1 - buy_pct/100)
-                            for tp_pct in range(2, 22, 2): # 利確目標を細かく (2%〜20%)
-                                sim_tp = sim_buy * (1 + tp_pct/100)
-                                # 【重要修復】利確目標が今の株価より低いと、追加後すぐに「利確達成」になってしまうのを防ぐ
-                                if sim_tp <= current_price * 1.01:
-                                    continue
-                                    
-                                for sl_pct in range(2, 16, 2): # 損切りライン (2%〜14%)
-                                    sim_sl = sim_buy * (1 - sl_pct/100)
-                                    t_trades, w_rate, e_val, _ = run_backtest(hist_2y, sim_buy, sim_tp, sim_sl)
-                                    if t_trades >= 2:
-                                        if w_rate > best_win_rate or (w_rate == best_win_rate and e_val > best_profit):
-                                            best_win_rate = w_rate
-                                            best_profit = e_val
-                                            best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
-                        
-                        # ======= [一定の安全ライン（勝率65%以上）があれば採用] =======
-                        # 勝率の合格ラインを70%→65%に少し緩和し、候補を増やします
-                        if (best_params is not None and best_win_rate >= 55): # 勝率基準をさらに緩和
-                            # AI分析風の動的テキスト生成
-                            deviation = cand.get('deviation', 0)
-                            rsi = cand.get('rsi', 0)
-                            
-                            # 以前の仕様（色分けカテゴリ）に基づいたAI分析コメント生成
-                            rsi_status = "底値圏/要注目" if rsi < 35 else ("割安圏" if rsi < 45 else "中立")
-                            ai_color = "orange"
-                            ai_text = f"【逆張り・急反発期待】25日乖離 {deviation:.1f}% / RSI {rsi:.1f} ({rsi_status})。過去データ勝率 {best_win_rate:.0f}% の優位点。リバウンドを狙った待ち伏せが有効な水準です。"
+                        # 以前の仕様（色分けカテゴリ）に基づいたAI分析コメント生成
+                        rsi_status = "底値圏/要注目" if rsi < 35 else ("割安圏" if rsi < 45 else "中立")
+                        ai_color = "orange"
+                        ai_text = f"【逆張り・急反発期待】25日乖離 {deviation:.1f}% / RSI {rsi:.1f} ({rsi_status})。過去データ勝率 {best_win_rate:.0f}% の優位点。リバウンドを狙った待ち伏せが有効な水準です。"
 
-                            if pbr > 0 and pbr <= 1.2:
-                                ai_color = "yellow"
-                                ai_text = f"【割安・バリュー銘柄】PBR {pbr:.2f}倍と資産面で割安。RSI {rsi:.1f}で底入れを示唆。過去統計勝率 {best_win_rate:.0f}%。中長期の押し目買い候補です。"
-                            elif c_div is not None and c_div >= 0.03:
-                                ai_color = "green"
-                                ai_text = f"【高配当・安定利回り】利回り {c_div*100:.1f}%。配当による下支えが期待される異常乖離 ({deviation:.1f}%) ポイント。勝率 {best_win_rate:.0f}% の反発期待ライン。"
-                            elif c_mc > 100_000_000_000:
-                                ai_color = "blue"
-                                mc_oku = c_mc / 1_0000_0000
-                                ai_text = f"【大型主力・リバウンド狙い】時価総額 {mc_oku:,.0f}億円の主力大型株。乖離率 {deviation:.1f}% からの需給回復を予測。AI抽出勝率 {best_win_rate:.0f}%。"
+                        if pbr > 0 and pbr <= 1.2:
+                            ai_color = "yellow"
+                            ai_text = f"【割安・バリュー銘柄】PBR {pbr:.2f}倍と資産面で割安。RSI {rsi:.1f}で底入れを示唆。過去統計勝率 {best_win_rate:.0f}%。中長期の押し目買い候補です。"
+                        elif c_div is not None and c_div >= 0.03:
+                            ai_color = "green"
+                            ai_text = f"【高配当・安定利回り】利回り {c_div*100:.1f}%。配当による下支えが期待される異常乖離 ({deviation:.1f}%) ポイント。勝率 {best_win_rate:.0f}% の反発期待ライン。"
+                        elif c_mc > 100_000_000_000:
+                            ai_color = "blue"
+                            mc_oku = c_mc / 1_0000_0000
+                            ai_text = f"【大型主力・リバウンド狙い】時価総額 {mc_oku:,.0f}億円の主力大型株。乖離率 {deviation:.1f}% からの需給回復を予測。AI抽出勝率 {best_win_rate:.0f}%。"
 
-                            # ホームページ（WordPress）用のリッチコンテンツ
-                            hp_draft = (
-                                f"【AI厳選銘柄 分析レポート】\n"
-                                f"対象銘柄: {ticker_name} ({s_code})\n\n"
-                                f"■ 市場データ & テクニカル評価\n"
+                        # ホームページ（WordPress）用のリッチコンテンツ
+                        hp_draft = (
+                            f"【AI厳選銘柄 分析レポート】\n"
+                            f"対象銘柄: {ticker_name} ({s_code})\n\n"
+                            f"■ 市場データ & テクニカル評価\n"
                                 f"・25日移動平均線乖離率: {deviation:.1f}%\n"
-                                f"・RSI (相対力指数): {rsi:.1f} ({rsi_status})\n"
-                                f"・PBR: {pbr:.2f}倍\n\n"
-                                f"■ AIによる投資考察\n"
-                                f"{ai_text}\n\n"
-                                f"■ 戦略ガイドスコア（過去勝率 {best_win_rate:.0f}% モデル）\n"
-                                f"・推奨 買いポイント: {int(best_params['Buy'])}円\n"
-                                f"・想定 利確ターゲット: {int(best_params['TakeProfit'])}円\n"
-                                f"・最終 損切りライン: {int(best_params['StopLoss'])}円\n\n"
-                                f"※本レポートはAIによる過去統計の解析結果であり、実際の投資判断は自己責任にてお願いいたします。"
-                            )
+                            f"・RSI (相対力指数): {rsi:.1f} ({rsi_status})\n"
+                            f"・PBR: {pbr:.2f}倍\n\n"
+                            f"■ AIによる投資考察\n"
+                            f"{ai_text}\n\n"
+                            f"■ 戦略ガイドスコア（過去勝率 {best_win_rate:.0f}% モデル）\n"
+                            f"・推奨 買いポイント: {int(best_params['Buy'])}円\n"
+                            f"・想定 利確ターゲット: {int(best_params['TakeProfit'])}円\n"
+                            f"・最終 損切りライン: {int(best_params['StopLoss'])}円\n\n"
+                            f"※本レポートはAIによる過去統計の解析結果であり、実際の投資判断は自己責任にてお願いいたします。"
+                        )
 
-                            # SNS用
-                            x_text = f"【AI厳選】{ticker_name}({s_code}) 現在値:{int(current_price)}円 目安:{int(best_params['Buy'])}円 勝率:{best_win_rate:.0f}% 詳細はHPへ"
+                        # SNS用
+                        x_text = f"【AI厳選】{ticker_name}({s_code}) 現在値:{int(current_price)}円 目安:{int(best_params['Buy'])}円 勝率:{best_win_rate:.0f}% 詳細はHPへ"
 
-                            # WordPress投稿（ホームページ追加）
-                            import xmlrpc.client
-                            try:
-                                wp_url = os.environ.get("WP_URL")
-                                wp_user = os.environ.get("WP_USERNAME")
-                                wp_pw = os.environ.get("WP_APP_PASSWORD")
-                                
-                                if wp_url and wp_user and wp_pw:
-                                    xmlrpc_url = f"{wp_url}/xmlrpc.php"
-                                    server = xmlrpc.client.ServerProxy(xmlrpc_url)
-                                    content_struct = {
-                                        'post_title': f"【本日の厳選銘柄】{ticker_name} ({s_code})",
-                                        'post_content': hp_draft.replace("\n", "<br>"),
-                                        'post_status': 'publish'
-                                    }
-                                    server.wp.newPost(1, wp_user, wp_pw, content_struct)
-                                    st.write(f"  └ ✅ ホームページ（WordPress）に記事を投稿しました。")
-                            except:
-                                pass
-
-                            payload = {
-                                "action": "add_new",
-                                "code": str(s_code),
-                                "current_price": float(current_price),
-                                "ai_text": ai_text,
-                                "ai_color": ai_color,
-                                "buy": int(best_params['Buy']),
-                                "tp": int(best_params['TakeProfit']),
-                                "sl": int(best_params['StopLoss']),
-                                "x_post_text": x_text,
-                                "hp_text": hp_draft,
-                                "sns_done": True, # 手動追加でも一旦完了扱い
-                                "sheet_sns": "SNS配信済",
-                                "sheet_x": "X配信テキスト",
-                                "sheet_hp": "ホームページへの自動記載"
-                            }
-                            res = requests.post(live_webhook_url, json=payload)
-                            if res.status_code == 200:
-                                st.success(f"✨ 新規追加: {s_code} (下落: {drop_pct:.1f}%, 勝率: {best_win_rate:.1f}%) -> スプレッドシート反映済")
-                                added_count += 1
-                        else:
-                            st.write(f"  └ ❌ {s_code} は安全な取引ライン（勝率70%超）が見つからなかったため追加を見送りました。")
+                        # WordPress投稿（ホームページ追加）
+                        import xmlrpc.client
+                        try:
+                            wp_url = os.environ.get("WP_URL")
+                            wp_user = os.environ.get("WP_USERNAME")
+                            wp_pw = os.environ.get("WP_APP_PASSWORD")
                             
-                    if added_count == 0:
-                        st.warning(f"⚠️ 調査対象の {len(candidates)} 銘柄すべてを確認しましたが、条件を満たせなかったため追加しませんでした。相場環境が悪い可能性があります。")
-                    elif added_count < needed_count:
-                        st.warning(f"⚠️ 指定した条件を満たせたのは {added_count} 銘柄のみでした。プログラミングの実行は完了しています。")
+                            if wp_url and wp_user and wp_pw:
+                                xmlrpc_url = f"{wp_url}/xmlrpc.php"
+                                server = xmlrpc.client.ServerProxy(xmlrpc_url)
+                                content_struct = {
+                                    'post_title': f"【本日の厳選銘柄】{ticker_name} ({s_code})",
+                                    'post_content': hp_draft.replace("\n", "<br>"),
+                                    'post_status': 'publish'
+                                }
+                                server.wp.newPost(1, wp_user, wp_pw, content_struct)
+                                st.write(f"  └ ✅ ホームページ（WordPress）に記事を投稿しました。")
+                        except:
+                            pass
+
+                        payload = {
+                            "action": "add_new",
+                            "code": str(s_code),
+                            "current_price": float(current_price),
+                            "ai_text": ai_text,
+                            "ai_color": ai_color,
+                            "buy": int(best_params['Buy']),
+                            "tp": int(best_params['TakeProfit']),
+                            "sl": int(best_params['StopLoss']),
+                            "x_post_text": x_text,
+                            "hp_text": hp_draft,
+                            "sns_done": True, # 手動追加でも一旦完了扱い
+                            "sheet_sns": "SNS配信済",
+                            "sheet_x": "X配信テキスト",
+                            "sheet_hp": "ホームページへの自動記載"
+                        }
+                        res = requests.post(live_webhook_url, json=payload)
+                        if res.status_code == 200:
+                            st.success(f"✨ 新規追加: {s_code} (勝率: {best_win_rate:.1f}%) -> スプレッドシート反映済")
+                            added_count += 1
+                    else:
+                        st.write(f"  └ ❌ {s_code} は安全な取引ライン（勝率70%超）が見つからなかったため追加を見送りました。")
+                        
+                if added_count == 0:
+                    st.warning(f"⚠️ 調査対象の {len(candidates)} 銘柄すべてを確認しましたが、条件を満たせなかったため追加しませんでした。相場環境が悪い可能性があります。")
+                elif added_count < needed_count:
+                    st.warning(f"⚠️ 指定した条件を満たせたのは {added_count} 銘柄のみでした。プログラミングの実行は完了しています。")
                 
             status.update(label="リアルタイム監視＆スクリーニング完了！", state="complete", expanded=True)
