@@ -42,6 +42,9 @@ WP_URL = os.environ.get("WP_URL")
 WP_USERNAME = os.environ.get("WP_USERNAME")
 WP_APP_PASSWORD = os.environ.get("WP_APP_PASSWORD")
 
+LINE_ACCESS_TOKEN = os.environ.get("LINE_ACCESS_TOKEN")
+LINE_USER_ID = os.environ.get("LINE_USER_ID")
+
 # GitHub Pages設定
 GITHUB_REPO = "p27dff96428v8m9-pixel/auto-kabu-screener"
 GITHUB_PAGES_URL = f"https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener"
@@ -158,6 +161,29 @@ def generate_fallback_article(ticker_name, code, current_price, buy_price, tp_pr
 過去の勝率は将来の成績を保証するものではありません。必ずご自身の判断と責任で投資を行ってください。
 
 ※本記事はAIによる自動分析です。投資判断は自己責任でお願いします。"""
+
+
+def send_line(message):
+    """LINE Messaging API でメッセージを送信する"""
+    if not LINE_ACCESS_TOKEN or not LINE_USER_ID:
+        logging.warning("LINE環境変数が未設定のためスキップ")
+        return
+    try:
+        requests.post(
+            "https://api.line.me/v2/bot/message/push",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
+            },
+            json={
+                "to": LINE_USER_ID,
+                "messages": [{"type": "text", "text": message}]
+            },
+            timeout=10
+        )
+        logging.info("LINE通知送信完了")
+    except Exception as e:
+        logging.error(f"LINE通知エラー: {e}")
 
 
 def post_to_twitter(base_text, link_url=None):
@@ -615,34 +641,63 @@ def check_portfolio_status():
                 hist = yf.Ticker(f"{code}.T").history(period="1mo")
                 if hist.empty: continue
                 
+                last_close = float(hist['Close'].iloc[-1])
                 last_high = float(hist['High'].iloc[-1])
                 last_low = float(hist['Low'].iloc[-1])
                 hist_low = float(hist['Low'].min())
-                
+
                 entered_flag = False
                 if buy_val and hist_low <= buy_val:
                     entered_flag = True
-                
+
                 action = None
                 if tp_val and last_high >= tp_val:
                     action = "hit_tp" if entered_flag else "delete"
                 elif sl_val and last_low <= sl_val:
                     action = "hit_sl" if entered_flag else "delete"
-                    
+
                 if action:
                     req_p = {"action": action, "code": str(code)}
                     requests.post(WEBHOOK_URL, json=req_p)
                     removed_count += 1
                     logging.info(f"{code}: {action} により削除しました")
-                    # APIへの負荷軽減
+                    # LINE通知: 損切り・利確の結果を即時通知
+                    if action == "hit_tp" and tp_val:
+                        send_line(
+                            f"✅ 利確達成！\n"
+                            f"銘柄コード: {code}\n"
+                            f"利確ライン {int(tp_val)}円 に到達しました。\n"
+                            f"ポジションをクローズしてください。"
+                        )
+                    elif action == "hit_sl" and sl_val:
+                        send_line(
+                            f"⚠️ 損切りライン到達\n"
+                            f"銘柄コード: {code}\n"
+                            f"損切りライン {int(sl_val)}円 を割り込みました。\n"
+                            f"迷わず損切りしてください。"
+                        )
                     time.sleep(1)
                 else:
+                    # エントリーアラート: 買いターゲットの±3%以内に近づいたら通知
+                    if buy_val and last_close <= buy_val * 1.03:
+                        send_line(
+                            f"🔔 エントリーチャンス接近！\n"
+                            f"銘柄コード: {code}\n"
+                            f"現在値 {int(last_close)}円 が買いターゲット {int(buy_val)}円 に近づいています。\n"
+                            f"購入タイミングを確認してください。"
+                        )
                     # 出来高急増チェック
                     if len(hist) >= 5:
                         avg_vol = hist['Volume'].iloc[:-1].mean()
                         if hist['Volume'].iloc[-1] > avg_vol * 3:
                             req_p = {"action": "update", "code": str(code), "volume_surge": True}
                             requests.post(WEBHOOK_URL, json=req_p)
+                            send_line(
+                                f"📊 出来高急増アラート\n"
+                                f"銘柄コード: {code}\n"
+                                f"本日の出来高が平均の3倍以上です。\n"
+                                f"何らかの材料が出ている可能性があります。確認してください。"
+                            )
             except Exception as e:
                 logging.error(f"{code} のチェック中エラー: {e}")
                 
@@ -1038,27 +1093,43 @@ def auto_screen_and_add():
                 logging.error(f"第3段階エラー ({s_code}): {e}")
                 continue
 
-    # ===== 最終結果の記録 =====
+    # ===== 最終結果の記録 & LINE サマリー送信 =====
+    today_str = datetime.now(JST).strftime("%Y年%m月%d日")
     if added_count == 0:
         logging.warning("3段階のスクリーニングをすべて実施しましたが、条件を満たす銘柄が見つかりませんでした。")
         no_result_article = (
-            f"## 【{datetime.now(JST).strftime('%Y年%m月%d日')}のAIスクリーニング結果】\n\n"
-            f"本日のAI自動スクリーニング（3段階・約3,000銘柄対象）を実施しましたが、\n"
+            f"## 【{today_str}のAIスクリーニング結果】\n\n"
+            f"本日のAI自動スクリーニング（3段階・約2,500銘柄対象）を実施しましたが、\n"
             f"**バックテスト勝率等の基準を満たす新銘柄は本日は見つかりませんでした。**\n\n"
             f"### 📊 本日の市場状況\n"
-            f"- スクリーニング対象: 約3,000銘柄\n"
+            f"- スクリーニング対象: 約2,500銘柄\n"
             f"- 第1段階基準: 上昇トレンド×押し目×勝率65%以上\n"
             f"- 第2段階基準: 75日線上×乖離±8%以内×勝率55%以上\n"
-            f"- 第3段階基準: 勝率50%以上 & リスクリワード比1.0以上\n\n"
+            f"- 第3段階基準: 勝率{min_winrate_stage3}%以上 & RR比2.0以上\n\n"
             f"条件に合う銘柄が見つかり次第、次回の更新でお届けします。\n\n"
             f"**焦らず、良い銘柄を厳選するのがAI投資の強みです。** 🤖"
         )
         post_to_github_pages(
             "本日は該当銘柄なし", "0000", 0, 0, 0, 0, 0, no_result_article
         )
+        send_line(
+            f"📋 {today_str} AIスクリーニング結果\n\n"
+            f"本日は条件を満たす新銘柄が見つかりませんでした。\n"
+            f"市場状況: {trend_msg}\n\n"
+            f"焦らず次回の更新をお待ちください。"
+        )
     else:
+        codes_summary = "、".join(added_codes[:5]) + ("..." if len(added_codes) > 5 else "")
         stage_summary = f"追加: {added_count}銘柄 (目標: {needed_count}銘柄)"
         logging.info(f"本日の最終結果: {stage_summary}")
+        send_line(
+            f"📋 {today_str} AIスクリーニング結果\n\n"
+            f"✅ {added_count}銘柄を新規追加しました！\n"
+            f"追加銘柄: {codes_summary}\n\n"
+            f"市場状況: {trend_msg}\n\n"
+            f"各銘柄の買いターゲットに近づいたら改めて通知します。\n"
+            f"📊 {GITHUB_PAGES_URL}"
+        )
     
     try:
         jst_now = datetime.now(JST).strftime("%Y/%m/%d %H:%M")
