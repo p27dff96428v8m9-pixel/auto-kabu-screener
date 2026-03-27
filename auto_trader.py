@@ -661,6 +661,19 @@ def check_portfolio_status():
                     requests.post(WEBHOOK_URL, json=req_p)
                     removed_count += 1
                     logging.info(f"{code}: {action} により削除しました")
+                    # 実績を記録
+                    result = "win" if action == "hit_tp" else "loss"
+                    predicted_wr = 0
+                    try:
+                        c_ai = col_idx.get('AIテキスト', col_idx.get('ai_text', -1))
+                        if c_ai != -1 and len(row) > c_ai:
+                            import re
+                            m = re.search(r'勝率(\d+)', str(row[c_ai]))
+                            if m:
+                                predicted_wr = int(m.group(1))
+                    except Exception:
+                        pass
+                    record_trade_result(code, predicted_wr, result)
                     # LINE通知は GAS の checkAndNotify() に一本化（二重通知防止）
                     time.sleep(1)
                 else:
@@ -678,23 +691,297 @@ def check_portfolio_status():
         logging.error(f"ステータスチェック中に通信エラー: {e}")
 
 
-def get_market_trend():
-    """TOPIXのトレンドを確認し、強い下落トレンドならFalseを返す"""
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TRADE_RESULTS_PATH = os.path.join(BASE_DIR, "trade_results.json")
+STRATEGIES_PATH = os.path.join(BASE_DIR, "strategies.json")
+
+
+def load_strategies():
+    """戦略設定を読み込む"""
     try:
-        topix = yf.Ticker("1305.T")  # TOPIX連動ETF
-        hist = topix.history(period="3mo")
+        with open(STRATEGIES_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {
+            "active_strategy": "B",
+            "strategies": {
+                "B": {"name": "通常戦略", "stage1_winrate": 70, "stage2_winrate": 65,
+                      "target_holdings": 15, "dip_range_pct": 0.05}
+            }
+        }
+
+
+def get_active_strategy():
+    """現在アクティブな戦略のパラメータを返す"""
+    data = load_strategies()
+    key = data.get("active_strategy", "B")
+    return key, data["strategies"].get(key, data["strategies"]["B"])
+
+
+def save_active_strategy(new_key):
+    """アクティブ戦略を変更して保存する"""
+    try:
+        with open(STRATEGIES_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["active_strategy"] = new_key
+        with open(STRATEGIES_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logging.error(f"strategies.json 保存失敗: {e}")
+
+
+def record_trade_result(code, predicted_winrate, result):
+    """利確/損切の実績を記録する（result: 'win' or 'loss'）"""
+    try:
+        with open(TRADE_RESULTS_PATH, "r", encoding="utf-8") as f:
+            results = json.load(f)
+    except Exception:
+        results = []
+
+    results.append({
+        "code": str(code),
+        "predicted_winrate": predicted_winrate,
+        "result": result,
+        "date": datetime.now(JST).strftime("%Y-%m-%d")
+    })
+
+    try:
+        with open(TRADE_RESULTS_PATH, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+        logging.info(f"実績記録: {code} → {result} (予測勝率:{predicted_winrate}%)")
+    except Exception as e:
+        logging.error(f"trade_results.json 保存失敗: {e}")
+
+
+def auto_switch_strategy():
+    """日次：相場状況×実績のツリーで最適戦略に自動切替しLINEで報告する"""
+    # 相場状況を取得
+    market_status, market_msg = get_market_status()
+
+    # 実績データを読み込む
+    try:
+        with open(TRADE_RESULTS_PATH, "r", encoding="utf-8") as f:
+            results = json.load(f)
+    except Exception:
+        results = []
+
+    # 実績が少ない場合は相場状況だけで判断
+    if len(results) < 10:
+        perf = "unknown"
+        actual_winrate = 0
+        gap = 0
+    else:
+        recent = results[-30:]
+        wins = sum(1 for r in recent if r["result"] == "win")
+        actual_winrate = wins / len(recent) * 100
+        avg_predicted = sum(r["predicted_winrate"] for r in recent) / len(recent)
+        gap = avg_predicted - actual_winrate
+        if gap <= -5:
+            perf = "good"    # 実際が予測を上回る好調
+        elif gap < 10:
+            perf = "normal"  # 通常範囲
+        elif gap < 20:
+            perf = "bad"     # やや不調
+        else:
+            perf = "crisis"  # 大幅不調
+
+    # ===== 戦略決定ツリー =====
+    if market_status == "crash":
+        new_key = "E"  # 急落 → 問答無用で完全停止
+    elif market_status == "mild_down":
+        new_key = "D"  # 下落 → 守備
+    elif market_status == "flat":
+        if perf in ("good", "normal", "unknown"):
+            new_key = "C"  # 横ばい×普通以上 → 慎重
+        else:
+            new_key = "D"  # 横ばい×不調 → 守備
+    elif market_status == "mild_up":
+        if perf == "good":
+            new_key = "B"  # 緩上昇×好調 → 通常
+        elif perf in ("normal", "unknown"):
+            new_key = "B"  # 緩上昇×普通 → 通常
+        else:
+            new_key = "C"  # 緩上昇×不調 → 慎重
+    else:  # strong_up
+        if perf == "good":
+            new_key = "A"  # 強上昇×好調 → 強気
+        elif perf == "normal":
+            new_key = "B"  # 強上昇×普通 → 通常
+        else:
+            new_key = "C"  # 強上昇×不調 → 慎重
+
+    data = load_strategies()
+    old_key = data.get("active_strategy", "B")
+    old_name = data["strategies"][old_key]["name"]
+    new_name = data["strategies"][new_key]["name"]
+    save_active_strategy(new_key)
+
+    changed = old_key != new_key
+    change_label = f"切替: {old_name} → {new_name}" if changed else f"維持: {new_name}"
+    perf_label = {"good": "好調", "normal": "普通", "bad": "不調", "crisis": "危機", "unknown": "実績少"}.get(perf, "")
+
+    msg = (
+        f"【戦略自動切替レポート】\n"
+        f"相場: {market_msg}\n"
+        f"実績: {perf_label}"
+        + (f"（勝率{actual_winrate:.1f}% 乖離{gap:+.1f}%）" if perf != "unknown" else "") +
+        f"\n\n→ {change_label}\n"
+        f"閾値: {data['strategies'][new_key]['stage1_winrate']}% "
+        f"上限: {data['strategies'][new_key]['target_holdings']}銘柄"
+    )
+    if changed:
+        send_line_message(msg)
+    logging.info(f"戦略決定: {new_key}（相場={market_status} 実績={perf}）")
+
+
+def gemini_analyze_financials(code, ticker_name):
+    """Geminiに決算書データを渡して銘柄の財務健全性を判定する。
+    戻り値: (score: int, reason: str)
+      score 2=良好 / 1=要注意 / 0=不良
+    """
+    if not genai or not GEMINI_API_KEY:
+        return 1, "Gemini未使用のため要注意扱い"
+    try:
+        ticker = yf.Ticker(f"{code}.T")
+        info = ticker.info
+        fins = ticker.quarterly_financials
+        bs = ticker.quarterly_balance_sheet
+
+        # 売上・利益の成長率を計算
+        revenue_growth = "不明"
+        op_profit_growth = "不明"
+        equity_ratio = "不明"
+
+        if fins is not None and not fins.empty and fins.shape[1] >= 2:
+            rev_row = [r for r in fins.index if "Revenue" in str(r) or "売上" in str(r)]
+            op_row = [r for r in fins.index if "Operating" in str(r) or "営業" in str(r)]
+            if rev_row:
+                r_new = fins.loc[rev_row[0]].iloc[0]
+                r_old = fins.loc[rev_row[0]].iloc[1]
+                if r_old and r_old != 0:
+                    revenue_growth = f"{(r_new / r_old - 1) * 100:+.1f}%"
+            if op_row:
+                o_new = fins.loc[op_row[0]].iloc[0]
+                o_old = fins.loc[op_row[0]].iloc[1]
+                if o_old and o_old != 0:
+                    op_profit_growth = f"{(o_new / o_old - 1) * 100:+.1f}%"
+
+        if bs is not None and not bs.empty:
+            eq_row = [r for r in bs.index if "Equity" in str(r) or "自己資本" in str(r)]
+            as_row = [r for r in bs.index if "Total Assets" in str(r) or "総資産" in str(r)]
+            if eq_row and as_row:
+                eq = bs.loc[eq_row[0]].iloc[0]
+                ta = bs.loc[as_row[0]].iloc[0]
+                if ta and ta != 0:
+                    equity_ratio = f"{eq / ta * 100:.1f}%"
+
+        per = info.get("trailingPE", "不明")
+        pbr = info.get("priceToBook", "不明")
+        per_str = f"{per:.1f}倍" if isinstance(per, float) else "不明"
+        pbr_str = f"{pbr:.2f}倍" if isinstance(pbr, float) else "不明"
+
+        prompt = f"""あなたは日本株の財務分析の専門家です。
+以下の財務データをもとに、この銘柄への投資判断を3段階で答えてください。
+
+【銘柄】{ticker_name}（{code}）
+【直近決算】
+- 売上成長率（前四半期比）: {revenue_growth}
+- 営業利益成長率（前四半期比）: {op_profit_growth}
+- 自己資本比率: {equity_ratio}
+- PER: {per_str}
+- PBR: {pbr_str}
+
+【回答形式】必ず以下のJSON形式のみで答えること。説明文は不要。
+{{"score": 2, "reason": "理由を30文字以内で"}}
+scoreは 2=良好 / 1=要注意 / 0=不良 のいずれか。"""
+
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        text = response.text.strip()
+        # JSON部分を抽出
+        import re
+        m = re.search(r'\{.*\}', text, re.DOTALL)
+        if m:
+            data = json.loads(m.group())
+            return int(data.get("score", 1)), str(data.get("reason", ""))
+    except Exception as e:
+        logging.warning(f"Gemini財務分析エラー ({code}): {e}")
+    return 1, "分析エラーのため要注意扱い"
+
+
+def gemini_analyze_performance():
+    """月次：Geminiに実績を渡して敗因分析・改善コメントをLINEで通知する"""
+    if not genai or not GEMINI_API_KEY:
+        return
+
+    try:
+        with open(TRADE_RESULTS_PATH, "r", encoding="utf-8") as f:
+            results = json.load(f)
+    except Exception:
+        return
+
+    if len(results) < 10:
+        return
+
+    recent = results[-30:]
+    wins = [r for r in recent if r["result"] == "win"]
+    losses = [r for r in recent if r["result"] == "loss"]
+    actual_winrate = len(wins) / len(recent) * 100
+    avg_predicted = sum(r["predicted_winrate"] for r in recent) / len(recent)
+    _, strategy = get_active_strategy()
+
+    prompt = f"""あなたは日本株の自動トレードシステムの専門家です。
+以下の実績データを分析してください。
+
+直近{len(recent)}件: 勝{len(wins)}件 / 負{len(losses)}件
+実際の勝率: {actual_winrate:.1f}% / 予測平均: {avg_predicted:.1f}%
+現在の戦略: {strategy['name']}（第1段階閾値{strategy['stage1_winrate']}%）
+
+【答えてほしいこと（LINEで読みやすく200文字以内）】
+1. 不調の原因として考えられること（1〜2つ）
+2. 現状の戦略で注意すべき点（1つ）"""
+
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        if response.text:
+            send_line_message(f"【AIコメント】\n\n{response.text.strip()}")
+            logging.info("Gemini月次分析をLINEに送信しました")
+    except Exception as e:
+        logging.error(f"Gemini月次分析エラー: {e}")
+
+
+def get_market_status():
+    """TOPIXを5段階で判定して返す: strong_up / mild_up / flat / mild_down / crash"""
+    try:
+        topix = yf.Ticker("1305.T")
+        hist = topix.history(period="6mo")
         if len(hist) < 25:
-            return True, "データ不足のためスクリーニング続行"
+            return "mild_up", "データ不足のため通常扱い"
         close = hist['Close']
+        current = float(close.iloc[-1])
         sma25 = float(close.rolling(25).mean().iloc[-1])
         sma75 = float(close.rolling(min(75, len(close))).mean().iloc[-1])
-        current = float(close.iloc[-1])
-        # 現在値が25日線を3%以上下回り、かつ25日線が75日線を下回っている = 強い下落トレンド
-        if current < sma25 * 0.97 and sma25 < sma75:
-            return False, f"TOPIX下落トレンド中 (現値:{current:.0f} < SMA25:{sma25:.0f})"
-        return True, f"TOPIX良好 (現値:{current:.0f}, SMA25:{sma25:.0f})"
+        prev_sma75 = float(close.rolling(min(75, len(close))).mean().iloc[-5])
+
+        if current < sma75 * 0.95:
+            return "crash", f"急落（現値{current:.0f} < SMA75×0.95={sma75*0.95:.0f}）"
+        elif current < sma25:
+            return "mild_down", f"緩やかな下落（現値{current:.0f} < SMA25={sma25:.0f}）"
+        elif sma75 <= prev_sma75 * 1.001 and current < sma25 * 1.03:
+            return "flat", f"横ばい（SMA75ほぼ横ばい 現値{current:.0f}）"
+        elif current >= sma25 * 1.03 and sma25 > sma75:
+            return "strong_up", f"強い上昇（現値{current:.0f} SMA25={sma25:.0f} SMA75={sma75:.0f}）"
+        else:
+            return "mild_up", f"緩やかな上昇（現値{current:.0f} SMA75={sma75:.0f}）"
     except Exception as e:
-        return True, f"TOPIXチェックエラー({e})のためスクリーニング続行"
+        return "mild_up", f"TOPIXチェックエラー({e})のため通常扱い"
+
+
+def get_market_trend():
+    """後方互換用：get_market_statusをラップして真偽値で返す"""
+    status, msg = get_market_status()
+    return status not in ("crash", "mild_down"), msg
 
 
 # 東証に実際に上場している銘柄コードの主要範囲
@@ -732,10 +1019,14 @@ def auto_screen_and_add():
         max_gain = int((best_params['TakeProfit'] - best_params['Buy']) * lot_size)
         ai_text = (
             f"【AI判定】勝率{best_win_rate:.0f}% RR比{rr_ratio:.1f}:1 | "
+            f"財務:{fin_label}（{fin_reason}）| "
             f"推奨{lot_size}株（投資額約{invest_amount:,}円）| "
             f"最大損失-{max_loss:,}円 / 利確+{max_gain:,}円"
         )
-        ai_color = "orange" if best_win_rate < 70 else "green"
+        fin_score = cand.get('financial_score', 1)
+        fin_reason = cand.get('financial_reason', '')
+        fin_label = {2: "良好", 1: "要注意", 0: "不良"}.get(fin_score, "不明")
+        ai_color = "orange" if best_win_rate < 70 or fin_score < 2 else "green"
         
         hp_article = generate_ai_article(
             ticker_name, s_code, current_price,
@@ -782,10 +1073,16 @@ def auto_screen_and_add():
             logging.error(f"スプレッドシート追加エラー ({s_code}): {e}")
         return False
     
-    # 市場トレンドチェック（強い下落相場では第3段階の勝率基準を引き上げ）
+    # アクティブ戦略を読み込む（月次自動切替で更新される）
+    strategy_key, strategy = get_active_strategy()
+    min_winrate_stage1 = strategy.get("stage1_winrate", 70)
+    min_winrate_stage2 = strategy.get("stage2_winrate", 65)
+    dip_range = strategy.get("dip_range_pct", 0.05)
+    logging.info(f"起動中の戦略: {strategy['name']}（第1段階={min_winrate_stage1}% / 第2段階={min_winrate_stage2}%）")
+
+    # 市場トレンドチェック
     is_uptrend, trend_msg = get_market_trend()
     logging.info(f"市場トレンド判定: {trend_msg}")
-    min_winrate_stage3 = 50 if is_uptrend else 55  # 下落相場は基準引き上げ
 
     import random
     # 実在コード範囲からランダムサンプリング（1300-9999全列挙より大幅に効率化）
@@ -890,9 +1187,31 @@ def auto_screen_and_add():
         time.sleep(2)
     
     logging.info(f"テクニカルフィルタ通過候補: {len(candidates)} 銘柄")
-    # 乖離率が小さい順（SMA25に近い順）に並び替え
-    # → Stage 1/2 の押し目条件を満たしやすい銘柄が先頭に来るため効率的に探索できる
-    candidates = sorted(candidates, key=lambda x: abs(x['deviation']))
+
+    # ── 財務スコアをGeminiで付与（上位30件のみ、API負荷対策）──
+    top_candidates = sorted(candidates, key=lambda x: abs(x['deviation']))[:30]
+    for cand in top_candidates:
+        try:
+            t_obj = yf.Ticker(f"{cand['code']}.T")
+            t_name = t_obj.info.get('shortName') or cand['code']
+            score, reason = gemini_analyze_financials(cand['code'], t_name)
+            cand['financial_score'] = score
+            cand['financial_reason'] = reason
+            logging.info(f"財務スコア {cand['code']}: {score}点 ({reason})")
+            time.sleep(1)  # API負荷対策
+        except Exception:
+            cand['financial_score'] = 1
+            cand['financial_reason'] = "取得エラー"
+
+    # 財務スコアがない銘柄はデフォルト1点
+    for cand in candidates:
+        if 'financial_score' not in cand:
+            cand['financial_score'] = 1
+            cand['financial_reason'] = "未評価"
+
+    # 財務不良（0点）は除外し、財務スコア降順×乖離率昇順で並び替え
+    candidates = [c for c in candidates if c.get('financial_score', 1) >= 1]
+    candidates = sorted(candidates, key=lambda x: (-x.get('financial_score', 1), abs(x['deviation'])))
     try:
         res = requests.post(WEBHOOK_URL, json={"action": "get_all"})
         all_rows = res.json()
@@ -904,16 +1223,16 @@ def auto_screen_and_add():
         existing_codes = []
 
     current_count = len(existing_codes)
-    target_holdings = 50
-    # 毎日最低3銘柄は追加したいという要望に対応
-    needed_count = max(3, target_holdings - current_count)
+    target_holdings = strategy.get("target_holdings", 15)
+    # 条件を満たす銘柄だけ追加（強制追加なし）
+    needed_count = max(0, target_holdings - current_count)
     added_count = 0
-    added_codes = []  
-    
+    added_codes = []
+
     logging.info(f"現在の監視銘柄数: {current_count} / 目標: {target_holdings} (今回の追加目標: {needed_count} 銘柄)")
             
-    # ===== 第1段階: 【最高品質】上昇トレンド(75日線上) + 25日線押し目 + 勝率65%以上 =====
-    logging.info(f"--- 第1段階: 上昇トレンド×押し目×勝率65%以上を探索 ---")
+    # ===== 第1段階: 【最高品質】上昇トレンド(75日線上) + 25日線押し目 + 勝率70%以上 =====
+    logging.info(f"--- 第1段階: 上昇トレンド×押し目×勝率70%以上を探索 ---")
     for cand in candidates:
         if added_count >= needed_count:
             break
@@ -956,8 +1275,8 @@ def auto_screen_and_add():
                     sl_range = [3, 5, 7]
                     best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
 
-                # 第1段階: 高い勝率基準（65%以上）
-                if best_params and best_win_rate >= 65:
+                # 第1段階: 高い勝率基準（自動調整された閾値）
+                if best_params and best_win_rate >= min_winrate_stage1:
                     cand['current_price'] = curr_p
                     cand['stage'] = 1
                     if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
@@ -1013,8 +1332,8 @@ def auto_screen_and_add():
                         sl_range = [3, 5, 7, 10]
                         best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
 
-                    # 第2段階: 勝率55%以上
-                    if best_params and best_win_rate >= 55:
+                    # 第2段階: 勝率（自動調整された閾値）
+                    if best_params and best_win_rate >= min_winrate_stage2:
                         cand['current_price'] = curr_p
                         cand['stage'] = 2
                         if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
@@ -1024,45 +1343,6 @@ def auto_screen_and_add():
                             
             except Exception as e:
                 logging.error(f"第2段階エラー ({s_code}): {e}")
-                continue
-
-    # ===== 第3段階: それでも目標未達の場合 - 期待値プラス + 勝率50%以上（下落相場は55%） =====
-    if added_count < needed_count:
-        logging.info(f"--- 第3段階: さらに条件緩和 - 勝率{min_winrate_stage3}%以上+期待値プラスを探索 ---")
-        for cand in candidates:
-            if added_count >= needed_count:
-                break
-            s_code = cand['code']
-            if str(s_code) in existing_codes or s_code in added_codes:
-                continue
-            
-            try:
-                hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
-                if len(hist_2y) < 60:
-                    continue
-                
-                curr_p = float(hist_2y['Close'].iloc[-1])
-                atr = calc_atr(hist_2y)
-                best_params, best_win_rate = optimize_params_atr_based(hist_2y, curr_p, atr)
-                if not best_params or best_win_rate < min_winrate_stage3:
-                    buy_range = range(0, 8, 2)
-                    tp_range = range(5, 31, 5)
-                    sl_range = range(3, 16, 3)
-                    best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
-
-                # 第3段階: 勝率基準（上昇相場50%以上、下落相場55%以上）かつ RR比 2.0以上
-                if best_params and best_win_rate >= min_winrate_stage3:
-                    rr = (best_params['TakeProfit'] - best_params['Buy']) / max(best_params['Buy'] - best_params['StopLoss'], 1)
-                    if rr >= 2.0:  # ATRベースならRR2:1以上、固定%でもここで保証
-                        cand['current_price'] = curr_p
-                        cand['stage'] = 3
-                        if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
-                            added_count += 1
-                            added_codes.append(s_code)
-                            logging.info(f"[第3段階] {s_code} 追加成功 (勝率{best_win_rate:.1f}%, RR={rr:.1f})")
-                            
-            except Exception as e:
-                logging.error(f"第3段階エラー ({s_code}): {e}")
                 continue
 
     # ===== 最終結果の記録 & LINE サマリー送信 =====
@@ -1075,9 +1355,8 @@ def auto_screen_and_add():
             f"**バックテスト勝率等の基準を満たす新銘柄は本日は見つかりませんでした。**\n\n"
             f"### 📊 本日の市場状況\n"
             f"- スクリーニング対象: 約2,500銘柄\n"
-            f"- 第1段階基準: 上昇トレンド×押し目×勝率65%以上\n"
-            f"- 第2段階基準: 75日線上×乖離±8%以内×勝率55%以上\n"
-            f"- 第3段階基準: 勝率{min_winrate_stage3}%以上 & RR比2.0以上\n\n"
+            f"- 第1段階基準: 上昇トレンド×押し目×勝率70%以上\n"
+            f"- 第2段階基準: 75日線上×乖離±8%以内×勝率65%以上\n\n"
             f"条件に合う銘柄が見つかり次第、次回の更新でお届けします。\n\n"
             f"**焦らず、良い銘柄を厳選するのがAI投資の強みです。** 🤖"
         )
@@ -1111,5 +1390,20 @@ def auto_screen_and_add():
 
 
 if __name__ == "__main__":
-    check_portfolio_status()
-    auto_screen_and_add()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', choices=['full', 'check_only'], default='full',
+                        help='full=全処理 / check_only=価格チェックのみ（取引時間中の高頻度実行用）')
+    args = parser.parse_args()
+
+    if args.mode == 'check_only':
+        # 取引時間中の15分おき実行：価格チェックのみ（スクリーニングはしない）
+        logging.info("=== 価格チェックモード（check_only）===")
+        check_portfolio_status()
+    else:
+        # 通常の全処理（1日1回・市場終了後）
+        logging.info("=== フルモード実行 ===")
+        auto_switch_strategy()
+        gemini_analyze_performance()
+        check_portfolio_status()
+        auto_screen_and_add()
