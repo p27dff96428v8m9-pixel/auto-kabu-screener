@@ -21,7 +21,9 @@ files_to_upload = [
     'price_action_analyzer.py', 'register_keys.py', 'trigger_workflow.py',
     'update_webhook.py', 'start_dashboard.bat', 'test_webhook.py',
     'check_sheets.py', 'github_upload_all.py',
+    'strategies.json', 'trade_config.json', 'trade_results.json',
     '.github/workflows/daily_screener.yml',
+    '.github/workflows/price_check.yml',
     'docs/index.html', 'docs/posts.json'
 ]
 
