@@ -384,6 +384,35 @@ def post_to_github_pages(ticker_name, code, current_price, buy_price, tp_price, 
         return None
 
 
+def calc_atr(hist, period=14):
+    """ATR（平均真の値幅）を計算する。各銘柄固有のボラティリティを測定。"""
+    high = hist['High']
+    low = hist['Low']
+    close = hist['Close']
+    prev_close = close.shift(1)
+    tr = pd.concat([
+        high - low,
+        (high - prev_close).abs(),
+        (low - prev_close).abs()
+    ], axis=1).max(axis=1)
+    atr = tr.rolling(period).mean().iloc[-1]
+    return float(atr) if not pd.isna(atr) else 0.0
+
+
+def calc_lot_size(buy_price, sl_price, max_loss_yen=10000):
+    """
+    1トレードあたりの最大損失額を上限に推奨株数を計算する。
+    デフォルト: 損切りになっても最大1万円の損失に収まる株数。
+    """
+    loss_per_share = buy_price - sl_price
+    if loss_per_share <= 0:
+        return 100  # 計算不能の場合は最低単元
+    lot = int(max_loss_yen / loss_per_share)
+    # 日本株の最小単元(100株)に切り捨て
+    lot = max(100, (lot // 100) * 100)
+    return lot
+
+
 def run_backtest(df, buy_price, tp_price, sl_price):
     """勝率のバックテスト関数（バグ修正版: entry_pのスコープ問題を解消）"""
     trades = []
@@ -477,6 +506,56 @@ def optimize_params_walk_forward(hist, buy_pct_range, tp_pct_range, sl_pct_range
                             best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl}
                             
     return best_params, best_win_rate
+
+
+def optimize_params_atr_based(hist, current_price, atr):
+    """
+    ATR（真の値幅）に基づいてTP/SLを最適化する。
+    固定%ではなく各銘柄のボラティリティに合わせた動的なパラメータを生成。
+    RRが常に2:1以上になるようにTpをSlの2倍以上に設定する。
+    """
+    if atr <= 0 or current_price <= 0:
+        return None, -1
+
+    atr_pct = (atr / current_price) * 100
+
+    # ATR倍率でパラメータレンジを定義
+    # 買いは現在値から0〜1×ATR下の範囲
+    buy_pct_range = [round(atr_pct * m, 2) for m in [0, 0.25, 0.5, 0.75, 1.0]]
+    # 損切りは0.75〜2×ATR（小さすぎると頻繁に損切り、大きすぎると損失が大きい）
+    sl_pct_range = [round(atr_pct * m, 2) for m in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0]]
+    # 利確は損切りの2倍以上（RR≥2:1）、最大4×ATR
+    tp_multipliers = [2.0, 2.5, 3.0, 3.5, 4.0]
+
+    train_size = int(len(hist) * 0.75)
+    if train_size < 30:
+        return None, -1
+    train_hist = hist.iloc[:train_size]
+    test_hist = hist.iloc[train_size:]
+
+    best_params = None
+    best_score = -1
+
+    for buy_pct in buy_pct_range:
+        sim_buy = current_price * (1 - buy_pct / 100)
+        for sl_pct in sl_pct_range:
+            sim_sl = sim_buy * (1 - sl_pct / 100)
+            for tp_mult in tp_multipliers:
+                # RR比 = tp_mult / 1 (損切り1に対してtp_mult倍の利益)
+                sim_tp = sim_buy + (sim_buy - sim_sl) * tp_mult
+
+                t_tr, w_tr, _, _ = run_backtest(train_hist, sim_buy, sim_tp, sim_sl)
+                if t_tr >= 2 and w_tr >= 45:
+                    t_te, w_te, _, _ = run_backtest(test_hist, sim_buy, sim_tp, sim_sl)
+                    t_all = t_tr + t_te
+                    if t_all > 0:
+                        w_all = ((w_tr * t_tr) + (w_te * t_te)) / t_all
+                        if (t_te == 0 or w_te >= 30) and w_all > best_score:
+                            best_score = w_all
+                            best_params = {"Buy": sim_buy, "TakeProfit": sim_tp, "StopLoss": sim_sl,
+                                           "rr_ratio": tp_mult}
+
+    return best_params, best_score
 
 
 def check_portfolio_status():
@@ -620,7 +699,15 @@ def auto_screen_and_add():
         logging.info(f"有望銘柄発見: {ticker_name}({s_code}) 現在値:{int(current_price)}円 (100株で{int(current_price*100):,}円) 勝率:{best_win_rate:.0f}%")
         
         rr_ratio = (best_params['TakeProfit'] - best_params['Buy']) / (best_params['Buy'] - best_params['StopLoss']) if (best_params['Buy'] - best_params['StopLoss']) > 0 else 0
-        ai_text = f"【AI判定】過去2年の検証勝率{best_win_rate:.0f}%。テクニカル反発期待。RR比: {rr_ratio:.1f}:1"
+        lot_size = calc_lot_size(best_params['Buy'], best_params['StopLoss'], max_loss_yen=10000)
+        invest_amount = int(best_params['Buy'] * lot_size)
+        max_loss = int((best_params['Buy'] - best_params['StopLoss']) * lot_size)
+        max_gain = int((best_params['TakeProfit'] - best_params['Buy']) * lot_size)
+        ai_text = (
+            f"【AI判定】勝率{best_win_rate:.0f}% RR比{rr_ratio:.1f}:1 | "
+            f"推奨{lot_size}株（投資額約{invest_amount:,}円）| "
+            f"最大損失-{max_loss:,}円 / 利確+{max_gain:,}円"
+        )
         ai_color = "orange" if best_win_rate < 70 else "green"
         
         hp_article = generate_ai_article(
@@ -650,6 +737,8 @@ def auto_screen_and_add():
             "ai_text": ai_text, "ai_color": ai_color,
             "buy": int(best_params['Buy']), "tp": int(best_params['TakeProfit']),
             "sl": int(best_params['StopLoss']), "current_price": float(current_price),
+            "lot_size": lot_size, "invest_amount": invest_amount,
+            "max_loss": max_loss, "max_gain": max_gain,
             "x_post_text": x_text, "hp_text": hp_article, "sns_done": True,
             "sheet_sns": "SNS配信済", "sheet_x": "X配信テキスト", "sheet_hp": "ホームページへの自動記載"
         }
@@ -829,12 +918,17 @@ def auto_screen_and_add():
                 hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
                 if len(hist_2y) < 60:
                     continue
-                # 勝率重視・過学習防止のウォークフォワード最適化
-                buy_range = [0, 1, 2, 3]
-                tp_range = range(5, 21, 5)
-                sl_range = [3, 5, 7]
-                best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
-                
+
+                # ATRベース最適化（ボラティリティ適応）を優先し、
+                # 失敗時は従来の固定%最適化にフォールバック
+                atr = calc_atr(hist_2y)
+                best_params, best_win_rate = optimize_params_atr_based(hist_2y, curr_p, atr)
+                if not best_params or best_win_rate < 65:
+                    buy_range = [0, 1, 2, 3]
+                    tp_range = range(5, 21, 5)
+                    sl_range = [3, 5, 7]
+                    best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
+
                 # 第1段階: 高い勝率基準（65%以上）
                 if best_params and best_win_rate >= 65:
                     cand['current_price'] = curr_p
@@ -884,11 +978,14 @@ def auto_screen_and_add():
                     hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
                     if len(hist_2y) < 60:
                         continue
-                    buy_range = [0, 1, 2, 3, 4]
-                    tp_range = range(5, 26, 5)
-                    sl_range = [3, 5, 7, 10]
-                    best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
-                    
+                    atr = calc_atr(hist_2y)
+                    best_params, best_win_rate = optimize_params_atr_based(hist_2y, curr_p, atr)
+                    if not best_params or best_win_rate < 55:
+                        buy_range = [0, 1, 2, 3, 4]
+                        tp_range = range(5, 26, 5)
+                        sl_range = [3, 5, 7, 10]
+                        best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
+
                     # 第2段階: 勝率55%以上
                     if best_params and best_win_rate >= 55:
                         cand['current_price'] = curr_p
@@ -918,16 +1015,18 @@ def auto_screen_and_add():
                     continue
                 
                 curr_p = float(hist_2y['Close'].iloc[-1])
-                # 幅広いパラメータで探索
-                buy_range = range(0, 8, 2)
-                tp_range = range(5, 31, 5)
-                sl_range = range(3, 16, 3)
-                best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
-                
-                # 第3段階: 勝率基準（上昇相場50%以上、下落相場55%以上）かつ RR比 1.0以上
+                atr = calc_atr(hist_2y)
+                best_params, best_win_rate = optimize_params_atr_based(hist_2y, curr_p, atr)
+                if not best_params or best_win_rate < min_winrate_stage3:
+                    buy_range = range(0, 8, 2)
+                    tp_range = range(5, 31, 5)
+                    sl_range = range(3, 16, 3)
+                    best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
+
+                # 第3段階: 勝率基準（上昇相場50%以上、下落相場55%以上）かつ RR比 2.0以上
                 if best_params and best_win_rate >= min_winrate_stage3:
                     rr = (best_params['TakeProfit'] - best_params['Buy']) / max(best_params['Buy'] - best_params['StopLoss'], 1)
-                    if rr >= 1.0:  # リスクリワード比が1以上であれば期待値プラス
+                    if rr >= 2.0:  # ATRベースならRR2:1以上、固定%でもここで保証
                         cand['current_price'] = curr_p
                         cand['stage'] = 3
                         if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
