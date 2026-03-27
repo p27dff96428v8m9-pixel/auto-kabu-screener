@@ -1,9 +1,13 @@
 // ==========================================
-// 設定（自分のものに書き換え）
+// キーの取得（PropertiesService で安全に管理）
+// GASエディタ → プロジェクトの設定 → スクリプトプロパティ に以下を登録:
+//   GEMINI_API_KEY  : GeminiのAPIキー
+//   LINE_TOKEN      : LINE Messaging APIのチャンネルアクセストークン
+//   LINE_USER_ID    : 通知先のLINEユーザーID
 // ==========================================
-const GEMINI_API_KEY = "AIzaSyAwXJBVQ2GmpgLfNCzvz3h-VfEZ3HykoGA";
-const ACCESS_TOKEN = "4QbExuhPZ+0Y/gUSuGjzLhGKbCQlk+vb9b14ucMRzm6u4E7GJJdK0yLYRyhzh3Mi3kjU+SctMCjaARLncJAosrfwHgEP1ft1jrblxx2BELjfIDPHZKPySf/MstVMFmgFRJRVNW2QuY9LWeOwXmXpfQdB04t89/1O/w1cDnyilFU=";
-const USER_ID = "Udb6dd807c71111b0331324a0604a2a4f";
+function getProps() {
+  return PropertiesService.getScriptProperties().getProperties();
+}
 
 // ==========================================
 // ヘルパー: 列番号 → アルファベット変換
@@ -381,7 +385,8 @@ function checkAndNotify() {
 // ==========================================
 function getGeminiAnalysis(name, price, rr, score) {
   try {
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
+    const props = getProps();
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + props.GEMINI_API_KEY;
     const prompt =
       "日本株「" + name + "」(現在値:" + Math.round(price) + "円) について、\n" +
       "テクニカル分析の観点から「今買うべきか・待つべきか」を\n" +
@@ -414,14 +419,15 @@ function getGeminiAnalysis(name, price, rr, score) {
 // LINE メッセージ送信
 // ==========================================
 function sendLineMessage(message) {
+  const props = getProps();
   UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
     "method": "post",
     "headers": {
       "Content-Type": "application/json",
-      "Authorization": "Bearer " + ACCESS_TOKEN
+      "Authorization": "Bearer " + props.LINE_TOKEN
     },
     "payload": JSON.stringify({
-      "to": USER_ID,
+      "to": props.LINE_USER_ID,
       "messages": [{ "type": "text", "text": message }]
     })
   });
