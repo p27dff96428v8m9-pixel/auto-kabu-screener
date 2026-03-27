@@ -1,0 +1,36 @@
+name: Price Check (15min during trading hours)
+
+on:
+  schedule:
+    # 取引時間中（JST 9:00〜15:30）に15分おきに実行
+    # UTC 0:00〜6:30 = JST 9:00〜15:30（夏時間考慮なし）
+    - cron: '0,15,30,45 0,1,2,3,4,5 * * 1-5'
+    - cron: '0,15 6 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  price-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Price Check Only
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python auto_trader.py --mode check_only
