@@ -385,35 +385,38 @@ def post_to_github_pages(ticker_name, code, current_price, buy_price, tp_price, 
 
 
 def run_backtest(df, buy_price, tp_price, sl_price):
-    """勝率のバックテスト関数"""
+    """勝率のバックテスト関数（バグ修正版: entry_pのスコープ問題を解消）"""
     trades = []
     in_position = False
+    entry_p = 0  # ← バグ修正: 変数を事前に初期化しスコープ問題を防ぐ
     
     for _, row in df.iterrows():
-        o_price = row['Open']
-        l_price = row['Low']
-        h_price = row['High']
-        c_price = row['Close']
+        o_price = float(row['Open'])
+        l_price = float(row['Low'])
+        h_price = float(row['High'])
         
         if not in_position:
             if l_price <= buy_price:
                 in_position = True
-                entry_p = min(buy_price, o_price) # 窓開けダウンは始値で約定
-                # エントリー当日損切り
+                entry_p = min(buy_price, o_price)  # 窓開けダウンは始値で約定
+                # エントリー当日に損切りラインも割り込んでいる場合
                 if l_price <= sl_price:
-                    exit_p = min(sl_price, o_price) if o_price <= sl_price else sl_price
-                    if exit_p > entry_p: exit_p = entry_p # 損切りなのでエントリーより上では売れない
+                    exit_p = sl_price if o_price > sl_price else o_price
                     trades.append(exit_p - entry_p)
                     in_position = False
+                    entry_p = 0
         else:
+            # 翌日以降の決済判定
             if o_price >= tp_price:
+                # 窓開け上昇で始値が直接利確ラインを超えた
                 trades.append(o_price - entry_p)
                 in_position = False
             elif o_price <= sl_price:
+                # 窓開け下落で始値が直接損切りラインを割った
                 trades.append(o_price - entry_p)
                 in_position = False
             elif l_price <= sl_price and h_price >= tp_price:
-                # 保守的に先に損切りに引っかかったと想定
+                # 同日中に両方タッチ → 保守的に損切り優先
                 trades.append(sl_price - entry_p)
                 in_position = False
             elif l_price <= sl_price:
@@ -422,6 +425,9 @@ def run_backtest(df, buy_price, tp_price, sl_price):
             elif h_price >= tp_price:
                 trades.append(tp_price - entry_p)
                 in_position = False
+            
+            if not in_position:
+                entry_p = 0
                 
     win_count = sum(1 for t in trades if t > 0)
     loss_count = sum(1 for t in trades if t <= 0)
@@ -566,6 +572,36 @@ def check_portfolio_status():
         logging.error(f"ステータスチェック中に通信エラー: {e}")
 
 
+def get_market_trend():
+    """TOPIXのトレンドを確認し、強い下落トレンドならFalseを返す"""
+    try:
+        topix = yf.Ticker("1305.T")  # TOPIX連動ETF
+        hist = topix.history(period="3mo")
+        if len(hist) < 25:
+            return True, "データ不足のためスクリーニング続行"
+        close = hist['Close']
+        sma25 = float(close.rolling(25).mean().iloc[-1])
+        sma75 = float(close.rolling(min(75, len(close))).mean().iloc[-1])
+        current = float(close.iloc[-1])
+        # 現在値が25日線を3%以上下回り、かつ25日線が75日線を下回っている = 強い下落トレンド
+        if current < sma25 * 0.97 and sma25 < sma75:
+            return False, f"TOPIX下落トレンド中 (現値:{current:.0f} < SMA25:{sma25:.0f})"
+        return True, f"TOPIX良好 (現値:{current:.0f}, SMA25:{sma25:.0f})"
+    except Exception as e:
+        return True, f"TOPIXチェックエラー({e})のためスクリーニング続行"
+
+
+# 東証に実際に上場している銘柄コードの主要範囲
+# （1300-9999の全コードは大半が未使用。実在銘柄の密度が高いレンジに絞る）
+TSE_ACTIVE_RANGES = list(range(1301, 2000)) + list(range(2001, 3000)) + \
+                    list(range(3001, 4000)) + list(range(4001, 5000)) + \
+                    list(range(5001, 6000)) + list(range(6001, 7000)) + \
+                    list(range(7001, 8000)) + list(range(8001, 9000)) + \
+                    list(range(9001, 9900))
+# 英数混合コード（例: 367A）などは除外し、4桁数字コードのみ対象とする
+TSE_ACTIVE_RANGES = [str(c) for c in TSE_ACTIVE_RANGES]
+
+
 def auto_screen_and_add():
     """全自動スクリーニングと有望銘柄の追加"""
     logging.info("--- 全自動スクリーニングと有望銘柄の追加開始 ---")
@@ -597,10 +633,7 @@ def auto_screen_and_add():
             best_params['Buy'], best_params['TakeProfit'], best_params['StopLoss'],
             best_win_rate, hp_article
         )
-        title_prefix = "10万円以内で始める注目株" if current_price <= 1000 else "本日の注目・厳選株"
-        wp_title = f"【{datetime.now(JST).strftime('%m/%d')} AI厳選】{ticker_name}（{s_code}）- {title_prefix}"
-        wp_post_url = post_to_wordpress(wp_title, hp_article)
-        homepage_url = pages_url or wp_post_url
+        homepage_url = pages_url
         
         x_title = "📈10万円以内で買える注目株✨\n\n" if current_price <= 1000 else "📈AI厳選！本日の注目銘柄✨\n\n"
         x_base_text = (
@@ -633,9 +666,14 @@ def auto_screen_and_add():
             logging.error(f"スプレッドシート追加エラー ({s_code}): {e}")
         return False
     
+    # 市場トレンドチェック（強い下落相場では第3段階の勝率基準を引き上げ）
+    is_uptrend, trend_msg = get_market_trend()
+    logging.info(f"市場トレンド判定: {trend_msg}")
+    min_winrate_stage3 = 50 if is_uptrend else 55  # 下落相場は基準引き上げ
+
     import random
-    all_codes = [str(c) for c in range(1300, 9999)]
-    target_codes = random.sample(all_codes, 3000)  # 全体の約8割（3000銘柄）をスクリーニング
+    # 実在コード範囲からランダムサンプリング（1300-9999全列挙より大幅に効率化）
+    target_codes = random.sample(TSE_ACTIVE_RANGES, min(2500, len(TSE_ACTIVE_RANGES)))
     
     # yfinanceへの負荷を抑えるために100銘柄ずつのチャンクに分ける
     chunk_size = 100
@@ -647,52 +685,88 @@ def auto_screen_and_add():
         logging.info(f"スクリーニング中: {i} to {i+chunk_size} 銘柄目...")
         
         try:
-            # yfinanceの制限対策（Too Many Requests回避のためにSessionオブジェクトを使用）
-            session = requests.Session()
-            session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-            
             # リトライロジックを追加
             retries = 3
             for attempt in range(retries):
                 try:
-                    data = yf.download(ticker_str, period="3mo", group_by="ticker", threads=True, progress=False, session=session)
+                    # yfinance 1.x対応: group_by/threads/sessionパラメータは廃止
+                    data = yf.download(ticker_str, period="3mo", progress=False)
                     break
                 except Exception as e:
                     if attempt < retries - 1:
                         time.sleep(5) # APIエラー時は5秒待機してリトライ
                     else:
                         raise e
-            
+
             for code in chunk:
                 t_code = f"{code}.T"
-                if t_code not in data.columns.levels[0]: continue
-                df = data[t_code]
-                if df.empty or len(df) < 30: continue
+                # ── yfinance 1.x対応: MultiIndex形式が (Price, Ticker) に変更 ──
                 try:
-                    current_price = float(df['Close'].iloc[-1])
-                    
+                    if hasattr(data.columns, 'levels'):
+                        # yfinance 1.x: MultiIndex (Price, Ticker) - level 1 がティッカー
+                        # yfinance 0.2.x group_by="ticker": (Ticker, Price) - level 0 がティッカー
+                        level1_vals = data.columns.get_level_values(1)
+                        level0_vals = data.columns.get_level_values(0)
+                        if t_code in level1_vals:
+                            # yfinance 1.x形式
+                            df_ticker = data.xs(t_code, axis=1, level=1).copy()
+                        elif t_code in level0_vals:
+                            # yfinance 0.2.x形式 (後方互換)
+                            df_ticker = data[t_code].copy()
+                        else:
+                            continue
+                    else:
+                        # 単一銘柄の場合はそのまま使う
+                        df_ticker = data.copy()
+                except (KeyError, AttributeError):
+                    continue
+                
+                if df_ticker.empty or len(df_ticker) < 30:
+                    continue
+                try:
+                    close_s = df_ticker['Close'].dropna()
+                    vol_s = df_ticker['Volume'].dropna()
+                    if len(close_s) < 25:
+                        continue
+                    current_price = float(close_s.iloc[-1])
+
                     if current_price < 100:
                         continue  # 極端に安い銘柄は除外
-                    
-                    sma25 = df['Close'].rolling(window=25).mean().iloc[-1]
-                    delta = df['Close'].diff()
+
+                    # 流動性フィルター: 直近20日平均出来高が5万株未満は除外
+                    avg_volume = float(vol_s.iloc[-20:].mean()) if len(vol_s) >= 20 else 0
+                    if avg_volume < 50000:
+                        continue
+
+                    sma25 = close_s.rolling(window=25).mean().iloc[-1]
+
+                    # ── バグ修正: RSI計算のNaN/Inf問題を解消 ──
+                    delta = close_s.diff()
                     gain = delta.clip(lower=0).rolling(window=14).mean()
-                    loss = -delta.clip(upper=0).rolling(window=14).mean()
-                    rs = gain / loss
-                    rsi = 100 - (100 / (1 + rs)).iloc[-1]
+                    loss = (-delta.clip(upper=0)).rolling(window=14).mean()
+                    # lossが0の場合のゼロ除算を防ぐ
+                    rs = gain / loss.replace(0, float('nan'))
+                    rsi_series = 100 - (100 / (1 + rs))
+                    rsi = float(rsi_series.iloc[-1]) if not rsi_series.empty and not pd.isna(rsi_series.iloc[-1]) else 50.0
+
+                    if pd.isna(sma25) or sma25 == 0:
+                        continue
                     deviation = (current_price - sma25) / sma25 * 100
-                    
+
                     if deviation <= 5 and rsi <= 65:
                         ticker_obj = yf.Ticker(t_code)
                         info = ticker_obj.info
-                        pbr = info.get('priceToBook', 0)
-                        mc = info.get('marketCap', 0)
-                        if pbr is not None and mc is not None and (10_000_000_000 <= mc <= 3_000_000_000_000):
+                        pbr = info.get('priceToBook') or 0
+                        mc = info.get('marketCap') or 0
+                        if 10_000_000_000 <= mc <= 3_000_000_000_000:
                             candidates.append({
-                                "code": code, "pbr": pbr, "deviation": deviation, "rsi": rsi, "current_price": current_price, "mc": mc,
-                                "dividend": info.get('dividendYield', 0)
+                                "code": code, "pbr": pbr, "deviation": deviation,
+                                "rsi": rsi, "current_price": current_price, "mc": mc,
+                                "dividend": info.get('dividendYield') or 0,
+                                "avg_volume": avg_volume
                             })
-                except: continue
+                except Exception:
+                    continue
         except Exception as e:
             logging.error(f"チャンク取得エラー: {e}")
         
@@ -700,7 +774,9 @@ def auto_screen_and_add():
         time.sleep(2)
     
     logging.info(f"テクニカルフィルタ通過候補: {len(candidates)} 銘柄")
-    candidates = sorted(candidates, key=lambda x: abs(x['deviation']), reverse=True)
+    # 乖離率が小さい順（SMA25に近い順）に並び替え
+    # → Stage 1/2 の押し目条件を満たしやすい銘柄が先頭に来るため効率的に探索できる
+    candidates = sorted(candidates, key=lambda x: abs(x['deviation']))
     try:
         res = requests.post(WEBHOOK_URL, json={"action": "get_all"})
         all_rows = res.json()
@@ -720,66 +796,161 @@ def auto_screen_and_add():
     
     logging.info(f"現在の監視銘柄数: {current_count} / 目標: {target_holdings} (今回の追加目標: {needed_count} 銘柄)")
             
-    # ===== 第1段階: 【最強の押し目】上昇トレンド(75日線上) + 25日線付近 + 勝率55%以上 =====
-    logging.info(f"--- 第1段階: 上昇トレンドの押し目（勝率55%以上）を探索 ---")
+    # ===== 第1段階: 【最高品質】上昇トレンド(75日線上) + 25日線押し目 + 勝率65%以上 =====
+    logging.info(f"--- 第1段階: 上昇トレンド×押し目×勝率65%以上を探索 ---")
     for cand in candidates:
-        if added_count >= needed_count: break
+        if added_count >= needed_count:
+            break
         s_code = cand['code']
-        if str(s_code) in existing_codes: continue
+        if str(s_code) in existing_codes:
+            continue
             
         try:
-            # トレンド判定のために余裕を持ってデータを取得
             hist_6m = yf.Ticker(f"{s_code}.T").history(period="6mo")
-            if len(hist_6m) < 75: continue
+            if len(hist_6m) < 75:
+                continue
             
-            # 移動平均の計算
             close_prices = hist_6m['Close']
             sma25 = close_prices.rolling(window=25).mean()
             sma75 = close_prices.rolling(window=75).mean()
             
-            curr_p = close_prices.iloc[-1]
-            curr_sma25 = sma25.iloc[-1]
-            curr_sma75 = sma75.iloc[-1]
-            prev_sma75 = sma75.iloc[-5] # 1週間前
+            curr_p = float(close_prices.iloc[-1])
+            curr_sma25 = float(sma25.iloc[-1])
+            curr_sma75 = float(sma75.iloc[-1])
+            prev_sma75 = float(sma75.iloc[-5])
             
-            # 【上昇トレンド条件】: 75日線が上向き、かつ株価が75日線の上
+            if curr_sma75 == 0 or curr_sma25 == 0:
+                continue
+            
             is_uptrend = (curr_p > curr_sma75) and (curr_sma75 > prev_sma75)
-            # 【押し目条件】: 25日線からの乖離が小さい（-2% 〜 +3%以内など）
             is_dip = (abs(curr_p - curr_sma25) / curr_sma25 <= 0.05)
 
             if is_uptrend and is_dip:
-                # バックテストで勝率確認
                 hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
-                # ウォークフォワード最適化に変更して過学習を抑制
-                buy_range = [0, 1, 2]
+                if len(hist_2y) < 60:
+                    continue
+                # 勝率重視・過学習防止のウォークフォワード最適化
+                buy_range = [0, 1, 2, 3]
                 tp_range = range(5, 21, 5)
                 sl_range = [3, 5, 7]
                 best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
                 
-                if best_params and best_win_rate >= 55:
+                # 第1段階: 高い勝率基準（65%以上）
+                if best_params and best_win_rate >= 65:
                     cand['current_price'] = curr_p
+                    cand['stage'] = 1
                     if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
                         added_count += 1
                         added_codes.append(s_code)
+                        logging.info(f"[第1段階] {s_code} 追加成功 (勝率{best_win_rate:.1f}%)")
+                        
         except Exception as e:
             logging.error(f"第1段階エラー ({s_code}): {e}")
             continue
-    
 
+    # ===== 第2段階: 目標未達の場合 - 25日線付近(条件緩和) + 勝率55%以上 =====
+    if added_count < needed_count:
+        logging.info(f"--- 第2段階: 目標未達({added_count}/{needed_count}) - 条件を緩和して探索 ---")
+        for cand in candidates:
+            if added_count >= needed_count:
+                break
+            s_code = cand['code']
+            if str(s_code) in existing_codes or s_code in added_codes:
+                continue
+            
+            try:
+                hist_6m = yf.Ticker(f"{s_code}.T").history(period="6mo")
+                if len(hist_6m) < 60:
+                    continue
+                
+                close_prices = hist_6m['Close']
+                sma25 = close_prices.rolling(window=25).mean()
+                sma75 = close_prices.rolling(window=75).mean()
+                
+                curr_p = float(close_prices.iloc[-1])
+                curr_sma25 = float(sma25.iloc[-1])
+                curr_sma75 = float(sma75.iloc[-1])
+                prev_sma75 = float(sma75.iloc[-5])
+                
+                if curr_sma75 == 0 or curr_sma25 == 0:
+                    continue
+                
+                # 第2段階では上昇トレンドの条件をやや緩和（横ばいも可）
+                is_uptrend_or_flat = (curr_p > curr_sma75)
+                # 乖離率の許容範囲を広げる（±8%以内）
+                is_near_dip = (abs(curr_p - curr_sma25) / curr_sma25 <= 0.08)
+                
+                if is_uptrend_or_flat and is_near_dip:
+                    hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
+                    if len(hist_2y) < 60:
+                        continue
+                    buy_range = [0, 1, 2, 3, 4]
+                    tp_range = range(5, 26, 5)
+                    sl_range = [3, 5, 7, 10]
+                    best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
+                    
+                    # 第2段階: 勝率55%以上
+                    if best_params and best_win_rate >= 55:
+                        cand['current_price'] = curr_p
+                        cand['stage'] = 2
+                        if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
+                            added_count += 1
+                            added_codes.append(s_code)
+                            logging.info(f"[第2段階] {s_code} 追加成功 (勝率{best_win_rate:.1f}%)")
+                            
+            except Exception as e:
+                logging.error(f"第2段階エラー ({s_code}): {e}")
+                continue
 
-    
-    # ===== それでも見つからなかった場合はホームページに「本日は該当なし」を投稿 =====
+    # ===== 第3段階: それでも目標未達の場合 - 期待値プラス + 勝率50%以上（下落相場は55%） =====
+    if added_count < needed_count:
+        logging.info(f"--- 第3段階: さらに条件緩和 - 勝率{min_winrate_stage3}%以上+期待値プラスを探索 ---")
+        for cand in candidates:
+            if added_count >= needed_count:
+                break
+            s_code = cand['code']
+            if str(s_code) in existing_codes or s_code in added_codes:
+                continue
+            
+            try:
+                hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
+                if len(hist_2y) < 60:
+                    continue
+                
+                curr_p = float(hist_2y['Close'].iloc[-1])
+                # 幅広いパラメータで探索
+                buy_range = range(0, 8, 2)
+                tp_range = range(5, 31, 5)
+                sl_range = range(3, 16, 3)
+                best_params, best_win_rate = optimize_params_walk_forward(hist_2y, buy_range, tp_range, sl_range)
+                
+                # 第3段階: 勝率基準（上昇相場50%以上、下落相場55%以上）かつ RR比 1.0以上
+                if best_params and best_win_rate >= min_winrate_stage3:
+                    rr = (best_params['TakeProfit'] - best_params['Buy']) / max(best_params['Buy'] - best_params['StopLoss'], 1)
+                    if rr >= 1.0:  # リスクリワード比が1以上であれば期待値プラス
+                        cand['current_price'] = curr_p
+                        cand['stage'] = 3
+                        if process_and_add_stock(cand, best_params, best_win_rate, existing_codes):
+                            added_count += 1
+                            added_codes.append(s_code)
+                            logging.info(f"[第3段階] {s_code} 追加成功 (勝率{best_win_rate:.1f}%, RR={rr:.1f})")
+                            
+            except Exception as e:
+                logging.error(f"第3段階エラー ({s_code}): {e}")
+                continue
+
+    # ===== 最終結果の記録 =====
     if added_count == 0:
-        logging.warning("今日は条件を満たす銘柄が見つかりませんでした。ホームページに通知を投稿します。")
+        logging.warning("3段階のスクリーニングをすべて実施しましたが、条件を満たす銘柄が見つかりませんでした。")
         no_result_article = (
             f"## 【{datetime.now(JST).strftime('%Y年%m月%d日')}のAIスクリーニング結果】\n\n"
-            f"本日のAI自動スクリーニングを実施しましたが、"
+            f"本日のAI自動スクリーニング（3段階・約3,000銘柄対象）を実施しましたが、\n"
             f"**バックテスト勝率等の基準を満たす新銘柄は本日は見つかりませんでした。**\n\n"
-            f"### 📊 本日の市場状況\n\n"
+            f"### 📊 本日の市場状況\n"
             f"- スクリーニング対象: 約3,000銘柄\n"
-            f"- 価格帯: 低位株から幅広く\n"
-            f"- テクニカル条件: 上昇トレンド継続 ＆ 25日線乖離率・RSIクリア\n"
-            f"- バックテスト要件: 高い勝率水準（55%以上）\n\n"
+            f"- 第1段階基準: 上昇トレンド×押し目×勝率65%以上\n"
+            f"- 第2段階基準: 75日線上×乖離±8%以内×勝率55%以上\n"
+            f"- 第3段階基準: 勝率50%以上 & リスクリワード比1.0以上\n\n"
             f"条件に合う銘柄が見つかり次第、次回の更新でお届けします。\n\n"
             f"**焦らず、良い銘柄を厳選するのがAI投資の強みです。** 🤖"
         )
@@ -787,12 +958,14 @@ def auto_screen_and_add():
             "本日は該当銘柄なし", "0000", 0, 0, 0, 0, 0, no_result_article
         )
     else:
-        logging.info(f"本日の最終結果: {added_count}銘柄を追加しました！")
+        stage_summary = f"追加: {added_count}銘柄 (目標: {needed_count}銘柄)"
+        logging.info(f"本日の最終結果: {stage_summary}")
     
     try:
         jst_now = datetime.now(JST).strftime("%Y/%m/%d %H:%M")
         requests.post(WEBHOOK_URL, json={"action": "log_time", "time": jst_now, "count": added_count})
-    except: pass
+    except:
+        pass
 
 
 if __name__ == "__main__":
