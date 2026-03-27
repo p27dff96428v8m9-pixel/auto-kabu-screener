@@ -661,43 +661,15 @@ def check_portfolio_status():
                     requests.post(WEBHOOK_URL, json=req_p)
                     removed_count += 1
                     logging.info(f"{code}: {action} により削除しました")
-                    # LINE通知: 損切り・利確の結果を即時通知
-                    if action == "hit_tp" and tp_val:
-                        send_line(
-                            f"✅ 利確達成！\n"
-                            f"銘柄コード: {code}\n"
-                            f"利確ライン {int(tp_val)}円 に到達しました。\n"
-                            f"ポジションをクローズしてください。"
-                        )
-                    elif action == "hit_sl" and sl_val:
-                        send_line(
-                            f"⚠️ 損切りライン到達\n"
-                            f"銘柄コード: {code}\n"
-                            f"損切りライン {int(sl_val)}円 を割り込みました。\n"
-                            f"迷わず損切りしてください。"
-                        )
+                    # LINE通知は GAS の checkAndNotify() に一本化（二重通知防止）
                     time.sleep(1)
                 else:
-                    # エントリーアラート: 買いターゲットの±3%以内に近づいたら通知
-                    if buy_val and last_close <= buy_val * 1.03:
-                        send_line(
-                            f"🔔 エントリーチャンス接近！\n"
-                            f"銘柄コード: {code}\n"
-                            f"現在値 {int(last_close)}円 が買いターゲット {int(buy_val)}円 に近づいています。\n"
-                            f"購入タイミングを確認してください。"
-                        )
-                    # 出来高急増チェック
+                    # 出来高急増チェック（LINE通知は GAS 側で行う）
                     if len(hist) >= 5:
                         avg_vol = hist['Volume'].iloc[:-1].mean()
                         if hist['Volume'].iloc[-1] > avg_vol * 3:
                             req_p = {"action": "update", "code": str(code), "volume_surge": True}
                             requests.post(WEBHOOK_URL, json=req_p)
-                            send_line(
-                                f"📊 出来高急増アラート\n"
-                                f"銘柄コード: {code}\n"
-                                f"本日の出来高が平均の3倍以上です。\n"
-                                f"何らかの材料が出ている可能性があります。確認してください。"
-                            )
             except Exception as e:
                 logging.error(f"{code} のチェック中エラー: {e}")
                 
