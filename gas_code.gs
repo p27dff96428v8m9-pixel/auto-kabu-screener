@@ -125,14 +125,8 @@ function doPost(e) {
         scoreColIdx = j + 1;
 
       } else if (colName.indexOf('AI分析') >= 0) {
-        // ── lot_size/max_loss/max_gain をAI分析テキストに追記 ──
-        var lotInfo = '';
-        if (data.lot_size && data.invest_amount && data.max_loss && data.max_gain) {
-          lotInfo = '\n【推奨】' + data.lot_size + '株（投資額約' + Number(data.invest_amount).toLocaleString()
-            + '円）| 損失上限-' + Number(data.max_loss).toLocaleString()
-            + '円 / 利益目標+' + Number(data.max_gain).toLocaleString() + '円';
-        }
-        newRow[j] = (data.ai_text || '') + lotInfo;
+        // Pythonのai_textに推奨株数・損失情報が含まれているのでそのまま使用
+        newRow[j] = data.ai_text || '';
         aiColIdx = j + 1;
 
       } else if (colName.indexOf('X配信テキスト') >= 0) {
