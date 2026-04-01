@@ -72,7 +72,7 @@ def generate_ai_article(ticker_name, code, current_price, buy_price, tp_price, s
         if dividend and dividend > 0:
             extra_info += f"配当利回り: {dividend*100:.2f}%\n"
         
-        budget_comment = "投資金額が10万円以内で始められることを強調" if current_price <= 1000 else "優良銘柄であることを強調"
+        budget_comment = "優良銘柄であることを強調"
         
         prompt = f"""あなたは日本株投資の専門ライターです。以下の銘柄データをもとに、
 投資初心者でもわかりやすく、魅力的で読み応えのある記事を書いてください。
@@ -129,12 +129,11 @@ def generate_fallback_article(ticker_name, code, current_price, buy_price, tp_pr
     today = datetime.now(JST).strftime("%Y年%m月%d日")
     unit_price = int(current_price * 100)
     rr_ratio = (tp_price - buy_price) / (buy_price - sl_price) if (buy_price - sl_price) > 0 else 0
-    budget_text = "10万円以内で投資を始められる" if current_price <= 1000 else "本格的な投資ができる"
     return f"""【{today}のAI厳選銘柄】{ticker_name}（{code}）
 
 🔍 銘柄選定理由
 本日のAIスクリーニングにより、{ticker_name}（証券コード: {code}）が有望銘柄として選出されました。
-現在の株価は{int(current_price)}円で、100株で約{unit_price:,}円と{budget_text}銘柄です。
+現在の株価は{int(current_price)}円で、100株で約{unit_price:,}円です。
 テクニカル指標が買いシグナルを示しており、過去データの検証でも高い勝率を記録しています。
 
 📊 AIテクニカル分析の結果
@@ -202,7 +201,7 @@ def post_to_twitter(base_text, link_url=None):
     if genai and GEMINI_API_KEY:
         try:
             client = genai.Client(api_key=GEMINI_API_KEY)
-            title_text = "📈10万円以内で買える注目株✨" if "10万円以内" in base_text or "1000円" in base_text else "📈AI厳選！本日の注目銘柄✨"
+            title_text = "📈AI厳選！本日の注目銘柄✨"
             prompt = (
                 "以下の株式情報をもとに、X（Twitter）用の投稿文を作成してください。\n"
                 "必ず以下のルールを守ること：\n"
@@ -1040,7 +1039,7 @@ def auto_screen_and_add():
         )
         homepage_url = pages_url
         
-        x_title = "📈10万円以内で買える注目株✨\n\n" if current_price <= 1000 else "📈AI厳選！本日の注目銘柄✨\n\n"
+        x_title = "📈AI厳選！本日の注目銘柄✨\n\n"
         x_base_text = (
             f"{x_title}"
             f"{ticker_name}（{s_code}）\n"
@@ -1349,20 +1348,6 @@ def auto_screen_and_add():
     today_str = datetime.now(JST).strftime("%Y年%m月%d日")
     if added_count == 0:
         logging.warning("3段階のスクリーニングをすべて実施しましたが、条件を満たす銘柄が見つかりませんでした。")
-        no_result_article = (
-            f"## 【{today_str}のAIスクリーニング結果】\n\n"
-            f"本日のAI自動スクリーニング（3段階・約2,500銘柄対象）を実施しましたが、\n"
-            f"**バックテスト勝率等の基準を満たす新銘柄は本日は見つかりませんでした。**\n\n"
-            f"### 📊 本日の市場状況\n"
-            f"- スクリーニング対象: 約2,500銘柄\n"
-            f"- 第1段階基準: 上昇トレンド×押し目×勝率70%以上\n"
-            f"- 第2段階基準: 75日線上×乖離±8%以内×勝率65%以上\n\n"
-            f"条件に合う銘柄が見つかり次第、次回の更新でお届けします。\n\n"
-            f"**焦らず、良い銘柄を厳選するのがAI投資の強みです。** 🤖"
-        )
-        post_to_github_pages(
-            "本日は該当銘柄なし", "0000", 0, 0, 0, 0, 0, no_result_article
-        )
         send_line(
             f"📋 {today_str} AIスクリーニング結果\n\n"
             f"本日は条件を満たす新銘柄が見つかりませんでした。\n"
