@@ -830,7 +830,7 @@ def auto_switch_strategy():
         f"上限: {data['strategies'][new_key]['target_holdings']}銘柄"
     )
     if changed:
-        send_line_message(msg)
+        send_line(msg)
     logging.info(f"戦略決定: {new_key}（相場={market_status} 実績={perf}）")
 
 
@@ -945,7 +945,7 @@ def gemini_analyze_performance():
         client = genai.Client(api_key=GEMINI_API_KEY)
         response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         if response.text:
-            send_line_message(f"【AIコメント】\n\n{response.text.strip()}")
+            send_line(f"【AIコメント】\n\n{response.text.strip()}")
             logging.info("Gemini月次分析をLINEに送信しました")
     except Exception as e:
         logging.error(f"Gemini月次分析エラー: {e}")
