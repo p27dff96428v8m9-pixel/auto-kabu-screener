@@ -1229,9 +1229,12 @@ def auto_screen_and_add():
     added_codes = []
 
     logging.info(f"現在の監視銘柄数: {current_count} / 目標: {target_holdings} (今回の追加目標: {needed_count} 銘柄)")
-            
-    # ===== 第1段階: 【最高品質】上昇トレンド(75日線上) + 25日線押し目 + 勝率70%以上 =====
-    logging.info(f"--- 第1段階: 上昇トレンド×押し目×勝率70%以上を探索 ---")
+
+    near_miss_count = 0  # 惜しかった件数（勝率不足で弾かれた）
+    trend_fail_count = 0  # トレンド/押し目条件で弾かれた件数
+
+    # ===== 第1段階: 【最高品質】上昇トレンド(75日線上) + 25日線押し目 + 勝率閾値以上 =====
+    logging.info(f"--- 第1段階: 上昇トレンド×押し目×勝率{min_winrate_stage1}%以上を探索 ---")
     for cand in candidates:
         if added_count >= needed_count:
             break
@@ -1256,7 +1259,8 @@ def auto_screen_and_add():
             if curr_sma75 == 0 or curr_sma25 == 0:
                 continue
             
-            is_uptrend = (curr_p > curr_sma75) and (curr_sma75 > prev_sma75)
+            # SMA75上昇中 or 横ばい（±0.5%以内）でも可（相場回復期対応）
+            is_uptrend = (curr_p > curr_sma75) and (curr_sma75 >= prev_sma75 * 0.995)
             is_dip = (abs(curr_p - curr_sma25) / curr_sma25 <= 0.05)
 
             if is_uptrend and is_dip:
@@ -1268,7 +1272,7 @@ def auto_screen_and_add():
                 # 失敗時は従来の固定%最適化にフォールバック
                 atr = calc_atr(hist_2y)
                 best_params, best_win_rate = optimize_params_atr_based(hist_2y, curr_p, atr)
-                if not best_params or best_win_rate < 65:
+                if not best_params or best_win_rate < 55:
                     buy_range = [0, 1, 2, 3]
                     tp_range = range(5, 21, 5)
                     sl_range = [3, 5, 7]
@@ -1282,7 +1286,12 @@ def auto_screen_and_add():
                         added_count += 1
                         added_codes.append(s_code)
                         logging.info(f"[第1段階] {s_code} 追加成功 (勝率{best_win_rate:.1f}%)")
-                        
+                elif best_params:
+                    near_miss_count += 1
+                    logging.info(f"[第1段階 惜しい] {s_code} 勝率{best_win_rate:.1f}% (閾値{min_winrate_stage1}%未満)")
+            else:
+                trend_fail_count += 1
+
         except Exception as e:
             logging.error(f"第1段階エラー ({s_code}): {e}")
             continue
@@ -1352,6 +1361,10 @@ def auto_screen_and_add():
             f"📋 {today_str} AIスクリーニング結果\n\n"
             f"本日は条件を満たす新銘柄が見つかりませんでした。\n"
             f"市場状況: {trend_msg}\n\n"
+            f"【内訳】\n"
+            f"・初期通過: {len(candidates)}銘柄\n"
+            f"・トレンド/押し目NG: {trend_fail_count}銘柄\n"
+            f"・勝率不足で惜しい: {near_miss_count}銘柄\n\n"
             f"焦らず次回の更新をお待ちください。"
         )
     else:
