@@ -816,19 +816,25 @@ def auto_switch_strategy():
     save_active_strategy(new_key)
 
     changed = old_key != new_key
-    change_label = f"切替: {old_name} → {new_name}" if changed else f"維持: {new_name}"
     perf_label = {"good": "好調", "normal": "普通", "bad": "不調", "crisis": "危機", "unknown": "実績少"}.get(perf, "")
 
-    msg = (
-        f"【戦略自動切替レポート】\n"
-        f"相場: {market_msg}\n"
-        f"実績: {perf_label}"
-        + (f"（勝率{actual_winrate:.1f}% 乖離{gap:+.1f}%）" if perf != "unknown" else "") +
-        f"\n\n→ {change_label}\n"
-        f"閾値: {data['strategies'][new_key]['stage1_winrate']}% "
-        f"上限: {data['strategies'][new_key]['target_holdings']}銘柄"
-    )
+    # 相場状況をわかりやすい言葉に変換
+    status_comment = {
+        "E": "今の相場は危険です。新規取引はやらない方がいいです。",
+        "D": "今の相場はやや不安定です。慎重に様子を見てください。",
+        "C": "相場は横ばいです。条件を厳しくして少数精鋭で運用します。",
+        "B": "相場は正常です。通常通りスクリーニングを行います。",
+        "A": "相場は好調です。積極的にスクリーニングを行います。",
+    }.get(new_key, "")
+
     if changed:
+        msg = (
+            f"【相場状況が変わりました】\n\n"
+            f"{status_comment}\n\n"
+            f"変更: {old_name} → {new_name}\n"
+            f"相場: {market_msg}"
+            + (f"\n実績: {perf_label}（勝率{actual_winrate:.1f}%）" if perf != "unknown" else "")
+        )
         send_line(msg)
     logging.info(f"戦略決定: {new_key}（相場={market_status} 実績={perf}）")
 
