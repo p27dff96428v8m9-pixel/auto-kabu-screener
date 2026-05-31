@@ -238,6 +238,57 @@ input[type="search"] {
   padding: 18px;
 }
 
+.api-status-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 1220px;
+  margin: -10px auto 18px;
+  padding: 0 18px;
+}
+
+.api-status-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.api-status-item strong {
+  display: block;
+  font-size: 13px;
+}
+
+.api-status-item small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+
+.status-dot.success {
+  background: #12805c;
+}
+
+.status-dot.error {
+  background: #c2410c;
+}
+
+.status-dot.pending {
+  background: #d89b00;
+}
+
 .guide-panel,
 .story-panel,
 .candidate-panel,

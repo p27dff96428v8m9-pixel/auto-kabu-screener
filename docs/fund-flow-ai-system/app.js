@@ -384,7 +384,9 @@ const state = {
   dataSource: "sample",
   dataMessage: "",
   aiResearch: null,
-  aiResearchMessage: ""
+  aiResearchMessage: "",
+  marketStatus: { state: "pending", text: "確認中" },
+  geminiStatus: { state: "pending", text: "確認中" }
 };
 
 const weights = {
@@ -1393,6 +1395,10 @@ function applyMarketDataPayload(payload) {
   if (!payload || !Array.isArray(payload.themes) || !payload.themes.length) {
     state.dataSource = payload?.source || "sample";
     state.dataMessage = payload?.message || "";
+    state.marketStatus = {
+      state: state.dataSource === "sample" ? "error" : "pending",
+      text: state.dataMessage || "取得データなし"
+    };
     return false;
   }
 
@@ -1409,6 +1415,10 @@ function applyMarketDataPayload(payload) {
 
   state.dataSource = payload.source || "api";
   state.dataMessage = payload.message || "";
+  state.marketStatus = {
+    state: "success",
+    text: `${marketDataSourceLabel(false)} / ${applied}テーマ / ${formatStatusTime(payload.updatedAt)}`
+  };
   return applied > 0;
 }
 
@@ -1416,12 +1426,51 @@ function applyAiResearchPayload(payload) {
   if (!payload || !Array.isArray(payload.candidates) || !payload.candidates.length) {
     state.aiResearch = null;
     state.aiResearchMessage = payload?.message || "";
+    state.geminiStatus = {
+      state: "error",
+      text: state.aiResearchMessage || "Gemini調査データなし"
+    };
     return false;
   }
 
   state.aiResearch = payload;
   state.aiResearchMessage = payload.message || "";
+  state.geminiStatus = {
+    state: payload.source === "gemini" ? "success" : "pending",
+    text: payload.source === "gemini"
+      ? `${payload.model || "Gemini"} / ${payload.candidates.length}候補 / ${formatStatusTime(payload.updatedAt)}`
+      : `Gemini未実行 / ${payload.message || "暫定候補"}`
+  };
   return true;
+}
+
+function formatStatusTime(value) {
+  if (!value) return "時刻不明";
+  try {
+    return new Intl.DateTimeFormat("ja-JP", {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "Asia/Tokyo"
+    }).format(new Date(value));
+  } catch {
+    return "時刻不明";
+  }
+}
+
+function renderApiStatus() {
+  const pairs = [
+    ["marketApiStatus", state.marketStatus],
+    ["geminiApiStatus", state.geminiStatus]
+  ];
+
+  pairs.forEach(([id, status]) => {
+    const element = document.querySelector(`#${id}`);
+    if (!element) return;
+    const dot = element.querySelector(".status-dot");
+    const small = element.querySelector("small");
+    dot.className = `status-dot ${status.state || "pending"}`;
+    small.textContent = status.text || "確認中";
+  });
 }
 
 function marketDataSourceLabel(refreshed = false) {
@@ -1487,10 +1536,14 @@ async function loadAiResearch({ force = false } = {}) {
 
   try {
     const payload = await fetchAiResearchPayload(force);
-    return applyAiResearchPayload(payload);
+    const applied = applyAiResearchPayload(payload);
+    renderApiStatus();
+    return applied;
   } catch (error) {
     state.aiResearch = null;
     state.aiResearchMessage = error.message;
+    state.geminiStatus = { state: "error", text: error.message };
+    renderApiStatus();
     return false;
   }
 }
@@ -1504,6 +1557,8 @@ async function loadMarketData({ force = false } = {}) {
 
   try {
     document.querySelector("#updatedAt").textContent = "市場データ取得中...";
+    state.marketStatus = { state: "pending", text: "取得中..." };
+    renderApiStatus();
     const payload = await fetchMarketDataPayload(force);
     const applied = applyMarketDataPayload(payload);
     if (applied) {
@@ -1512,11 +1567,14 @@ async function loadMarketData({ force = false } = {}) {
     } else {
       setUpdatedAt(false, marketDataSourceLabel(false));
     }
+    renderApiStatus();
     return applied;
   } catch (error) {
     state.dataSource = "sample";
     state.dataMessage = error.message;
+    state.marketStatus = { state: "error", text: error.message };
     setUpdatedAt(false, "サンプル / API未接続");
+    renderApiStatus();
     return false;
   }
 }
@@ -1540,6 +1598,7 @@ async function init() {
   const cachedAt = loadDailyCache();
   renderFilters();
   bindEvents();
+  renderApiStatus();
   if (cachedAt) {
     document.querySelector("#updatedAt").textContent = `${new Intl.DateTimeFormat("ja-JP", {
       dateStyle: "medium",
