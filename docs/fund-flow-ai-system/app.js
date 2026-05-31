@@ -427,24 +427,24 @@ const themeIcons = {
 };
 
 const mapPositions = {
-  "jp-banks": { x: 16, y: 13 },
-  "jp-semiconductor": { x: 50, y: 13 },
-  "jp-defense": { x: 84, y: 13 },
-  "jp-gold": { x: 16, y: 38 },
-  "jp-electric-power": { x: 50, y: 38 },
-  "jp-trading-houses": { x: 84, y: 38 },
-  "jp-small-growth": { x: 16, y: 63 },
-  "jp-reits": { x: 50, y: 63 },
-  "jpy-exporters": { x: 84, y: 63 },
-  "jp-inbound": { x: 50, y: 88 },
-  "jp-auto": { x: 82, y: 50 },
-  "jp-pharma": { x: 18, y: 88 },
-  "jp-telecom": { x: 82, y: 88 },
-  "jp-retail": { x: 34, y: 76 },
-  "jp-construction": { x: 66, y: 76 },
-  "jp-insurance": { x: 18, y: 72 },
-  "jp-chemical": { x: 38, y: 24 },
-  "jp-low-pbr": { x: 66, y: 24 }
+  "jp-banks": { x: 13, y: 10 },
+  "jp-gold": { x: 13, y: 32 },
+  "jp-insurance": { x: 13, y: 58 },
+  "jp-small-growth": { x: 13, y: 84 },
+  "jp-semiconductor": { x: 39, y: 10 },
+  "jp-chemical": { x: 39, y: 34 },
+  "jp-reits": { x: 39, y: 58 },
+  "jp-inbound": { x: 39, y: 84 },
+  "jp-low-pbr": { x: 65, y: 16 },
+  "jp-electric-power": { x: 65, y: 40 },
+  "jp-construction": { x: 65, y: 66 },
+  "jp-pharma": { x: 65, y: 90 },
+  "jp-defense": { x: 88, y: 10 },
+  "jp-trading-houses": { x: 88, y: 34 },
+  "jp-auto": { x: 88, y: 58 },
+  "jpy-exporters": { x: 88, y: 82 },
+  "jp-telecom": { x: 88, y: 94 },
+  "jp-retail": { x: 52, y: 76 }
 };
 
 const flowRoutes = [
