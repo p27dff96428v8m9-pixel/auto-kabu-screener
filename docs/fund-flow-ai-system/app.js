@@ -606,13 +606,40 @@ function flowRouteCandidates(list) {
       const strength = Math.round((fundAmount(fromTheme) + accelerationForPeriod(toTheme, state.period) + spreadScore(toTheme)) / 3);
       const midX = (start.x + end.x) / 2;
       const midY = (start.y + end.y) / 2;
-      return { from, to, fromTheme, toTheme, midX, midY, strength, d: `M ${start.x} ${start.y} L ${end.x} ${end.y}` };
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const curve = Math.min(9, Math.max(5, distance * 0.14));
+      const direction = from < to ? 1 : -1;
+      const controlX = midX + (-dy / distance) * curve * direction;
+      const controlY = midY + (dx / distance) * curve * direction;
+      return {
+        from,
+        to,
+        fromTheme,
+        toTheme,
+        start,
+        end,
+        control: { x: controlX, y: controlY },
+        midX,
+        midY,
+        strength,
+        d: `M ${start.x} ${start.y} Q ${controlX} ${controlY} ${end.x} ${end.y}`
+      };
     })
     .sort((a, b) => b.strength - a.strength);
 }
 
 function primaryRouteFor(list) {
   return flowRouteCandidates(list)[0];
+}
+
+function quadraticPoint(start, control, end, t) {
+  const inv = 1 - t;
+  return {
+    x: inv * inv * start.x + 2 * inv * t * control.x + t * t * end.x,
+    y: inv * inv * start.y + 2 * inv * t * control.y + t * t * end.y
+  };
 }
 
 function themeById(id) {
@@ -711,18 +738,27 @@ function renderFlowMap(list) {
   layer.appendChild(routeLayer);
 
   routePaths.forEach((route) => {
-    const start = mapPositionFor(route.from, mapList);
-    const end = mapPositionFor(route.to, mapList);
     const flowCount = route.strength >= 60 ? 7 : route.strength >= 35 ? 5 : 4;
     const duration = 9.5 + Math.min(3.5, Math.max(0, 70 - route.strength) / 18);
 
     for (let i = 0; i < flowCount; i += 1) {
+      const first = quadraticPoint(route.start, route.control, route.end, 0.08);
+      const second = quadraticPoint(route.start, route.control, route.end, 0.28);
+      const third = quadraticPoint(route.start, route.control, route.end, 0.52);
+      const fourth = quadraticPoint(route.start, route.control, route.end, 0.76);
+      const fifth = quadraticPoint(route.start, route.control, route.end, 0.94);
       const trail = document.createElement("span");
       trail.className = "flow-trail";
-      trail.style.left = `${start.x}%`;
-      trail.style.top = `${start.y}%`;
-      trail.style.setProperty("--flow-end-x", `${end.x}%`);
-      trail.style.setProperty("--flow-end-y", `${end.y}%`);
+      trail.style.left = `${first.x}%`;
+      trail.style.top = `${first.y}%`;
+      trail.style.setProperty("--flow-x1", `${second.x}%`);
+      trail.style.setProperty("--flow-y1", `${second.y}%`);
+      trail.style.setProperty("--flow-x2", `${third.x}%`);
+      trail.style.setProperty("--flow-y2", `${third.y}%`);
+      trail.style.setProperty("--flow-x3", `${fourth.x}%`);
+      trail.style.setProperty("--flow-y3", `${fourth.y}%`);
+      trail.style.setProperty("--flow-end-x", `${fifth.x}%`);
+      trail.style.setProperty("--flow-end-y", `${fifth.y}%`);
       trail.style.setProperty("--flow-duration", `${duration}s`);
       trail.style.animationDelay = `${-(duration / flowCount) * i}s`;
       trail.textContent = "💰";
