@@ -387,7 +387,8 @@ const state = {
   aiResearchMessage: "",
   marketStatus: { state: "pending", text: "確認中" },
   geminiStatus: { state: "pending", text: "確認中" },
-  previousRanks: {}
+  previousRanks: {},
+  publicRankHistory: null
 };
 
 const weights = {
@@ -622,6 +623,27 @@ function lifecycleStage(theme) {
     return { icon: "🍂", label: "衰退期", decision: "資金の移動先を確認" };
   }
   return { icon: "🌿", label: "成長期", decision: "条件確認" };
+}
+
+function actionStageForTheme(theme) {
+  const m = theme.metrics[state.period];
+  const score = calculateScore(theme, state.period);
+  const accel = accelerationForPeriod(theme, state.period);
+  const spread = spreadScore(theme);
+
+  if (m.crowdedness >= 78 || (m.fundFlow >= 78 && accel <= 8)) {
+    return { label: "追いかけ注意", className: "watchout", reason: "資金量か過熱度が高く、上値追いより押し目確認が優先です。" };
+  }
+  if (score >= 68 && accel > 0 && spread >= 58) {
+    return { label: "個別銘柄確認", className: "check", reason: "テーマの資金量と広がりがあり、関連銘柄の業績確認へ進めます。" };
+  }
+  if (score >= 52 && accel > 0 && m.crowdedness < 65) {
+    return { label: "監視開始", className: "watch", reason: "まだ主役ではありませんが、資金の向きが改善しています。" };
+  }
+  if (accel < -10 || m.fundFlow < 45) {
+    return { label: "見送り", className: "skip", reason: "資金量または加速度が弱く、次の改善待ちです。" };
+  }
+  return { label: "見るだけ", className: "observe", reason: "判断材料はありますが、まだ決め手待ちです。" };
 }
 
 function mapPositionFor(id, list = []) {
@@ -1204,7 +1226,10 @@ function renderGeminiResearchCandidates(source) {
     return true;
   }
 
-  container.innerHTML = candidates
+  const summary = state.aiResearch.summary
+    ? `<div class="gemini-summary"><strong>Gemini全体判断</strong><span>${state.aiResearch.summary}</span></div>`
+    : "";
+  container.innerHTML = summary + candidates
     .map((candidate) => {
       const theme = themeById(candidate.id);
       const evidence = Array.isArray(candidate.evidence) ? candidate.evidence.slice(0, 3) : [];
@@ -1366,6 +1391,7 @@ function renderDetail() {
   const m = theme.metrics[state.period];
   const score = calculateScore(theme, state.period);
   const stage = lifecycleStage(theme);
+  const actionStage = actionStageForTheme(theme);
 
   document.querySelector("#detailClass").textContent = `${theme.assetClass} / ${theme.region}`;
   document.querySelector("#detailName").textContent = `${themeIcons[theme.id]} ${theme.name}`;
@@ -1396,7 +1422,8 @@ function renderDetail() {
     : '<p class="empty">上がりすぎ・悪材料・値動き注意を除外すると、今すぐ表示できるお宝候補はありません。</p>';
 
   document.querySelector("#dataPoints").innerHTML = `
-    <dt>判断</dt><dd>${stage.decision}</dd>
+    <dt>判断</dt><dd><span class="action-stage ${actionStage.className}">${actionStage.label}</span></dd>
+    <dt>理由</dt><dd>${actionStage.reason}</dd>
     <dt>総合スコア</dt><dd>${score}</dd>
     <dt>価格モメンタム</dt><dd>${m.momentum}%</dd>
     <dt>出来高増加</dt><dd>${m.volume}%</dd>
@@ -1466,6 +1493,7 @@ function bindEvents() {
 
   document.querySelector("#refreshButton").addEventListener("click", async () => {
     const loaded = await loadMarketData({ force: true });
+    await loadPublicRankHistory({ force: true });
     if (!loaded) {
       simulateDailyRefresh();
     }
@@ -1533,6 +1561,19 @@ function loadRankHistory() {
   }
 }
 
+async function loadPublicRankHistory({ force = false } = {}) {
+  if (typeof window === "undefined" || window.location.protocol === "file:") return false;
+  try {
+    const cacheBust = force ? `?t=${Date.now()}` : "";
+    const response = await fetch(`data/ranking-history.json${cacheBust}`, { cache: "no-store" });
+    if (!response.ok) return false;
+    state.publicRankHistory = await response.json();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function saveRankSnapshot(list) {
   try {
     const history = {
@@ -1550,7 +1591,7 @@ function saveRankSnapshot(list) {
 }
 
 function rankMoveFor(themeId, currentRank) {
-  const snapshot = state.previousRanks?.[rankSnapshotKey()];
+  const snapshot = state.publicRankHistory?.previous?.[rankSnapshotKey()] || state.previousRanks?.[rankSnapshotKey()];
   const previousRank = snapshot?.ranks?.[themeId];
   if (!previousRank) return { label: "新", className: "new", title: "前回記録なし" };
   const diff = previousRank - currentRank;
@@ -1808,6 +1849,7 @@ async function init() {
   }
   await loadMarketData();
   await loadAiResearch();
+  await loadPublicRankHistory();
   renderList();
 }
 
