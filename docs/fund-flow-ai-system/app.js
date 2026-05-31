@@ -954,7 +954,7 @@ function renderCharacters() {
           <span class="character-icon">${character.icon}</span>
           <span>
             <strong>${character.name}：${character.style}</strong>
-            <span>意味: 実際の資金ではなく、このAIが今注目しているテーマです。注目 ${themeIcons[current.id]} ${current.name}、次に確認 ${themeIcons[next.id]} ${next.name}</span>
+            <span>意味: 実際の資金ではなく、Geminiが今注目しているテーマです。注目 ${themeIcons[current.id]} ${current.name}、次に確認 ${themeIcons[next.id]} ${next.name}</span>
           </span>
         </div>
       `;
@@ -1028,7 +1028,7 @@ function buildAiResearchReason(theme) {
   const riskText = theme.metrics[state.period].crowdedness >= 70
     ? "過熱度が高めなので、追いかけ買いではなく押し目や出来高確認が必要です。"
     : "過熱度はまだ極端ではないため、関連銘柄への広がりを確認しやすい状態です。";
-  return `AI調査: 資金量の流れは${fundSeq}、${periodLabel()}の加速度は${accel >= 0 ? "+" : ""}${accel}、広がりは${spreadScore(theme)}です。${routeText}${riskText}`;
+  return `Gemini候補: 資金量の流れは${fundSeq}、${periodLabel()}の加速度は${accel >= 0 ? "+" : ""}${accel}、広がりは${spreadScore(theme)}です。${routeText}${riskText}`;
 }
 
 function renderGeminiResearchCandidates(source) {
@@ -1055,7 +1055,7 @@ function renderGeminiResearchCandidates(source) {
             <span class="candidate-next">次に確認: ${candidate.nextCheck || "関連銘柄とニュースの継続確認"}</span>
             <span class="candidate-risk">注意: ${candidate.risk || "過熱度と材料の変化を確認"}</span>
           </span>
-          <span class="candidate-decision">${candidate.decision || "AI確認"} ${candidate.score ?? ""}</span>
+          <span class="candidate-decision">${candidate.decision || "Gemini確認"} ${candidate.score ?? ""}</span>
         </button>
       `;
     })
@@ -1063,7 +1063,7 @@ function renderGeminiResearchCandidates(source) {
 
   const status = document.querySelector("#aiResearchStatus");
   if (status) {
-    const sourceName = state.aiResearch.source === "gemini" ? "Gemini AI調査" : "暫定AI候補";
+    const sourceName = "Gemini調査";
     const updated = state.aiResearch.updatedAt
       ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tokyo" }).format(new Date(state.aiResearch.updatedAt))
       : "";
@@ -1122,15 +1122,15 @@ function renderResearchCandidates(list) {
             <strong>${themeIcons[theme.id]} ${theme.name}</strong>
             <span>${reason}</span>
           </span>
-          <span class="candidate-decision">AI調査 ${researchScore}</span>
+          <span class="candidate-decision">Gemini候補 ${researchScore}</span>
         </button>
       `)
       .join("")
-    : '<p class="empty">AIが調べられるテーマがありません。フィルター条件を戻してください。</p>';
+    : '<p class="empty">Geminiが調べられるテーマがありません。フィルター条件を戻してください。</p>';
 
   const status = document.querySelector("#aiResearchStatus");
   if (status) {
-    status.textContent = `${periodLabel()}の監視テーマ${source.length}件をAIが自動調査しました。画面には次に関連銘柄・出来高・ニュースを確認する候補だけを出しています。`;
+    status.textContent = `${periodLabel()}の監視テーマ${source.length}件をGemini候補として整理しました。Gemini API実行後はニュース・金利・為替を含む調査結果に更新されます。`;
   }
 
   container.querySelectorAll("[data-id]").forEach((button) => {
@@ -1303,7 +1303,7 @@ function bindEvents() {
   });
 
   document.querySelector("#runAiResearch").addEventListener("click", async () => {
-    document.querySelector("#aiResearchStatus").textContent = "公開済みのAI調査データを再読み込みしています...";
+    document.querySelector("#aiResearchStatus").textContent = "公開済みのGemini調査データを再読み込みしています...";
     await loadAiResearch({ force: true });
     renderResearchCandidates(filteredThemes());
   });
@@ -1462,7 +1462,7 @@ async function fetchAiResearchPayload(force) {
     }
   }
 
-  throw lastError || new Error("AI調査データを取得できませんでした。");
+  throw lastError || new Error("Gemini調査データを取得できませんでした。");
 }
 
 async function loadAiResearch({ force = false } = {}) {
