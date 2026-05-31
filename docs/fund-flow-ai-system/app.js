@@ -454,37 +454,6 @@ const flowRoutes = [
   ["jp-banks", "jp-reits"]
 ];
 
-const aiCharacters = [
-  {
-    name: "Gemini",
-    icon: "🤖",
-    style: "成長資金・テーマ追随型",
-    current: "jp-semiconductor",
-    next: "jp-electric-power"
-  },
-  {
-    name: "Claude",
-    icon: "🧐",
-    style: "保守資金・安全確認型",
-    current: "jp-banks",
-    next: "jp-reits"
-  },
-  {
-    name: "Grok",
-    icon: "🚀",
-    style: "投機資金・先回り型",
-    current: "jp-small-growth",
-    next: "jp-inbound"
-  },
-  {
-    name: "GPT",
-    icon: "🧠",
-    style: "総合判断資金",
-    current: "jp-electric-power",
-    next: "jp-reits"
-  }
-];
-
 function calculateScore(theme, period) {
   const m = theme.metrics[period];
   const base =
@@ -785,9 +754,9 @@ function renderMapTakeaway(list) {
   const routeText = route
     ? `動く💰は候補ルート上のお金の流れです。特に目立つ流れは${themeIcons[route.from]} ${route.fromTheme.name} → ${themeIcons[route.to]} ${route.toTheme.name}ですが、市場資金が全部そこだけへ移ったという意味ではありません。`
     : "動く💰は現在の絞り込み条件では出ていません。表示中テーマ同士の候補ルートがない状態です。";
-  const aiThemes = aiCharacters
-    .filter((character) => visibleIds.has(character.current))
-    .map((character) => `${character.name}: ${themeIcons[character.current]} ${themeById(character.current).name}`)
+  const geminiThemes = geminiResearchCandidates(visibleIds)
+    .slice(0, 2)
+    .map((candidate) => `${themeIcons[candidate.id]} ${candidate.name || themeById(candidate.id).name}`)
     .join("、");
 
   container.innerHTML = `
@@ -795,7 +764,7 @@ function renderMapTakeaway(list) {
     <p>${goldText}</p>
     ${rotationText ? `<p>${rotationText}</p>` : ""}
     <p>${routeText}</p>
-    <p>AI注目は実際の資金ではなく、AIごとの調査メモです。${aiThemes ? `今は ${aiThemes} を見ています。` : "今の絞り込みでは表示中のAI注目メモはありません。"}</p>
+    <p>Gemini注目は実際の資金ではなく、Geminiの調査メモです。${geminiThemes ? `今は ${geminiThemes} を見ています。` : "Gemini調査の実行後、ここに注目テーマが表示されます。"}</p>
   `;
 }
 
@@ -928,38 +897,63 @@ function renderPeriodFlow(theme) {
 }
 
 function renderAiMarkers(container, visibleIds) {
-  aiCharacters
-    .filter((character) => visibleIds.has(character.current))
-    .forEach((character, index) => {
-      const pos = mapPositions[character.current];
-      const marker = document.createElement("span");
-      marker.className = "ai-marker";
-      marker.style.left = `${Math.min(92, pos.x + 8 + (index % 2) * 3)}%`;
-      marker.style.top = `${Math.max(4, pos.y - 8 - (index % 3) * 2)}%`;
-      marker.style.setProperty("--drift-x", `${index % 2 === 0 ? 4 : -4}px`);
-      marker.style.setProperty("--drift-y", "-3px");
-      marker.innerHTML = `${character.icon} AI注目`;
-      container.appendChild(marker);
-    });
+  const candidate = geminiResearchCandidates(visibleIds)[0];
+  if (!candidate) return;
+
+  const pos = mapPositionFor(candidate.id);
+  const marker = document.createElement("span");
+  marker.className = "ai-marker";
+  marker.style.left = `${Math.min(92, pos.x + 8)}%`;
+  marker.style.top = `${Math.max(4, pos.y - 8)}%`;
+  marker.style.setProperty("--drift-x", "4px");
+  marker.style.setProperty("--drift-y", "-3px");
+  marker.innerHTML = `💎 Gemini注目`;
+  container.appendChild(marker);
+}
+
+function isGeminiResearchReady() {
+  return state.aiResearch?.source === "gemini" && Array.isArray(state.aiResearch.candidates);
+}
+
+function geminiResearchCandidates(visibleIds = null) {
+  if (!isGeminiResearchReady()) return [];
+  return state.aiResearch.candidates
+    .filter((candidate) => themeById(candidate.id))
+    .filter((candidate) => !visibleIds || visibleIds.has(candidate.id));
 }
 
 function renderCharacters() {
   const container = document.querySelector("#aiCharacters");
-  container.innerHTML = aiCharacters
-    .map((character) => {
-      const current = themeById(character.current);
-      const next = themeById(character.next);
-      return `
-        <div class="character-card">
-          <span class="character-icon">${character.icon}</span>
-          <span>
-            <strong>${character.name}：${character.style}</strong>
-            <span>意味: 実際の資金ではなく、Geminiが今注目しているテーマです。注目 ${themeIcons[current.id]} ${current.name}、次に確認 ${themeIcons[next.id]} ${next.name}</span>
-          </span>
-        </div>
-      `;
-    })
-    .join("");
+  const candidates = geminiResearchCandidates();
+
+  if (!candidates.length) {
+    container.innerHTML = `
+      <div class="character-card">
+        <span class="character-icon">💎</span>
+        <span>
+          <strong>Gemini：調査待ち</strong>
+          <span>GitHub ActionsでGemini調査が実行されると、ここに注目テーマと次に確認するテーマが表示されます。</span>
+        </span>
+      </div>
+    `;
+    return;
+  }
+
+  const current = candidates[0];
+  const next = candidates[1];
+  const currentTheme = themeById(current.id);
+  const nextTheme = next ? themeById(next.id) : null;
+  const evidence = Array.isArray(current.evidence) ? current.evidence.slice(0, 2).join(" / ") : "";
+  container.innerHTML = `
+    <div class="character-card">
+      <span class="character-icon">💎</span>
+      <span>
+        <strong>Gemini：価格・出来高・ニュース・金利・為替の総合調査</strong>
+        <span>注目 ${themeIcons[current.id]} ${current.name || currentTheme.name}。${nextTheme ? `次に確認 ${themeIcons[next.id]} ${next.name || nextTheme.name}。` : ""}${current.reason || ""}</span>
+        ${evidence ? `<span class="candidate-evidence">${evidence}</span>` : ""}
+      </span>
+    </div>
+  `;
 }
 
 function renderMarketStory(list) {
@@ -1032,15 +1026,37 @@ function buildAiResearchReason(theme) {
 }
 
 function renderGeminiResearchCandidates(source) {
-  if (!state.aiResearch || !Array.isArray(state.aiResearch.candidates)) return false;
-
   const container = document.querySelector("#researchCandidates");
+  const status = document.querySelector("#aiResearchStatus");
+
+  if (!state.aiResearch || !Array.isArray(state.aiResearch.candidates)) {
+    container.innerHTML = '<p class="empty">Gemini調査データがまだありません。GitHub Actionsの「Update market data」を実行すると表示されます。</p>';
+    if (status) {
+      status.textContent = "Gemini調査待ち: まだ ai-research.json を読み込めていません。";
+    }
+    return true;
+  }
+
+  if (state.aiResearch.source !== "gemini") {
+    container.innerHTML = '<p class="empty">Gemini調査はまだ未実行です。GitHub ActionsでGemini APIを実行すると、ここに本物のGemini調査結果だけを表示します。</p>';
+    if (status) {
+      status.textContent = "Gemini調査待ち: 現在のファイルは暫定候補です。Gemini API実行後に更新されます。";
+    }
+    return true;
+  }
+
   const visibleIds = new Set(source.map((theme) => theme.id));
   const candidates = state.aiResearch.candidates
     .filter((candidate) => visibleIds.has(candidate.id))
     .slice(0, 5);
 
-  if (!candidates.length) return false;
+  if (!candidates.length) {
+    container.innerHTML = '<p class="empty">現在の絞り込み条件ではGemini調査候補がありません。フィルター条件を戻してください。</p>';
+    if (status) {
+      status.textContent = "Gemini調査済みですが、現在のフィルターに一致する候補はありません。";
+    }
+    return true;
+  }
 
   container.innerHTML = candidates
     .map((candidate) => {
@@ -1061,7 +1077,6 @@ function renderGeminiResearchCandidates(source) {
     })
     .join("");
 
-  const status = document.querySelector("#aiResearchStatus");
   if (status) {
     const sourceName = "Gemini調査";
     const updated = state.aiResearch.updatedAt
