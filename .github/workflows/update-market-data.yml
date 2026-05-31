@@ -1,0 +1,38 @@
+name: Update market data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/20 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update-market-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch J-Quants data
+        env:
+          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+          JQUANTS_MAX_REQUESTS_PER_RUN: "5"
+          MARKET_DATA_OUTPUT_PATH: docs/fund-flow-ai-system/data/market-data.json
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FX_API_URL: ${{ secrets.FX_API_URL }}
+          RATES_API_URL: ${{ secrets.RATES_API_URL }}
+          BOJ_STAT_API_URL: ${{ secrets.BOJ_STAT_API_URL }}
+        run: node scripts/update-market-data.js
+
+      - name: Commit market data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/fund-flow-ai-system/data/market-data.json
+          git diff --cached --quiet || git commit -m "Update market data"
+          git push
