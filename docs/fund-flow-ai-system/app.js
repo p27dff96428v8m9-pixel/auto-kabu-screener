@@ -382,7 +382,9 @@ const state = {
   mapZoom: 1,
   mapFullscreen: false,
   dataSource: "sample",
-  dataMessage: ""
+  dataMessage: "",
+  aiResearch: null,
+  aiResearchMessage: ""
 };
 
 const weights = {
@@ -1029,6 +1031,56 @@ function buildAiResearchReason(theme) {
   return `AI調査: 資金量の流れは${fundSeq}、${periodLabel()}の加速度は${accel >= 0 ? "+" : ""}${accel}、広がりは${spreadScore(theme)}です。${routeText}${riskText}`;
 }
 
+function renderGeminiResearchCandidates(source) {
+  if (!state.aiResearch || !Array.isArray(state.aiResearch.candidates)) return false;
+
+  const container = document.querySelector("#researchCandidates");
+  const visibleIds = new Set(source.map((theme) => theme.id));
+  const candidates = state.aiResearch.candidates
+    .filter((candidate) => visibleIds.has(candidate.id))
+    .slice(0, 5);
+
+  if (!candidates.length) return false;
+
+  container.innerHTML = candidates
+    .map((candidate) => {
+      const theme = themeById(candidate.id);
+      const evidence = Array.isArray(candidate.evidence) ? candidate.evidence.slice(0, 3) : [];
+      return `
+        <button class="candidate-card ai-picked gemini-picked" type="button" data-id="${candidate.id}">
+          <span>
+            <strong>${themeIcons[candidate.id] || "●"} ${candidate.name || theme.name}</strong>
+            <span>${candidate.reason || "Geminiが価格・出来高、ニュース、金利・為替材料から確認候補にしました。"}</span>
+            <span class="candidate-evidence">${evidence.join(" / ")}</span>
+            <span class="candidate-next">次に確認: ${candidate.nextCheck || "関連銘柄とニュースの継続確認"}</span>
+            <span class="candidate-risk">注意: ${candidate.risk || "過熱度と材料の変化を確認"}</span>
+          </span>
+          <span class="candidate-decision">${candidate.decision || "AI確認"} ${candidate.score ?? ""}</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  const status = document.querySelector("#aiResearchStatus");
+  if (status) {
+    const sourceName = state.aiResearch.source === "gemini" ? "Gemini AI調査" : "暫定AI候補";
+    const updated = state.aiResearch.updatedAt
+      ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tokyo" }).format(new Date(state.aiResearch.updatedAt))
+      : "";
+    status.textContent = `${sourceName}: 価格・出来高、ニュース、金利・為替材料から次に見るテーマを更新しました。${updated}`;
+  }
+
+  container.querySelectorAll("[data-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedId = button.dataset.id;
+      renderList();
+      renderDetail();
+    });
+  });
+
+  return true;
+}
+
 function renderResearchCandidates(list) {
   const container = document.querySelector("#researchCandidates");
   const needle = state.search.trim().toLowerCase();
@@ -1047,6 +1099,11 @@ function renderResearchCandidates(list) {
       ].join(" ").toLowerCase();
       return text.includes(needle);
     });
+
+  if (renderGeminiResearchCandidates(source)) {
+    return;
+  }
+
   const displayCandidates = source
     .map((theme) => ({
       theme,
@@ -1245,11 +1302,10 @@ function bindEvents() {
     renderList();
   });
 
-  document.querySelector("#runAiResearch").addEventListener("click", () => {
-    document.querySelector("#aiResearchStatus").textContent = "AIが資金量、加速度、広がり、過熱度、候補ルートを再調査しています...";
-    window.setTimeout(() => {
-      renderResearchCandidates(filteredThemes());
-    }, 280);
+  document.querySelector("#runAiResearch").addEventListener("click", async () => {
+    document.querySelector("#aiResearchStatus").textContent = "公開済みのAI調査データを再読み込みしています...";
+    await loadAiResearch({ force: true });
+    renderResearchCandidates(filteredThemes());
   });
 
   document.querySelector("#mapZoomOut").addEventListener("click", () => {
@@ -1341,6 +1397,18 @@ function applyMarketDataPayload(payload) {
   return applied > 0;
 }
 
+function applyAiResearchPayload(payload) {
+  if (!payload || !Array.isArray(payload.candidates) || !payload.candidates.length) {
+    state.aiResearch = null;
+    state.aiResearchMessage = payload?.message || "";
+    return false;
+  }
+
+  state.aiResearch = payload;
+  state.aiResearchMessage = payload.message || "";
+  return true;
+}
+
 function marketDataSourceLabel(refreshed = false) {
   const sourceNames = {
     "jquants-v2": "実データ: J-Quants V2",
@@ -1377,6 +1445,39 @@ async function fetchMarketDataPayload(force) {
     }
   }
   throw lastError || new Error("市場データを取得できませんでした。");
+}
+
+async function fetchAiResearchPayload(force) {
+  const cacheBust = force ? `?t=${Date.now()}` : "";
+  const endpoints = [`data/ai-research.json${cacheBust}`];
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${endpoint}`);
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("AI調査データを取得できませんでした。");
+}
+
+async function loadAiResearch({ force = false } = {}) {
+  if (typeof window === "undefined" || window.location.protocol === "file:") {
+    return false;
+  }
+
+  try {
+    const payload = await fetchAiResearchPayload(force);
+    return applyAiResearchPayload(payload);
+  } catch (error) {
+    state.aiResearch = null;
+    state.aiResearchMessage = error.message;
+    return false;
+  }
 }
 
 async function loadMarketData({ force = false } = {}) {
@@ -1434,6 +1535,7 @@ async function init() {
     setUpdatedAt();
   }
   await loadMarketData();
+  await loadAiResearch();
   renderList();
 }
 

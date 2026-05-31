@@ -29,10 +29,18 @@ jobs:
           BOJ_STAT_API_URL: ${{ secrets.BOJ_STAT_API_URL }}
         run: node scripts/update-market-data.js
 
+      - name: Run Gemini theme research
+        env:
+          GEMINI_API_KEY: ${{ secrets.FUND_FLOW_GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-2.5-flash
+          MARKET_DATA_INPUT_PATH: docs/fund-flow-ai-system/data/market-data.json
+          AI_RESEARCH_OUTPUT_PATH: docs/fund-flow-ai-system/data/ai-research.json
+        run: node scripts/update-ai-research.js
+
       - name: Commit market data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/fund-flow-ai-system/data/market-data.json
+          git add docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json
           git diff --cached --quiet || git commit -m "Update market data"
           git push
