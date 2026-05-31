@@ -627,7 +627,11 @@ function filteredThemes() {
       ].join(" ").toLowerCase();
       return text.includes(needle);
     })
-    .sort((a, b) => aiResearchScore(b) - aiResearchScore(a));
+    .sort((a, b) => {
+      const scoreDiff = calculateScore(b, state.period) - calculateScore(a, state.period);
+      if (scoreDiff !== 0) return scoreDiff;
+      return aiResearchScore(b) - aiResearchScore(a);
+    });
 
   const isExploring = needle || state.assetClass !== "all" || state.stage !== "all" || state.liquidityOnly;
   return isExploring ? filtered : filtered.slice(0, 12);
