@@ -696,8 +696,8 @@ function renderFlowMap(list) {
   const visibleIds = new Set(mapList.map((theme) => theme.id));
   const routePaths = flowRouteCandidates(list);
 
-  const routeLayer = document.createElement("svg");
-  routeLayer.classList.add("flow-svg");
+  const routeLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  routeLayer.setAttribute("class", "flow-svg");
   routeLayer.setAttribute("viewBox", "0 0 100 100");
   routeLayer.setAttribute("preserveAspectRatio", "none");
   routePaths.forEach((route) => {
