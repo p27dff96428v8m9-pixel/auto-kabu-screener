@@ -696,6 +696,20 @@ function renderFlowMap(list) {
   const visibleIds = new Set(mapList.map((theme) => theme.id));
   const routePaths = flowRouteCandidates(list);
 
+  const routeLayer = document.createElement("svg");
+  routeLayer.classList.add("flow-svg");
+  routeLayer.setAttribute("viewBox", "0 0 100 100");
+  routeLayer.setAttribute("preserveAspectRatio", "none");
+  routePaths.forEach((route) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", route.d);
+    path.classList.add(
+      route.strength >= 60 ? "route-strength-high" : route.strength >= 35 ? "route-strength-mid" : "route-strength-low"
+    );
+    routeLayer.appendChild(path);
+  });
+  layer.appendChild(routeLayer);
+
   routePaths.forEach((route) => {
     const start = mapPositionFor(route.from, mapList);
     const end = mapPositionFor(route.to, mapList);
