@@ -674,7 +674,7 @@ function renderSummary(list) {
 function renderFlowMap(list) {
   const container = document.querySelector("#flowMap");
   container.innerHTML = "";
-  container.style.setProperty("--map-zoom", state.mapZoom);
+  container.style.setProperty("--map-scale", state.mapZoom);
 
   const layer = document.createElement("div");
   layer.className = "flow-map-inner";
@@ -784,7 +784,7 @@ function renderMapTakeaway(list) {
 
 function setMapZoom(nextZoom) {
   state.mapZoom = Math.max(0.75, Math.min(1.45, Number(nextZoom.toFixed(2))));
-  document.querySelector("#flowMap")?.style.setProperty("--map-zoom", state.mapZoom);
+  document.querySelector("#flowMap")?.style.setProperty("--map-scale", state.mapZoom);
 }
 
 function setMapFullscreen(enabled) {

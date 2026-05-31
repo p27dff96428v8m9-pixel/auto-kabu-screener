@@ -427,7 +427,7 @@ input[type="search"] {
 .flow-map {
   position: relative;
   min-height: 820px;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
@@ -438,11 +438,12 @@ input[type="search"] {
 }
 
 .flow-map-inner {
-  position: absolute;
-  inset: 0;
-  transform: scale(var(--map-zoom, 1));
-  transform-origin: center;
-  transition: transform 180ms ease;
+  position: relative;
+  width: calc(100% * var(--map-scale, 1));
+  min-width: 100%;
+  height: calc(820px * var(--map-scale, 1));
+  min-height: 820px;
+  transition: width 180ms ease, height 180ms ease;
 }
 
 .map-fullscreen {
@@ -459,6 +460,11 @@ input[type="search"] {
 }
 
 .map-fullscreen .flow-map {
+  min-height: calc(100vh - 260px);
+}
+
+.map-fullscreen .flow-map-inner {
+  height: calc((100vh - 260px) * var(--map-scale, 1));
   min-height: calc(100vh - 260px);
 }
 
