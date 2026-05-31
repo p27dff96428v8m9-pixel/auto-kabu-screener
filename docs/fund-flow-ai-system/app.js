@@ -427,6 +427,48 @@ const themeIcons = {
   "jp-low-pbr": "📘"
 };
 
+const extraInstrumentsByTheme = {
+  "jp-semiconductor": [
+    { ticker: "6723", name: "ルネサスエレクトロニクス", type: "大型株", strength: 70, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "6146", name: "ディスコ", type: "大型株", strength: 78, warning: "値動き大", quality: "業績良好候補", newsRisk: "材料確認" },
+    { ticker: "6920", name: "レーザーテック", type: "大型株", strength: 72, warning: "混雑", quality: "高成長候補", newsRisk: "過熱確認" }
+  ],
+  "jp-banks": [
+    { ticker: "8308", name: "りそなホールディングス", type: "大型株", strength: 71, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "7182", name: "ゆうちょ銀行", type: "大型株", strength: 66, warning: "", quality: "安定業績候補", newsRisk: "悪材料未検出" },
+    { ticker: "7167", name: "めぶきフィナンシャルグループ", type: "中型株", strength: 63, warning: "", quality: "地銀見直し候補", newsRisk: "悪材料未検出" }
+  ],
+  "jp-electric-power": [
+    { ticker: "9508", name: "九州電力", type: "大型株", strength: 74, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "9506", name: "東北電力", type: "大型株", strength: 67, warning: "", quality: "改善候補", newsRisk: "悪材料未検出" },
+    { ticker: "9504", name: "中国電力", type: "大型株", strength: 64, warning: "", quality: "改善候補", newsRisk: "悪材料未検出" }
+  ],
+  "jp-trading-houses": [
+    { ticker: "8015", name: "豊田通商", type: "大型株", strength: 70, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "8053", name: "住友商事", type: "大型株", strength: 68, warning: "", quality: "高配当候補", newsRisk: "悪材料未検出" },
+    { ticker: "2768", name: "双日", type: "中型株", strength: 63, warning: "", quality: "割安見直し候補", newsRisk: "悪材料未検出" }
+  ],
+  "jp-reits": [
+    { ticker: "8952", name: "ジャパンリアルエステイト投資法人", type: "J-REIT", strength: 65, warning: "", quality: "安定利回り候補", newsRisk: "悪材料未検出" },
+    { ticker: "8953", name: "日本都市ファンド投資法人", type: "J-REIT", strength: 62, warning: "", quality: "分散型候補", newsRisk: "悪材料未検出" },
+    { ticker: "3462", name: "野村不動産マスターファンド投資法人", type: "J-REIT", strength: 61, warning: "", quality: "安定利回り候補", newsRisk: "悪材料未検出" }
+  ],
+  "jpy-exporters": [
+    { ticker: "6301", name: "小松製作所", type: "大型株", strength: 68, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "6501", name: "日立製作所", type: "大型株", strength: 76, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "6981", name: "村田製作所", type: "大型株", strength: 65, warning: "", quality: "回復候補", newsRisk: "悪材料未検出" }
+  ],
+  "jp-auto": [
+    { ticker: "7201", name: "日産自動車", type: "大型株", strength: 58, warning: "材料確認", quality: "再建候補", newsRisk: "材料確認" },
+    { ticker: "7270", name: "SUBARU", type: "大型株", strength: 66, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "6902", name: "デンソー", type: "大型株", strength: 68, warning: "", quality: "部品優良候補", newsRisk: "悪材料未検出" }
+  ],
+  "jp-insurance": [
+    { ticker: "8750", name: "第一生命ホールディングス", type: "大型株", strength: 69, warning: "", quality: "業績良好候補", newsRisk: "悪材料未検出" },
+    { ticker: "8795", name: "T&Dホールディングス", type: "大型株", strength: 65, warning: "", quality: "金利恩恵候補", newsRisk: "悪材料未検出" }
+  ]
+};
+
 const mapPositions = {
   "jp-banks": { x: 13, y: 10 },
   "jp-gold": { x: 13, y: 32 },
@@ -644,6 +686,34 @@ function quadraticPoint(start, control, end, t) {
 
 function themeById(id) {
   return themes.find((theme) => theme.id === id);
+}
+
+function instrumentScore(instrument) {
+  const warningPenalty = instrument.warning ? 12 : 0;
+  const qualityBonus = instrument.quality?.includes("業績良好") ? 8 : instrument.quality ? 4 : 0;
+  const newsBonus = instrument.newsRisk === "悪材料未検出" ? 6 : 0;
+  return instrument.strength + qualityBonus + newsBonus - warningPenalty;
+}
+
+function relatedInstruments(theme) {
+  const merged = [...theme.instruments, ...(extraInstrumentsByTheme[theme.id] || [])];
+  const byTicker = new Map();
+  merged.forEach((instrument) => {
+    const current = byTicker.get(instrument.ticker);
+    if (!current || instrumentScore(instrument) > instrumentScore(current)) {
+      byTicker.set(instrument.ticker, {
+        quality: instrument.warning ? "材料確認" : "業績良好候補",
+        newsRisk: instrument.warning ? "悪材料確認" : "悪材料未検出",
+        ...instrument
+      });
+    }
+  });
+  return [...byTicker.values()]
+    .filter((instrument) => !instrument.warning)
+    .filter((instrument) => (instrument.newsRisk || "悪材料未検出") === "悪材料未検出")
+    .filter((instrument) => instrument.strength >= 60 && instrument.strength <= 78)
+    .sort((a, b) => instrumentScore(b) - instrumentScore(a))
+    .slice(0, 7);
 }
 
 function filteredThemes() {
@@ -1311,15 +1381,19 @@ function renderDetail() {
   renderPeriodFlow(theme);
 
   document.querySelector("#aiSummary").innerHTML = buildAiSummary(theme, score);
-  document.querySelector("#instrumentList").innerHTML = theme.instruments
-    .map((instrument) => `
+  const treasureInstruments = relatedInstruments(theme);
+  document.querySelector("#instrumentList").innerHTML = treasureInstruments.length
+    ? treasureInstruments.map((instrument) => `
       <div class="instrument">
         <span class="ticker">${instrument.ticker}</span>
-        <span>${instrument.name}<small>${instrument.type} / 調査優先度 ${instrument.strength} / まず材料確認</small></span>
-        <span class="warning">${instrument.warning || ""}</span>
+        <span>
+          ${instrument.name}
+          <small>${instrument.type} / お宝度 ${instrumentScore(instrument)} / ${instrument.quality || "業績良好候補"} / ${instrument.newsRisk || "悪材料未検出"}</small>
+        </span>
       </div>
     `)
-    .join("");
+      .join("")
+    : '<p class="empty">上がりすぎ・悪材料・値動き注意を除外すると、今すぐ表示できるお宝候補はありません。</p>';
 
   document.querySelector("#dataPoints").innerHTML = `
     <dt>判断</dt><dd>${stage.decision}</dd>
