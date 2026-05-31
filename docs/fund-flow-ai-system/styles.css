@@ -769,7 +769,7 @@ input[type="search"] {
   box-shadow: none;
   transform: translate(-50%, -50%);
   opacity: 0;
-  animation: moneyFlow var(--flow-duration, 3.4s) ease-in-out infinite;
+  animation: moneyFlow var(--flow-duration, 10s) linear infinite;
 }
 
 .route-label {
@@ -1185,17 +1185,17 @@ input[type="search"] {
 @keyframes moneyFlow {
   0% {
     opacity: 0;
-    scale: 0.82;
+    scale: 0.9;
   }
-  14%,
-  78% {
+  8%,
+  92% {
     opacity: 1;
   }
   100% {
     left: var(--flow-end-x);
     top: var(--flow-end-y);
     opacity: 0;
-    scale: 1;
+    scale: 0.98;
   }
 }
 

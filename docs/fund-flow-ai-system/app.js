@@ -699,7 +699,8 @@ function renderFlowMap(list) {
   routePaths.forEach((route) => {
     const start = mapPositionFor(route.from, mapList);
     const end = mapPositionFor(route.to, mapList);
-    const flowCount = route.strength >= 60 ? 3 : route.strength >= 35 ? 2 : 1;
+    const flowCount = route.strength >= 60 ? 7 : route.strength >= 35 ? 5 : 4;
+    const duration = 9.5 + Math.min(3.5, Math.max(0, 70 - route.strength) / 18);
 
     for (let i = 0; i < flowCount; i += 1) {
       const trail = document.createElement("span");
@@ -708,8 +709,8 @@ function renderFlowMap(list) {
       trail.style.top = `${start.y}%`;
       trail.style.setProperty("--flow-end-x", `${end.x}%`);
       trail.style.setProperty("--flow-end-y", `${end.y}%`);
-      trail.style.setProperty("--flow-duration", `${4.2 - Math.min(1.2, route.strength / 80)}s`);
-      trail.style.animationDelay = `${i * 0.85}s`;
+      trail.style.setProperty("--flow-duration", `${duration}s`);
+      trail.style.animationDelay = `${-(duration / flowCount) * i}s`;
       trail.textContent = "💰";
       layer.appendChild(trail);
     }
