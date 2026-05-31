@@ -386,7 +386,8 @@ const state = {
   aiResearch: null,
   aiResearchMessage: "",
   marketStatus: { state: "pending", text: "確認中" },
-  geminiStatus: { state: "pending", text: "確認中" }
+  geminiStatus: { state: "pending", text: "確認中" },
+  previousRanks: {}
 };
 
 const weights = {
@@ -1195,12 +1196,16 @@ function renderList() {
   list.forEach((theme, index) => {
     const m = theme.metrics[state.period];
     const score = calculateScore(theme, state.period);
+    const rankMove = rankMoveFor(theme.id, index + 1);
     const card = document.createElement("button");
     card.type = "button";
     card.className = `theme-card ${theme.id === state.selectedId ? "active" : ""}`;
     card.dataset.id = theme.id;
     card.innerHTML = `
-      <span class="rank">${index + 1}</span>
+      <span class="rank">
+        <strong>${index + 1}</strong>
+        <small class="rank-move ${rankMove.className}" title="${rankMove.title}">${rankMove.label}</small>
+      </span>
       <span class="theme-main">
         <span class="theme-title">${theme.name}</span>
         <span class="theme-meta">
@@ -1221,6 +1226,7 @@ function renderList() {
     container.appendChild(card);
   });
 
+  saveRankSnapshot(list);
   renderDetail();
 }
 
@@ -1372,6 +1378,50 @@ function cacheKey() {
     day: "2-digit"
   }).format(new Date());
   return `fund-flow-ai-map:${today}`;
+}
+
+function rankHistoryKey() {
+  return "fund-flow-ai-map:rank-history";
+}
+
+function rankSnapshotKey() {
+  return `${state.period}:${state.assetClass}:${state.stage}:${state.liquidityOnly ? "liquidity" : "all"}:${state.hideCrowded ? "hide-crowded" : "show-crowded"}`;
+}
+
+function loadRankHistory() {
+  try {
+    const raw = localStorage.getItem(rankHistoryKey());
+    if (!raw) return;
+    state.previousRanks = JSON.parse(raw) || {};
+  } catch {
+    state.previousRanks = {};
+  }
+}
+
+function saveRankSnapshot(list) {
+  try {
+    const history = {
+      ...state.previousRanks,
+      [rankSnapshotKey()]: {
+        savedAt: new Date().toISOString(),
+        ranks: Object.fromEntries(list.map((theme, index) => [theme.id, index + 1]))
+      }
+    };
+    localStorage.setItem(rankHistoryKey(), JSON.stringify(history));
+    state.previousRanks = history;
+  } catch {
+    // ランク履歴は補助表示なので、保存できなくても画面表示は続ける。
+  }
+}
+
+function rankMoveFor(themeId, currentRank) {
+  const snapshot = state.previousRanks?.[rankSnapshotKey()];
+  const previousRank = snapshot?.ranks?.[themeId];
+  if (!previousRank) return { label: "新", className: "new", title: "前回記録なし" };
+  const diff = previousRank - currentRank;
+  if (diff > 0) return { label: `↑${diff}`, className: "up", title: `前回${previousRank}位から${diff}ランク上昇` };
+  if (diff < 0) return { label: `↓${Math.abs(diff)}`, className: "down", title: `前回${previousRank}位から${Math.abs(diff)}ランク下落` };
+  return { label: "→", className: "flat", title: `前回${previousRank}位から変化なし` };
 }
 
 function saveDailyCache() {
@@ -1608,6 +1658,7 @@ function setUpdatedAt(refreshed = false, sourceLabel = "") {
 
 async function init() {
   const cachedAt = loadDailyCache();
+  loadRankHistory();
   renderFilters();
   bindEvents();
   renderApiStatus();
