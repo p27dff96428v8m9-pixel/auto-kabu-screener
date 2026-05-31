@@ -643,7 +643,18 @@ function filteredThemes() {
     });
 
   const isExploring = needle || state.assetClass !== "all" || state.stage !== "all" || state.liquidityOnly;
-  return isExploring ? filtered : filtered.slice(0, 12);
+  if (isExploring) return filtered;
+
+  const display = filtered.slice(0, 12);
+  geminiResearchCandidates()
+    .map((candidate) => themeById(candidate.id))
+    .filter(Boolean)
+    .forEach((theme) => {
+      if (!display.some((item) => item.id === theme.id)) {
+        display.push(theme);
+      }
+    });
+  return display;
 }
 
 function renderFilters() {
@@ -955,7 +966,7 @@ function renderCharacters() {
   }
 
   const current = candidates[0];
-  const next = candidates[1];
+  const next = candidates.find((candidate) => candidate.id !== current.id);
   const currentTheme = themeById(current.id);
   const nextTheme = next ? themeById(next.id) : null;
   const evidence = Array.isArray(current.evidence) ? current.evidence.slice(0, 2).join(" / ") : "";
