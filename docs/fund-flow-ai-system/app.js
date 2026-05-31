@@ -738,7 +738,6 @@ function renderFlowMap(list) {
     node.style.setProperty("--drift-y", `${(index % 3 === 0 ? -1 : 1) * 3}px`);
     node.title = `${theme.name} / ${stage.label} / ${accelerationLabel(periodAccel)} / 加速度 ${periodAccel}`;
     node.innerHTML = `
-      <span class="spread-badge">広がり ${spread}</span>
       <span class="node-icon">${themeIcons[theme.id] || "■"}</span>
       <span>
         <strong>${theme.name}</strong>
