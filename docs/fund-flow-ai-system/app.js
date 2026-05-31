@@ -436,7 +436,15 @@ const mapPositions = {
   "jp-small-growth": { x: 16, y: 63 },
   "jp-reits": { x: 50, y: 63 },
   "jpy-exporters": { x: 84, y: 63 },
-  "jp-inbound": { x: 50, y: 88 }
+  "jp-inbound": { x: 50, y: 88 },
+  "jp-auto": { x: 82, y: 50 },
+  "jp-pharma": { x: 18, y: 88 },
+  "jp-telecom": { x: 82, y: 88 },
+  "jp-retail": { x: 34, y: 76 },
+  "jp-construction": { x: 66, y: 76 },
+  "jp-insurance": { x: 18, y: 72 },
+  "jp-chemical": { x: 38, y: 24 },
+  "jp-low-pbr": { x: 66, y: 24 }
 };
 
 const flowRoutes = [
