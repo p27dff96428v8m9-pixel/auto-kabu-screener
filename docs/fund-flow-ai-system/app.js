@@ -1597,9 +1597,10 @@ function renderInstrumentMarketBlock(instrument, quote) {
   const stage = (() => {
     const priceReady = [p90, p30, p7].every((value) => Number.isFinite(Number(value)));
     const volumeImproving = Number.isFinite(Number(v30)) && Number.isFinite(Number(v7)) && Number(v7) > Number(v30);
-    if (!priceReady) return { label: "更新待ち", badge: "履歴不足", tone: "neutral", detail: "株価データがまだ足りません" };
+    if (!priceReady) return { state: "更新待ち", label: "更新待ち", badge: "履歴不足", tone: "neutral", detail: "株価データがまだ足りません" };
     if (p90 > 0 && p30 > p90 && p7 > p30) {
       return {
+        state: "判定あり",
         label: "買われ続けている",
         badge: "加速",
         tone: "good",
@@ -1608,6 +1609,7 @@ function renderInstrumentMarketBlock(instrument, quote) {
     }
     if (p90 > 0 && p30 > 0 && p7 > 0) {
       return {
+        state: "判定あり",
         label: "買われている",
         badge: "継続",
         tone: "good",
@@ -1615,12 +1617,12 @@ function renderInstrumentMarketBlock(instrument, quote) {
       };
     }
     if (p90 > 0 && p30 > 0 && p7 <= 0) {
-      return { label: "勢い鈍化", badge: "失速", tone: "warn", detail: "短期で勢いが落ちています" };
+      return { state: "判定あり", label: "勢い鈍化", badge: "失速", tone: "warn", detail: "短期で勢いが落ちています" };
     }
     if (p90 <= 0 && p30 > 0) {
-      return { label: "買われ始め", badge: "発芽", tone: "warn", detail: "中期で上向きに転じています" };
+      return { state: "判定あり", label: "買われ始め", badge: "発芽", tone: "warn", detail: "中期で上向きに転じています" };
     }
-    return { label: "様子見", badge: "確認中", tone: "neutral", detail: "まだ方向感が弱いです" };
+    return { state: "様子見", label: "様子見", badge: "確認中", tone: "neutral", detail: "まだ方向感が弱いです" };
   })();
   return `
     <div class="instrument-market">
@@ -1628,6 +1630,10 @@ function renderInstrumentMarketBlock(instrument, quote) {
         <div class="stage-head">
           <span class="stage-kicker">判定</span>
           <div class="trend-badge">${stage.badge}</div>
+        </div>
+        <div class="stage-row">
+          <span class="stage-kicker">状態</span>
+          <strong class="stage-label">${stage.state}</strong>
         </div>
         <div class="stage-row">
           <span class="stage-kicker">段階</span>
