@@ -1629,8 +1629,11 @@ function renderInstrumentMarketBlock(instrument, quote) {
           <span class="stage-kicker">判定</span>
           <div class="trend-badge">${stage.badge}</div>
         </div>
-        <strong class="stage-label">${stage.label}</strong>
-        <small>${stage.detail}</small>
+        <div class="stage-row">
+          <span class="stage-kicker">段階</span>
+          <strong class="stage-label">${stage.label}</strong>
+        </div>
+        <small class="stage-detail">${stage.detail}</small>
       </div>
       <div class="trend-card">
         <span>90日</span>
