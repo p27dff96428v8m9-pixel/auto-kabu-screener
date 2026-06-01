@@ -935,6 +935,7 @@ function renderFlowMap(list) {
       state.selectedId = theme.id;
       renderList();
       renderDetail();
+      centerSelectedMapNode();
     });
     layer.appendChild(node);
   });
@@ -984,11 +985,31 @@ function setMapZoom(nextZoom) {
   const map = document.querySelector("#flowMap");
   map?.style.setProperty("--map-scale", state.mapZoom);
   map?.style.setProperty("--map-y-scale", mapVerticalScale());
+  centerSelectedMapNode();
 }
 
 function mapVerticalScale() {
   const extraZoom = Math.max(0, state.mapZoom - 1);
   return Number((state.mapZoom + extraZoom * 0.85).toFixed(2));
+}
+
+function centerSelectedMapNode() {
+  requestAnimationFrame(() => {
+    const map = document.querySelector("#flowMap");
+    const node = map?.querySelector(".flow-node.active");
+    if (!map || !node) return;
+
+    const targetLeft = node.offsetLeft + node.offsetWidth / 2 - map.clientWidth / 2;
+    const targetTop = node.offsetTop + node.offsetHeight / 2 - map.clientHeight / 2;
+    const maxLeft = Math.max(0, map.scrollWidth - map.clientWidth);
+    const maxTop = Math.max(0, map.scrollHeight - map.clientHeight);
+
+    map.scrollTo({
+      left: Math.max(0, Math.min(maxLeft, targetLeft)),
+      top: Math.max(0, Math.min(maxTop, targetTop)),
+      behavior: "smooth"
+    });
+  });
 }
 
 function setMapFullscreen(enabled) {
@@ -1390,6 +1411,7 @@ function renderResearchCandidates(list) {
       state.selectedId = button.dataset.id;
       renderList();
       renderDetail();
+      centerSelectedMapNode();
     });
   });
 }
@@ -1398,6 +1420,10 @@ function renderList() {
   const list = filteredThemes();
   const container = document.querySelector("#themeList");
   container.innerHTML = "";
+
+  if (list.length && !list.some((theme) => theme.id === state.selectedId)) {
+    state.selectedId = list[0].id;
+  }
 
   renderSummary(list);
   renderFlowMap(list);
@@ -1409,10 +1435,6 @@ function renderList() {
   if (!list.length) {
     container.innerHTML = '<p class="empty">条件に一致するテーマがありません。</p>';
     return;
-  }
-
-  if (!list.some((theme) => theme.id === state.selectedId)) {
-    state.selectedId = list[0].id;
   }
 
   list.forEach((theme, index) => {
@@ -1444,6 +1466,7 @@ function renderList() {
       state.selectedId = theme.id;
       renderList();
       renderDetail();
+      centerSelectedMapNode();
     });
     container.appendChild(card);
   });
