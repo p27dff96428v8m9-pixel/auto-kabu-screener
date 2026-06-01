@@ -753,7 +753,7 @@ function relatedInstruments(theme) {
   return [...byTicker.values()]
     .filter((instrument) => instrument.strength >= 55)
     .sort((a, b) => instrumentScore(b) - instrumentScore(a))
-    .slice(0, 7);
+    .slice(0, 8);
 }
 
 function filteredThemes() {
@@ -1597,18 +1597,37 @@ function renderInstrumentMarketBlock(instrument, quote) {
   const stage = (() => {
     const priceReady = [p90, p30, p7].every((value) => Number.isFinite(Number(value)));
     const volumeImproving = Number.isFinite(Number(v30)) && Number.isFinite(Number(v7)) && Number(v7) > Number(v30);
-    if (!priceReady) return { label: "更新待ち", tone: "neutral", detail: "履歴不足" };
-    if (p90 > 0 && p30 > p90 && p7 > p30) return { label: "加速", tone: "good", detail: volumeImproving ? "価格と出来高が加速" : "短中期で加速" };
-    if (p90 > 0 && p30 > 0 && p7 > 0) return { label: "継続", tone: "good", detail: "上昇基調を維持" };
-    if (p90 > 0 && p30 > 0 && p7 <= 0) return { label: "失速", tone: "warn", detail: "短期で鈍化" };
-    if (p90 <= 0 && p30 > 0) return { label: "発芽", tone: "warn", detail: "中期で立ち上がり" };
-    return { label: "様子見", tone: "neutral", detail: "まだ不安定" };
+    if (!priceReady) return { label: "更新待ち", badge: "履歴不足", tone: "neutral", detail: "株価データがまだ足りません" };
+    if (p90 > 0 && p30 > p90 && p7 > p30) {
+      return {
+        label: "買われ続けている",
+        badge: "加速",
+        tone: "good",
+        detail: volumeImproving ? "価格と出来高がそろって伸長" : "短中期の上昇が連続"
+      };
+    }
+    if (p90 > 0 && p30 > 0 && p7 > 0) {
+      return {
+        label: "買われている",
+        badge: "継続",
+        tone: "good",
+        detail: volumeImproving ? "上昇基調と出来高増が継続" : "上昇基調を維持"
+      };
+    }
+    if (p90 > 0 && p30 > 0 && p7 <= 0) {
+      return { label: "勢い鈍化", badge: "失速", tone: "warn", detail: "短期で勢いが落ちています" };
+    }
+    if (p90 <= 0 && p30 > 0) {
+      return { label: "買われ始め", badge: "発芽", tone: "warn", detail: "中期で上向きに転じています" };
+    }
+    return { label: "様子見", badge: "確認中", tone: "neutral", detail: "まだ方向感が弱いです" };
   })();
   return `
     <div class="instrument-market">
       <div class="instrument-stage ${stage.tone}">
         <span>段階</span>
         <strong>${stage.label}</strong>
+        <small class="trend-badge">${stage.badge}</small>
         <small>${stage.detail}</small>
       </div>
       <div class="trend-card">
