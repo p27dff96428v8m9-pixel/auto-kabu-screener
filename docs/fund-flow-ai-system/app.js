@@ -1625,9 +1625,11 @@ function renderInstrumentMarketBlock(instrument, quote) {
   return `
     <div class="instrument-market">
       <div class="instrument-stage ${stage.tone}">
-        <span>段階</span>
+        <div class="stage-head">
+          <span class="stage-kicker">判定</span>
+          <div class="trend-badge">${stage.badge}</div>
+        </div>
         <strong class="stage-label">${stage.label}</strong>
-        <div class="trend-badge">${stage.badge}</div>
         <small>${stage.detail}</small>
       </div>
       <div class="trend-card">
