@@ -1610,9 +1610,22 @@ input[type="search"] {
   gap: 8px 10px;
   align-items: start;
   padding: 10px;
-  border: 1px solid var(--line);
+  border: 2px solid #9bcac2;
   border-radius: 8px;
-  background: #fbfcfd;
+  background: #f8fcfb;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  position: relative;
+}
+
+.instrument::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 8px;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #12b76a, #0f766e);
 }
 
 .instrument-market {
@@ -1621,8 +1634,8 @@ input[type="search"] {
   grid-template-columns: minmax(118px, 1.1fr) minmax(58px, 0.55fr) minmax(58px, 0.55fr);
   gap: 8px;
   align-items: stretch;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  border-top: 2px solid rgba(15, 118, 110, 0.18);
 }
 
 .instrument-price,
@@ -1630,7 +1643,7 @@ input[type="search"] {
   display: grid;
   gap: 2px;
   padding: 8px;
-  border: 1px solid rgba(15, 118, 110, 0.18);
+  border: 1px solid rgba(15, 118, 110, 0.24);
   border-radius: 8px;
   background: #f4faf8;
 }
@@ -1667,7 +1680,7 @@ input[type="search"] {
   gap: 2px;
   min-height: 58px;
   padding: 8px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(15, 118, 110, 0.18);
   border-radius: 8px;
   background:
     linear-gradient(180deg, rgba(216, 224, 232, 0.8) 1px, transparent 1px),
@@ -1696,6 +1709,7 @@ input[type="search"] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding-top: 2px;
 }
 
 .secondary-link {
