@@ -768,6 +768,13 @@ input[type="search"] {
   box-shadow: 0 0 0 5px rgba(15, 118, 110, 0.14), 0 16px 34px rgba(23, 32, 51, 0.26);
 }
 
+.flow-node.locked {
+  border-color: rgba(15, 23, 42, 0.24);
+  background:
+    repeating-linear-gradient(135deg, rgba(15, 23, 42, 0.08) 0 6px, rgba(255, 255, 255, 0.72) 6px 12px),
+    rgba(255, 255, 255, 0.94);
+}
+
 .flow-node::after {
   content: "";
   position: absolute;
@@ -954,6 +961,51 @@ input[type="search"] {
 .candidate-card.gemini-picked {
   border-color: #7db7ac;
   background: #f3fbf9;
+}
+
+.locked-card {
+  position: relative;
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(135deg, rgba(15, 23, 42, 0.05) 0 8px, rgba(255, 255, 255, 0.9) 8px 16px),
+    #fbfcfd;
+}
+
+.pro-lock {
+  display: inline-grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: #172033;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.pro-lock small {
+  color: #dbeafe;
+  font-size: 9px;
+}
+
+.locked-detail {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed #9aa7b7;
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(135deg, rgba(15, 23, 42, 0.05) 0 8px, rgba(255, 255, 255, 0.9) 8px 16px),
+    #fbfcfd;
+  color: #334155;
+}
+
+.locked-detail p {
+  margin: 0;
+  color: #475467;
+  font-size: 13px;
 }
 
 .gemini-summary {

@@ -390,7 +390,8 @@ const state = {
   geminiStatus: { state: "pending", text: "確認中" },
   macroStatus: { state: "pending", text: "確認中" },
   previousRanks: {},
-  publicRankHistory: null
+  publicRankHistory: null,
+  isPro: false
 };
 
 const weights = {
@@ -902,6 +903,7 @@ function renderFlowMap(list) {
   });
 
   mapList.forEach((theme, index) => {
+    const locked = isLockedTheme(theme, mapList);
     const score = calculateScore(theme, state.period);
     const amount = fundAmount(theme);
     const fundFlowLevel = theme.metrics[state.period].fundFlow;
@@ -914,7 +916,7 @@ function renderFlowMap(list) {
     const color = accelerationColor(periodAccel);
     const node = document.createElement("button");
     node.type = "button";
-    node.className = `flow-node ${theme.id === state.selectedId ? "active" : ""}`;
+    node.className = `flow-node ${theme.id === state.selectedId ? "active" : ""} ${locked ? "locked" : ""}`;
     node.style.left = `${pos.x}%`;
     node.style.top = `${pos.y}%`;
     node.style.setProperty("--size", `${size}px`);
@@ -926,10 +928,11 @@ function renderFlowMap(list) {
     node.innerHTML = `
       <span class="node-icon">${themeIcons[theme.id] || "■"}</span>
       <span>
-        <strong>${theme.name}</strong>
-        <span class="money-marks" aria-label="資金流入推定 ${fundFlowLevel}">${moneyMarks(fundFlowLevel)}</span>
-        <small>${stage.icon} ${stage.label} / 資金量 ${fundFlowLevel} / 加速度 ${periodAccel >= 0 ? "+" : ""}${periodAccel} / 広がり ${spread} / 過熱度 ${overheat}</small>
+        <strong>${locked ? "重要テーマを検出" : theme.name}</strong>
+        <span class="money-marks" aria-label="${locked ? "Pro限定" : `資金流入推定 ${fundFlowLevel}`}">${locked ? "■■■" : moneyMarks(fundFlowLevel)}</span>
+        <small>${locked ? "資金の集中・流出入が複数あります" : `${stage.icon} ${stage.label} / 資金量 ${fundFlowLevel} / 加速度 ${periodAccel >= 0 ? "+" : ""}${periodAccel} / 広がり ${spread} / 過熱度 ${overheat}`}</small>
       </span>
+      ${locked ? proLockMarkup("重要セクターを解除") : ""}
     `;
     node.addEventListener("click", () => {
       state.selectedId = theme.id;
@@ -986,6 +989,27 @@ function setMapZoom(nextZoom) {
   map?.style.setProperty("--map-scale", state.mapZoom);
   map?.style.setProperty("--map-y-scale", mapVerticalScale());
   centerSelectedMapNode();
+}
+
+function routeCountsFor(list) {
+  const counts = {};
+  flowRouteCandidates(list).forEach((route) => {
+    counts[route.from] = counts[route.from] || { incoming: 0, outgoing: 0 };
+    counts[route.to] = counts[route.to] || { incoming: 0, outgoing: 0 };
+    counts[route.from].outgoing += 1;
+    counts[route.to].incoming += 1;
+  });
+  return counts;
+}
+
+function isLockedTheme(theme, list) {
+  if (state.isPro) return false;
+  const counts = routeCountsFor(list.length ? list : themes)[theme.id] || { incoming: 0, outgoing: 0 };
+  return counts.incoming >= 2 || counts.outgoing >= 2;
+}
+
+function proLockMarkup(label = "Proで解除") {
+  return `<span class="pro-lock"><b>LOCK</b><small>${label}</small></span>`;
 }
 
 function mapVerticalScale() {
@@ -1301,6 +1325,7 @@ function renderGeminiResearchCandidates(source) {
   }
 
   const visibleIds = new Set(source.map((theme) => theme.id));
+  const allowedFreeIds = new Set([source[0]?.id].filter(Boolean));
   const candidates = state.aiResearch.candidates
     .filter((candidate) => visibleIds.has(candidate.id))
     .slice(0, 5);
@@ -1319,17 +1344,18 @@ function renderGeminiResearchCandidates(source) {
   container.innerHTML = summary + candidates
     .map((candidate) => {
       const theme = themeById(candidate.id);
+      const locked = !state.isPro && !allowedFreeIds.has(candidate.id);
       const evidence = Array.isArray(candidate.evidence) ? candidate.evidence.slice(0, 3) : [];
       return `
-        <button class="candidate-card ai-picked gemini-picked" type="button" data-id="${candidate.id}">
+        <button class="candidate-card ai-picked gemini-picked ${locked ? "locked-card" : ""}" type="button" data-id="${candidate.id}">
           <span>
-            <strong>${themeIcons[candidate.id] || "●"} ${candidate.name || theme.name}</strong>
-            <span>${candidate.reason || "Geminiが価格・出来高、ニュース、金利・為替材料から確認候補にしました。"}</span>
-            <span class="candidate-evidence">${evidence.join(" / ")}</span>
-            <span class="candidate-next">次に確認: ${candidate.nextCheck || "関連銘柄とニュースの継続確認"}</span>
-            <span class="candidate-risk">注意: ${candidate.risk || "過熱度と材料の変化を確認"}</span>
+            <strong>${locked ? "Pro限定のGemini候補" : `${themeIcons[candidate.id] || "●"} ${candidate.name || theme.name}`}</strong>
+            <span>${locked ? "資金フローと材料が重なった候補を検出しました。" : candidate.reason || "Geminiが価格・出来高、ニュース、金利・為替材料から確認候補にしました。"}</span>
+            <span class="candidate-evidence">${locked ? "根拠・テーマ名・確認点はProで表示されます。" : evidence.join(" / ")}</span>
+            <span class="candidate-next">次に確認: ${locked ? "Proで解除" : candidate.nextCheck || "関連銘柄とニュースの継続確認"}</span>
+            <span class="candidate-risk">注意: ${locked ? "無料プレビューでは詳細を伏せています" : candidate.risk || "過熱度と材料の変化を確認"}</span>
           </span>
-          <span class="candidate-decision">${candidate.decision || "Gemini確認"} ${candidate.score != null ? `Geminiスコア ${candidate.score}` : ""}</span>
+          <span class="candidate-decision">${locked ? "LOCK" : `${candidate.decision || "Gemini確認"} ${candidate.score != null ? `Geminiスコア ${candidate.score}` : ""}`}</span>
         </button>
       `;
     })
@@ -1386,18 +1412,22 @@ function renderResearchCandidates(list) {
     }))
     .sort((a, b) => b.researchScore - a.researchScore)
     .slice(0, 4);
+  const allowedFreeIds = new Set([displayCandidates[0]?.theme.id].filter(Boolean));
 
   container.innerHTML = displayCandidates.length
     ? displayCandidates
-      .map(({ theme, stage, researchScore, reason }) => `
-        <button class="candidate-card ai-picked" type="button" data-id="${theme.id}">
+      .map(({ theme, stage, researchScore, reason }) => {
+        const locked = !state.isPro && !allowedFreeIds.has(theme.id);
+        return `
+        <button class="candidate-card ai-picked ${locked ? "locked-card" : ""}" type="button" data-id="${theme.id}">
           <span>
-            <strong>${themeIcons[theme.id]} ${theme.name}</strong>
-            <span>${reason}</span>
+            <strong>${locked ? "Pro限定の確認テーマ" : `${themeIcons[theme.id]} ${theme.name}`}</strong>
+            <span>${locked ? "90日→30日→7日の変化が出ている候補です。詳細はProで表示されます。" : reason}</span>
           </span>
-          <span class="candidate-decision">Gemini候補 ${researchScore}</span>
+          <span class="candidate-decision">${locked ? "LOCK" : `Gemini候補 ${researchScore}`}</span>
         </button>
-      `)
+      `;
+      })
       .join("")
     : '<p class="empty">Geminiが調べられるテーマがありません。フィルター条件を戻してください。</p>';
 
@@ -1477,49 +1507,61 @@ function renderList() {
 
 function renderDetail() {
   const theme = themes.find((item) => item.id === state.selectedId) || filteredThemes()[0] || themes[0];
+  const locked = isLockedTheme(theme, filteredThemes());
   const m = theme.metrics[state.period];
   const score = calculateScore(theme, state.period);
   const stage = lifecycleStage(theme);
   const actionStage = actionStageForTheme(theme);
 
   document.querySelector("#detailClass").textContent = `${theme.assetClass} / ${theme.region}`;
-  document.querySelector("#detailName").textContent = `${themeIcons[theme.id]} ${theme.name}`;
-  document.querySelector("#detailStage").textContent = `${stage.icon} ${stage.label}`;
+  document.querySelector("#detailName").textContent = locked ? "🔒 Pro限定テーマ" : `${themeIcons[theme.id]} ${theme.name}`;
+  document.querySelector("#detailStage").textContent = locked ? "LOCK" : `${stage.icon} ${stage.label}`;
   document.querySelector("#detailStage").className = `stage ${theme.stage}`;
-  document.querySelector("#detailScore").textContent = m.fundFlow;
-  document.querySelector("#detailAcceleration").textContent = accelerationForPeriod(theme, state.period);
-  document.querySelector("#detailBreadth").textContent = `${spreadScore(theme)}`;
-  document.querySelector("#detailCrowdedness").textContent = `${m.crowdedness}%`;
-  document.querySelector("#crowdedBar").style.width = `${m.crowdedness}%`;
-  renderScoreChart(theme);
-  renderPeriodMetricChart(theme);
-  renderPeriodFlow(theme);
+  document.querySelector("#detailScore").textContent = locked ? "LOCK" : m.fundFlow;
+  document.querySelector("#detailAcceleration").textContent = locked ? "LOCK" : accelerationForPeriod(theme, state.period);
+  document.querySelector("#detailBreadth").textContent = locked ? "LOCK" : `${spreadScore(theme)}`;
+  document.querySelector("#detailCrowdedness").textContent = locked ? "LOCK" : `${m.crowdedness}%`;
+  document.querySelector("#crowdedBar").style.width = `${locked ? 100 : m.crowdedness}%`;
+  if (locked) {
+    document.querySelector("#scoreChart").innerHTML = `<div class="locked-detail">${proLockMarkup("内訳を解除")}<p>資金量・加速度・広がり・過熱度の内訳はProで表示されます。</p></div>`;
+    document.querySelector("#periodMetricChart").innerHTML = `<div class="locked-detail">${proLockMarkup("期間比較を解除")}<p>90日・30日・7日の詳細比較はProで表示されます。</p></div>`;
+    document.querySelector("#periodFlow").innerHTML = `<div class="period-current locked-detail">${proLockMarkup("つながりを解除")}<p>このテーマの期間推移はProで表示されます。</p></div>`;
+  } else {
+    renderScoreChart(theme);
+    renderPeriodMetricChart(theme);
+    renderPeriodFlow(theme);
+  }
 
-  document.querySelector("#aiSummary").innerHTML = buildAiSummary(theme, score);
+  document.querySelector("#aiSummary").innerHTML = locked
+    ? `<div class="locked-detail">${proLockMarkup("資金フロー詳細を解除")}<p>このテーマは流入または流出の候補ルートが複数あるため、無料プレビューでは詳細を伏せています。</p><button class="text-button compact" type="button">Proで見る</button></div>`
+    : buildAiSummary(theme, score);
   const treasureInstruments = relatedInstruments(theme);
   document.querySelector("#instrumentList").innerHTML = treasureInstruments.length
-    ? treasureInstruments.map((instrument) => `
+    ? treasureInstruments.map((instrument, index) => {
+      const instrumentLocked = locked || (!state.isPro && index > 0);
+      return `
       <div class="instrument">
-        <span class="ticker">${instrument.ticker}</span>
+        <span class="ticker">${instrumentLocked ? "LOCK" : instrument.ticker}</span>
         <span>
-          ${instrument.name}
-          <small>${instrument.type} / お宝度 ${instrumentScore(instrument)} / ${instrument.quality || "業績良好候補"} / ${instrument.newsRisk || "悪材料未検出"}</small>
+          ${instrumentLocked ? "Pro限定の関連銘柄" : instrument.name}
+          <small>${instrumentLocked ? "銘柄名・お宝度・悪材料確認はProで表示されます" : `${instrument.type} / お宝度 ${instrumentScore(instrument)} / ${instrument.quality || "業績良好候補"} / ${instrument.newsRisk || "悪材料未検出"}`}</small>
         </span>
       </div>
-    `)
+    `;
+    })
       .join("")
     : '<p class="empty">上がりすぎ・悪材料・値動き注意を除外すると、今すぐ表示できるお宝候補はありません。</p>';
 
   document.querySelector("#dataPoints").innerHTML = `
-    <dt>判断</dt><dd><span class="action-stage ${actionStage.className}">${actionStage.label}</span></dd>
-    <dt>理由</dt><dd>${actionStage.reason}</dd>
-    <dt>総合スコア</dt><dd>${score}</dd>
-    <dt>価格モメンタム</dt><dd>${m.momentum}%</dd>
-    <dt>出来高増加</dt><dd>${m.volume}%</dd>
-    <dt>資金流入推定</dt><dd>${m.fundFlow}%</dd>
-    <dt>ニュース増加</dt><dd>${m.news}%</dd>
-    <dt>AI妥当性</dt><dd>${m.ai}%</dd>
-    <dt>信頼度</dt><dd>${m.confidence}%</dd>
+    <dt>判断</dt><dd><span class="action-stage ${locked ? "observe" : actionStage.className}">${locked ? "Pro限定" : actionStage.label}</span></dd>
+    <dt>理由</dt><dd>${locked ? "重要な資金フロー候補のため無料プレビューでは伏せています。" : actionStage.reason}</dd>
+    <dt>総合スコア</dt><dd>${locked ? "LOCK" : score}</dd>
+    <dt>価格モメンタム</dt><dd>${locked ? "LOCK" : `${m.momentum}%`}</dd>
+    <dt>出来高増加</dt><dd>${locked ? "LOCK" : `${m.volume}%`}</dd>
+    <dt>資金流入推定</dt><dd>${locked ? "LOCK" : `${m.fundFlow}%`}</dd>
+    <dt>ニュース増加</dt><dd>${locked ? "LOCK" : `${m.news}%`}</dd>
+    <dt>AI妥当性</dt><dd>${locked ? "LOCK" : `${m.ai}%`}</dd>
+    <dt>信頼度</dt><dd>${locked ? "LOCK" : `${m.confidence}%`}</dd>
   `;
 }
 
