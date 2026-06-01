@@ -744,16 +744,28 @@ function relatedInstruments(theme) {
     const current = byTicker.get(instrument.ticker);
     if (!current || instrumentScore(instrument) > instrumentScore(current)) {
       byTicker.set(instrument.ticker, {
-        quality: instrument.warning ? "材料確認" : "業績良好候補",
-        newsRisk: instrument.warning ? "悪材料確認" : "悪材料未検出",
+        quality: instrument.warning ? "????" : "??????",
+        newsRisk: instrument.warning ? "???????" : "??????",
         ...instrument
       });
     }
   });
   return [...byTicker.values()]
-    .filter((instrument) => instrument.strength >= 55)
-    .sort((a, b) => instrumentScore(b) - instrumentScore(a))
-    .slice(0, 8);
+    .map((instrument) => {
+      const signal = instrumentFinalSignal(instrument, stockQuoteFor(instrument.ticker));
+      const signalBonus = signal.kind === "buy" ? 26 : signal.kind === "watch" ? 16 : signal.kind === "early" ? 8 : -20;
+      return {
+        ...instrument,
+        signal,
+        displayScore: instrumentScore(instrument) + signalBonus
+      };
+    })
+    .filter((instrument) => instrument.strength >= 58)
+    .filter((instrument) => instrument.signal.kind !== "neutral" || instrument.strength >= 72)
+    .filter((instrument) => instrument.signal.kind !== "early" || instrument.strength >= 62)
+    .sort((a, b) => b.displayScore - a.displayScore || instrumentScore(b) - instrumentScore(a))
+    .slice(0, 8)
+    .map(({ signal, displayScore, ...instrument }) => instrument);
 }
 
 function filteredThemes() {
@@ -1550,10 +1562,17 @@ function renderDetail() {
   document.querySelector("#instrumentList").innerHTML = treasureInstruments.length
     ? treasureInstruments.map((instrument, index) => {
       const instrumentLocked = locked || (!state.isPro && index > 0);
+      const signal = instrumentFinalSignal(instrument, stockQuoteFor(instrument.ticker));
       return `
       <div class="instrument">
         <span class="ticker">${instrumentLocked ? "LOCK" : instrument.ticker}</span>
         <span>
+          ${instrumentLocked ? "" : `
+            <span class="instrument-meta">
+              <span class="order-pill">確認順 ${index + 1}</span>
+              <span class="final-pill ${signal.tone}">${signal.label}</span>
+            </span>
+          `}
           ${instrumentLocked ? "Pro限定の関連銘柄" : instrument.name}
           <small>${instrumentLocked ? "銘柄名・お宝度・悪材料確認はProで表示されます" : `${instrument.type} / お宝度 ${instrumentScore(instrument)} / ${instrument.quality || "業績良好候補"} / ${instrument.newsRisk || "悪材料未検出"}`}</small>
         </span>
@@ -1586,6 +1605,36 @@ function formatChange(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "-";
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}%`;
+}
+
+function instrumentFinalSignal(instrument, quote) {
+  const p90 = Number(quote?.changes?.["90d"]);
+  const p30 = Number(quote?.changes?.["30d"]);
+  const p7 = Number(quote?.changes?.["7d"]);
+  const v30 = Number(quote?.changes?.volume30d);
+  const v7 = Number(quote?.changes?.volume7d);
+  const ready = [p90, p30, p7, v30, v7].every(Number.isFinite);
+
+  if (!ready) {
+    return { label: "????", tone: "neutral", kind: "neutral" };
+  }
+
+  const aligned = p90 > 0 && p30 > p90 && p7 > p30 && v7 > v30 && instrumentScore(instrument) >= 70;
+  if (aligned) {
+    return { label: "??", tone: "buy", kind: "buy" };
+  }
+
+  const riding = p90 > 0 && p30 > 0 && p7 > 0;
+  if (riding) {
+    return { label: "??", tone: "watch", kind: "watch" };
+  }
+
+  const early = p90 <= 0 && p30 > 0;
+  if (early) {
+    return { label: "???", tone: "watch", kind: "early" };
+  }
+
+  return { label: "???", tone: "neutral", kind: "neutral" };
 }
 
 function renderInstrumentMarketBlock(instrument, quote) {
