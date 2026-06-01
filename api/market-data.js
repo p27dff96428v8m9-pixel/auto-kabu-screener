@@ -28,6 +28,8 @@ const ALPHA_MACRO_COMMODITIES = (process.env.ALPHA_VANTAGE_COMMODITIES || "WTI,C
   .split(",")
   .map((item) => item.trim().toUpperCase())
   .filter(Boolean);
+const ALPHA_COMMODITY_BATCH_COUNT = Math.max(1, Number(process.env.ALPHA_VANTAGE_COMMODITY_BATCH_COUNT || 2) || 2);
+const ALPHA_REQUEST_DELAY_MS = Math.max(0, Number(process.env.ALPHA_VANTAGE_REQUEST_DELAY_MS || 1200) || 1200);
 
 const THEME_UNIVERSE = [
   { id: "jp-semiconductor", tickers: ["8035", "6857", "7735", "1321"], news: ["semiconductor", "AI", "Tokyo Electron"] },
@@ -95,6 +97,47 @@ function pointChanges(points) {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function loadPreviousAlphaSignals() {
+  const outputPath = process.env.MARKET_DATA_OUTPUT_PATH;
+  if (!outputPath) return null;
+
+  const resolvedPath = path.resolve(process.cwd(), outputPath);
+  if (!fs.existsSync(resolvedPath)) return null;
+
+  try {
+    const existing = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+    return existing?.macro?.alpha || null;
+  } catch {
+    return null;
+  }
+}
+
+function selectedAlphaCommodityBatch() {
+  const batches = Array.from({ length: ALPHA_COMMODITY_BATCH_COUNT }, () => []);
+  ALPHA_MACRO_COMMODITIES.forEach((commodity, index) => {
+    batches[index % ALPHA_COMMODITY_BATCH_COUNT].push(commodity);
+  });
+
+  const explicitIndex = Number(process.env.ALPHA_VANTAGE_COMMODITY_BATCH_INDEX);
+  const runNumber = Number(process.env.GITHUB_RUN_NUMBER);
+  const rawIndex = Number.isFinite(explicitIndex)
+    ? explicitIndex
+    : Number.isFinite(runNumber)
+      ? runNumber - 1
+      : Math.floor(Date.now() / (20 * 60 * 1000));
+  const index = ((Math.trunc(rawIndex) % batches.length) + batches.length) % batches.length;
+
+  return {
+    index,
+    count: batches.length,
+    commodities: batches[index]
+  };
+}
+
 function parseAlphaFxDaily(data) {
   const series = data?.["Time Series FX (Daily)"] || {};
   return pointChanges(Object.entries(series).map(([date, row]) => ({
@@ -126,11 +169,18 @@ async function fetchAlphaMacroSignals() {
     return { source: "not_configured" };
   }
 
+  const previousAlpha = loadPreviousAlphaSignals();
+  const selectedBatch = selectedAlphaCommodityBatch();
   const alpha = {
     source: "alpha_vantage",
     fx: {},
-    commodities: {},
-    errors: []
+    commodities: { ...(previousAlpha?.commodities || {}) },
+    errors: [],
+    commodityBatch: {
+      index: selectedBatch.index,
+      count: selectedBatch.count,
+      symbols: selectedBatch.commodities
+    }
   };
 
   try {
@@ -145,7 +195,10 @@ async function fetchAlphaMacroSignals() {
     alpha.errors.push(`USDJPY:${error.message}`);
   }
 
-  for (const commodity of ALPHA_MACRO_COMMODITIES) {
+  for (const commodity of selectedBatch.commodities) {
+    if (ALPHA_REQUEST_DELAY_MS) {
+      await sleep(ALPHA_REQUEST_DELAY_MS);
+    }
     try {
       const data = await fetchAlphaVantage({
         function: commodity,
