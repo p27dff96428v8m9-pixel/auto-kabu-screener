@@ -394,6 +394,8 @@ const state = {
   isPro: false
 };
 
+const PRO_CHECKOUT_URL = "";
+
 const weights = {
   momentum: 0.25,
   volume: 0.20,
@@ -1012,6 +1014,14 @@ function proLockMarkup(label = "Proで解除") {
   return `<span class="pro-lock"><b>LOCK</b><small>${label}</small></span>`;
 }
 
+function openUpgrade() {
+  if (PRO_CHECKOUT_URL) {
+    window.location.href = PRO_CHECKOUT_URL;
+    return;
+  }
+  window.alert("Proは月額980円 / 年額9,800円で準備中です。Stripe決済リンクを設定すると、このボタンから登録できます。");
+}
+
 function mapVerticalScale() {
   const extraZoom = Math.max(0, state.mapZoom - 1);
   return Number((state.mapZoom + extraZoom * 0.85).toFixed(2));
@@ -1533,7 +1543,7 @@ function renderDetail() {
   }
 
   document.querySelector("#aiSummary").innerHTML = locked
-    ? `<div class="locked-detail">${proLockMarkup("資金フロー詳細を解除")}<p>このテーマは流入または流出の候補ルートが複数あるため、無料プレビューでは詳細を伏せています。</p><button class="text-button compact" type="button">Proで見る</button></div>`
+    ? `<div class="locked-detail">${proLockMarkup("資金フロー詳細を解除")}<p>このテーマは流入または流出の候補ルートが複数あるため、無料プレビューでは詳細を伏せています。</p><button class="text-button compact" data-upgrade type="button">Proで見る</button></div>`
     : buildAiSummary(theme, score);
   const treasureInstruments = relatedInstruments(theme);
   document.querySelector("#instrumentList").innerHTML = treasureInstruments.length
@@ -1563,6 +1573,7 @@ function renderDetail() {
     <dt>AI妥当性</dt><dd>${locked ? "LOCK" : `${m.ai}%`}</dd>
     <dt>信頼度</dt><dd>${locked ? "LOCK" : `${m.confidence}%`}</dd>
   `;
+
 }
 
 function buildAiSummary(theme, score) {
@@ -1588,6 +1599,13 @@ function buildAiSummary(theme, score) {
 }
 
 function bindEvents() {
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-upgrade]");
+    if (!target) return;
+    event.preventDefault();
+    openUpgrade();
+  });
+
   document.querySelectorAll("[data-scroll-target]").forEach((button) => {
     button.addEventListener("click", () => {
       const target = document.querySelector(`#${button.dataset.scrollTarget}`);
