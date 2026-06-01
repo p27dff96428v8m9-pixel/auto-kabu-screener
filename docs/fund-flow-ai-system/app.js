@@ -391,7 +391,7 @@ const state = {
   macroStatus: { state: "pending", text: "確認中" },
   previousRanks: {},
   publicRankHistory: null,
-  isPro: false
+  isPro: true
 };
 
 const PRO_CHECKOUT_URL = "";
