@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>日本版 資金フローAI v2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260601-19" />
+  <link rel="stylesheet" href="./styles.css?v=20260601-20" />
 </head>
 <body>
   <header class="app-header">
@@ -40,15 +40,15 @@
       <section class="panel guide-panel">
         <h2>この画面の見方</h2>
         <div class="guide-steps">
-          <span><b>1</b> 本日の資金ストーリーを見る</span>
-          <span><b>2</b> 次に見るテーマを見る</span>
-          <span><b>3</b> 市場のお金の移動マップを見る</span>
-          <span><b>4</b> 90日 → 30日 → 7日のつながりを見る</span>
-          <span><b>5</b> 右側の詳細で関連銘柄を確認する</span>
+          <button type="button" data-scroll-target="sectionStory"><b>1</b> 本日の資金ストーリーを見る</button>
+          <button type="button" data-scroll-target="sectionCandidates"><b>2</b> 次に見るテーマを見る</button>
+          <button type="button" data-scroll-target="sectionMap"><b>3</b> 市場のお金の移動マップを見る</button>
+          <button type="button" data-scroll-target="sectionPeriodFlow"><b>4</b> 90日 → 30日 → 7日のつながりを見る</button>
+          <button type="button" data-scroll-target="sectionDetail"><b>5</b> 右側の詳細で関連銘柄を確認する</button>
         </div>
       </section>
 
-      <section class="panel story-panel">
+      <section id="sectionStory" class="panel story-panel">
         <div class="panel-head">
           <div>
             <h2><span class="step-badge">1</span>本日の資金ストーリー</h2>
@@ -58,7 +58,7 @@
         <p id="marketStory" class="market-story">-</p>
       </section>
 
-      <section class="panel candidate-panel priority-panel">
+      <section id="sectionCandidates" class="panel candidate-panel priority-panel">
         <div class="panel-head">
           <div>
             <h2><span class="step-badge">2</span>次に見るテーマ</h2>
@@ -70,7 +70,7 @@
         <div id="researchCandidates" class="candidate-list"></div>
       </section>
 
-      <section class="panel flow-panel main-map-panel">
+      <section id="sectionMap" class="panel flow-panel main-map-panel">
         <div class="panel-head">
           <div>
             <h2><span class="step-badge">3</span>市場のお金の移動マップ</h2>
@@ -110,7 +110,7 @@
         </div>
         <div id="flowMap" class="flow-map"></div>
         <div id="mapTakeaway" class="map-takeaway" aria-live="polite"></div>
-        <h3 class="subsection-title"><span class="step-badge">4</span>90日 → 30日 → 7日のつながり</h3>
+        <h3 id="sectionPeriodFlow" class="subsection-title"><span class="step-badge">4</span>90日 → 30日 → 7日のつながり</h3>
         <div id="periodFlow" class="period-flow"></div>
       </section>
 
@@ -148,7 +148,7 @@
       </section>
     </section>
 
-    <aside class="detail" aria-label="テーマ詳細">
+    <aside id="sectionDetail" class="detail" aria-label="テーマ詳細">
       <section class="panel detail-panel">
         <div class="detail-head">
           <div>
@@ -231,6 +231,6 @@
     </aside>
   </main>
 
-  <script src="./app.js?v=20260601-18"></script>
+  <script src="./app.js?v=20260601-19"></script>
 </body>
 </html>

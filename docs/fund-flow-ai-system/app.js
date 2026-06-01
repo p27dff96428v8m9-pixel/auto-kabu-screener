@@ -1515,6 +1515,14 @@ function buildAiSummary(theme, score) {
 }
 
 function bindEvents() {
+  document.querySelectorAll("[data-scroll-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = document.querySelector(`#${button.dataset.scrollTarget}`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
   document.querySelectorAll("[data-period]").forEach((button) => {
     button.addEventListener("click", () => {
       document.querySelectorAll("[data-period]").forEach((item) => item.classList.remove("active"));
