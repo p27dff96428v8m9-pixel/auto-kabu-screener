@@ -18,6 +18,8 @@ async function main() {
       commodities: Object.keys(data.macro?.alpha?.commodities || {}).length,
       errors: data.macro?.alpha?.errors?.length || 0
     },
+    instrumentQuotes: Object.keys(data.instrumentQuotes || {}).length,
+    instrumentQuoteBatch: data.instrumentQuoteBatch || null,
     updatedAt: data.updatedAt,
     message: data.message || ""
   }));

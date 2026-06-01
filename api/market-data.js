@@ -52,6 +52,16 @@ const THEME_UNIVERSE = [
   { id: "jp-low-pbr", tickers: ["1306", "8411", "8058"], news: ["Japan low PBR", "TSE reform"] }
 ];
 
+const TREASURE_TICKERS = [
+  "6723", "6146", "6920",
+  "8308", "7182", "7167",
+  "9508", "9506", "9504",
+  "8015", "8053", "2768",
+  "8952", "8953", "3462",
+  "6301", "6501", "6981",
+  "7201", "7270", "8750", "8795"
+];
+
 function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
@@ -101,7 +111,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function loadPreviousAlphaSignals() {
+function loadPreviousMarketData() {
   const outputPath = process.env.MARKET_DATA_OUTPUT_PATH;
   if (!outputPath) return null;
 
@@ -109,11 +119,14 @@ function loadPreviousAlphaSignals() {
   if (!fs.existsSync(resolvedPath)) return null;
 
   try {
-    const existing = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
-    return existing?.macro?.alpha || null;
+    return JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
   } catch {
     return null;
   }
+}
+
+function loadPreviousAlphaSignals() {
+  return loadPreviousMarketData()?.macro?.alpha || null;
 }
 
 function selectedAlphaCommodityBatch() {
@@ -326,6 +339,41 @@ function summarizeThemeQuotes(themeQuotes) {
   return metrics;
 }
 
+function percentChangeFromRows(rows, days) {
+  if (rows.length < 2) return null;
+  const latest = rows[rows.length - 1];
+  const start = rows[Math.max(0, rows.length - days)] || rows[0];
+  if (!start?.close) return null;
+  return Number((((latest.close - start.close) / Math.max(1, start.close)) * 100).toFixed(2));
+}
+
+function summarizeInstrumentQuote(ticker, rows) {
+  const ordered = rows
+    .filter((row) => row.date && Number.isFinite(row.close))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const latest = ordered[ordered.length - 1];
+  if (!latest) return null;
+
+  return {
+    ticker,
+    updatedAt: new Date().toISOString(),
+    latest: {
+      date: latest.date,
+      close: latest.close,
+      volume: Number.isFinite(latest.volume) ? latest.volume : null
+    },
+    changes: {
+      "7d": percentChangeFromRows(ordered, 7),
+      "30d": percentChangeFromRows(ordered, 30),
+      "90d": percentChangeFromRows(ordered, 90)
+    },
+    history: ordered.slice(-60).map((row) => ({
+      date: row.date,
+      close: row.close
+    }))
+  };
+}
+
 function macroChange(macro, group, key, period) {
   const value = macro?.alpha?.[group]?.[key]?.changes?.[period];
   return Number.isFinite(value) ? value : 0;
@@ -447,11 +495,14 @@ async function fetchMacroSignals() {
 async function buildMarketData() {
   const auth = await getJQuantsAuth();
   const macro = await fetchMacroSignals();
+  const previousMarketData = loadPreviousMarketData();
+  const instrumentQuotes = { ...(previousMarketData?.instrumentQuotes || {}) };
   if (!auth) {
     return {
       source: "sample",
       message: "J-Quants credentials are not configured. Set JQUANTS_API_KEY on the server.",
       macro,
+      instrumentQuotes,
       themes: []
     };
   }
@@ -471,6 +522,8 @@ async function buildMarketData() {
       try {
         requestCount += 1;
         const rows = await fetchDailyQuotes(ticker, auth);
+        const quote = summarizeInstrumentQuote(ticker, rows);
+        if (quote) instrumentQuotes[ticker] = quote;
         if (rows.length >= 10) quoteSets.push(rows);
       } catch (error) {
         errors.push(`${theme.id}:${ticker}:${error.message}`);
@@ -486,11 +539,38 @@ async function buildMarketData() {
     themes.push({ id: theme.id, metrics });
   }
 
+  const allInstrumentTickers = Array.from(new Set([
+    ...THEME_UNIVERSE.flatMap((theme) => theme.tickers),
+    ...TREASURE_TICKERS
+  ]));
+  const quoteRequestLimit = Number(process.env.JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN || (auth.mode === "v2" ? 6 : 20));
+  const runNumber = Number(process.env.GITHUB_RUN_NUMBER);
+  const batchSeed = Number.isFinite(runNumber) ? runNumber - 1 : Math.floor(Date.now() / (20 * 60 * 1000));
+  const batchStart = ((Math.trunc(batchSeed) * quoteRequestLimit) % allInstrumentTickers.length + allInstrumentTickers.length) % allInstrumentTickers.length;
+  const quoteBatch = Array.from({ length: Math.min(quoteRequestLimit, allInstrumentTickers.length) }, (_, index) => {
+    return allInstrumentTickers[(batchStart + index) % allInstrumentTickers.length];
+  });
+
+  for (const ticker of quoteBatch) {
+    try {
+      const rows = await fetchDailyQuotes(ticker, auth);
+      const quote = summarizeInstrumentQuote(ticker, rows);
+      if (quote) instrumentQuotes[ticker] = quote;
+    } catch (error) {
+      errors.push(`quote:${ticker}:${error.message}`);
+    }
+  }
+
   return {
     source: auth.mode === "v2" ? "jquants-v2" : "jquants-v1",
     updatedAt: new Date().toISOString(),
     message: themes.length ? "" : errors.slice(0, 3).join(" / "),
     macro,
+    instrumentQuotes,
+    instrumentQuoteBatch: {
+      count: quoteRequestLimit,
+      tickers: quoteBatch
+    },
     themes
   };
 }
