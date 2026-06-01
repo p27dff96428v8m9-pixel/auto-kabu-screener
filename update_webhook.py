@@ -5,7 +5,7 @@ import base64
 from nacl import encoding, public
 
 # New Webhook URL
-NEW_URL = "https://script.google.com/macros/s/AKfycbxYpuh4YDjbK9LhK1lIU5qPXPlHeEtqgp6cYVFmcz-L2qQ5uMiciZnwOFfBT_5ioFWB/exec"
+NEW_URL = "https://script.google.com/macros/s/AKfycbxFTzFLd4wWg4U97SnIjHybPG9wfd8OVuw8ThDJTikunAdTExP0ZFhVwK0EStxwP-oR/exec"
 
 # 1. Update local config.json
 config_path = r"c:\Users\p27df\.gemini\kabukazidou\config.json"

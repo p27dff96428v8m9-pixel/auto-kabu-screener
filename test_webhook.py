@@ -1,6 +1,6 @@
 import requests
 
-url = "https://script.google.com/macros/s/AKfycbzhXxMimj7bAG4z3UwYBKdhVfgiMFB4ktOhN2t4Dv110TH47sBTWgHi2mzgqjFddZXt/exec"
+url = "https://script.google.com/macros/s/AKfycbxFTzFLd4wWg4U97SnIjHybPG9wfd8OVuw8ThDJTikunAdTExP0ZFhVwK0EStxwP-oR/exec"
 
 payload = {
     "action": "add_new",
