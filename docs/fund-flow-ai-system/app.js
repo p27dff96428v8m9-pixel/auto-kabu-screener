@@ -1720,11 +1720,14 @@ function applyAiResearchPayload(payload) {
 
   state.aiResearch = payload;
   state.aiResearchMessage = payload.message || "";
+  const isTemporaryGeminiError = /503|504|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand/i.test(state.aiResearchMessage);
   state.geminiStatus = {
     state: payload.source === "gemini" ? "success" : "pending",
     text: payload.source === "gemini"
       ? `${payload.model || "Gemini"} / ${payload.candidates.length}候補 / ${formatStatusTime(payload.updatedAt)}`
-      : `Gemini未実行 / ${payload.message || "暫定候補"}`
+      : isTemporaryGeminiError
+        ? `Gemini一時混雑 / 暫定候補 / ${formatStatusTime(payload.updatedAt)}`
+        : `Gemini未実行 / ${payload.message || "暫定候補"}`
   };
   return true;
 }

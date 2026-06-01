@@ -3,6 +3,13 @@ const path = require("path");
 
 const GEMINI_BASE_URL = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODELS = [GEMINI_MODEL, ...(process.env.GEMINI_FALLBACK_MODELS || "")
+  .split(",")
+  .map((model) => model.trim())
+  .filter(Boolean)]
+  .filter((model, index, models) => model && models.indexOf(model) === index);
+const GEMINI_RETRY_COUNT = Math.max(1, Number(process.env.GEMINI_RETRY_COUNT || 3) || 3);
+const GEMINI_RETRY_DELAY_MS = Math.max(0, Number(process.env.GEMINI_RETRY_DELAY_MS || 15000) || 15000);
 
 const THEME_LABELS = {
   "jp-semiconductor": "半導体・製造装置",
@@ -57,6 +64,15 @@ function writeJson(filePath, payload) {
 
 function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableGeminiError(error) {
+  const message = error?.message || "";
+  return /(^|\D)(429|500|502|503|504)(\D|$)|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand/i.test(message);
 }
 
 function metric(theme, period = "90d") {
@@ -172,21 +188,8 @@ function parseJsonText(text) {
   }
 }
 
-async function runGemini(context) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
-  }
-
-  const prompt = [
-    "あなたは日本株の資金フロー分析アシスタントです。投資助言ではなく、次に確認すべきテーマ候補を整理してください。",
-    "必ず日本語で返してください。Flow Scoreなど英語は使わず、資金量・加速度・広がり・過熱度という語に統一してください。",
-    "価格・出来高、ニュース見出し、金利・為替材料を分けて考え、過熱しているテーマは追いかけ買い注意と書いてください。",
-    "返答はJSONだけ。schema: {summary:string,candidates:[{id:string,name:string,score:number,decision:string,reason:string,evidence:string[],nextCheck:string,risk:string}]}",
-    JSON.stringify(context)
-  ].join("\n\n");
-
-  const response = await fetch(`${GEMINI_BASE_URL}/models/${GEMINI_MODEL}:generateContent`, {
+async function requestGemini(model, apiKey, prompt) {
+  const response = await fetch(`${GEMINI_BASE_URL}/models/${model}:generateContent`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -208,6 +211,39 @@ async function runGemini(context) {
   return parseJsonText(extractGeminiText(await response.json()));
 }
 
+async function runGemini(context) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+
+  const prompt = [
+    "あなたは日本株の資金フロー分析アシスタントです。投資助言ではなく、次に確認すべきテーマ候補を整理してください。",
+    "必ず日本語で返してください。Flow Scoreなど英語は使わず、資金量・加速度・広がり・過熱度という語に統一してください。",
+    "価格・出来高、ニュース見出し、金利・為替材料を分けて考え、過熱しているテーマは追いかけ買い注意と書いてください。",
+    "返答はJSONだけ。schema: {summary:string,candidates:[{id:string,name:string,score:number,decision:string,reason:string,evidence:string[],nextCheck:string,risk:string}]}",
+    JSON.stringify(context)
+  ].join("\n\n");
+
+  const errors = [];
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 1; attempt <= GEMINI_RETRY_COUNT; attempt += 1) {
+      try {
+        return {
+          model,
+          payload: await requestGemini(model, apiKey, prompt)
+        };
+      } catch (error) {
+        errors.push(`${model}#${attempt}:${error.message}`);
+        if (!isRetryableGeminiError(error) || attempt === GEMINI_RETRY_COUNT) break;
+        await sleep(GEMINI_RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  throw new Error(errors.join(" / "));
+}
+
 async function main() {
   const marketPath = path.resolve(process.cwd(), process.env.MARKET_DATA_INPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "market-data.json"));
   const outputPath = path.resolve(process.cwd(), process.env.AI_RESEARCH_OUTPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "ai-research.json"));
@@ -221,10 +257,10 @@ async function main() {
       source: "gemini",
       updatedAt: new Date().toISOString(),
       period: "90d",
-      model: GEMINI_MODEL,
+      model: gemini.model,
       marketUpdatedAt: marketData.updatedAt,
-      summary: gemini.summary || "",
-      candidates: Array.isArray(gemini.candidates) ? gemini.candidates.slice(0, 5) : []
+      summary: gemini.payload.summary || "",
+      candidates: Array.isArray(gemini.payload.candidates) ? gemini.payload.candidates.slice(0, 5) : []
     };
   } catch (error) {
     payload = buildFallbackResearch(marketData, error.message);
