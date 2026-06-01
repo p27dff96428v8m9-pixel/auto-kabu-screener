@@ -660,8 +660,16 @@ function mapPositionFor(id, list = []) {
 function flowRouteCandidates(list) {
   const mapList = list.length ? list : themes;
   const visibleIds = new Set(mapList.map((theme) => theme.id));
-  return flowRoutes
-    .filter(([from, to]) => visibleIds.has(from) && visibleIds.has(to))
+  const visibleRoutes = flowRoutes.filter(([from, to]) => visibleIds.has(from) && visibleIds.has(to));
+  const outgoingCounts = new Map();
+  const incomingCounts = new Map();
+
+  visibleRoutes.forEach(([from, to]) => {
+    outgoingCounts.set(from, (outgoingCounts.get(from) || 0) + 1);
+    incomingCounts.set(to, (incomingCounts.get(to) || 0) + 1);
+  });
+
+  return visibleRoutes
     .map(([from, to]) => {
       const start = mapPositionFor(from, mapList);
       const end = mapPositionFor(to, mapList);
@@ -677,6 +685,8 @@ function flowRouteCandidates(list) {
       const direction = from < to ? 1 : -1;
       const controlX = midX + (-dy / distance) * curve * direction;
       const controlY = midY + (dx / distance) * curve * direction;
+      const outflowCount = outgoingCounts.get(from) || 1;
+      const inflowCount = incomingCounts.get(to) || 1;
       return {
         from,
         to,
@@ -688,6 +698,10 @@ function flowRouteCandidates(list) {
         midX,
         midY,
         strength,
+        outflowCount,
+        inflowCount,
+        outflowOpacity: outflowCount >= 2 ? Math.min(0.44, 0.12 + outflowCount * 0.09) : 0.08,
+        inflowOpacity: inflowCount >= 2 ? Math.min(0.44, 0.12 + inflowCount * 0.09) : 0.08,
         d: `M ${start.x} ${start.y} Q ${controlX} ${controlY} ${end.x} ${end.y}`
       };
     })
@@ -819,9 +833,35 @@ function renderFlowMap(list) {
   routeLayer.setAttribute("class", "flow-svg");
   routeLayer.setAttribute("viewBox", "0 0 100 100");
   routeLayer.setAttribute("preserveAspectRatio", "none");
-  routePaths.forEach((route) => {
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  routeLayer.appendChild(defs);
+
+  routePaths.forEach((route, index) => {
+    const gradientId = `flow-gradient-${index}`;
+    const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+    gradient.setAttribute("id", gradientId);
+    gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+    gradient.setAttribute("x1", route.start.x);
+    gradient.setAttribute("y1", route.start.y);
+    gradient.setAttribute("x2", route.end.x);
+    gradient.setAttribute("y2", route.end.y);
+
+    [
+      { offset: "0%", color: "rgb(220, 38, 38)", opacity: route.outflowOpacity },
+      { offset: "50%", color: "rgb(15, 118, 110)", opacity: 0.12 },
+      { offset: "100%", color: "rgb(37, 99, 235)", opacity: route.inflowOpacity }
+    ].forEach((stopDef) => {
+      const stop = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+      stop.setAttribute("offset", stopDef.offset);
+      stop.setAttribute("stop-color", stopDef.color);
+      stop.setAttribute("stop-opacity", stopDef.opacity);
+      gradient.appendChild(stop);
+    });
+    defs.appendChild(gradient);
+
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", route.d);
+    path.setAttribute("stroke", `url(#${gradientId})`);
     path.classList.add(
       route.strength >= 60 ? "route-strength-high" : route.strength >= 35 ? "route-strength-mid" : "route-strength-low"
     );
