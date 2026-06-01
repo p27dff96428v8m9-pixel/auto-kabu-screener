@@ -461,7 +461,7 @@ input[type="search"] {
   position: relative;
   width: calc(100% * var(--map-scale, 1));
   min-width: 100%;
-  height: calc(1080px * var(--map-scale, 1));
+  height: calc(1080px * var(--map-y-scale, var(--map-scale, 1)));
   min-height: 1080px;
   transition: width 180ms ease, height 180ms ease;
 }
@@ -484,7 +484,7 @@ input[type="search"] {
 }
 
 .map-fullscreen .flow-map-inner {
-  height: calc((100vh - 260px) * var(--map-scale, 1));
+  height: calc((100vh - 260px) * var(--map-y-scale, var(--map-scale, 1)));
   min-height: calc(100vh - 260px);
 }
 

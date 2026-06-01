@@ -822,6 +822,7 @@ function renderFlowMap(list) {
   const container = document.querySelector("#flowMap");
   container.innerHTML = "";
   container.style.setProperty("--map-scale", state.mapZoom);
+  container.style.setProperty("--map-y-scale", mapVerticalScale());
 
   const layer = document.createElement("div");
   layer.className = "flow-map-inner";
@@ -980,7 +981,14 @@ function renderMapTakeaway(list) {
 
 function setMapZoom(nextZoom) {
   state.mapZoom = Math.max(0.75, Math.min(1.45, Number(nextZoom.toFixed(2))));
-  document.querySelector("#flowMap")?.style.setProperty("--map-scale", state.mapZoom);
+  const map = document.querySelector("#flowMap");
+  map?.style.setProperty("--map-scale", state.mapZoom);
+  map?.style.setProperty("--map-y-scale", mapVerticalScale());
+}
+
+function mapVerticalScale() {
+  const extraZoom = Math.max(0, state.mapZoom - 1);
+  return Number((state.mapZoom + extraZoom * 0.85).toFixed(2));
 }
 
 function setMapFullscreen(enabled) {
