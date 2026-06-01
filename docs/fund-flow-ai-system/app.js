@@ -1357,7 +1357,7 @@ function renderGeminiResearchCandidates(source) {
       const locked = !state.isPro && !allowedFreeIds.has(candidate.id);
       const evidence = Array.isArray(candidate.evidence) ? candidate.evidence.slice(0, 3) : [];
       return `
-        <button class="candidate-card ai-picked gemini-picked ${locked ? "locked-card" : ""}" type="button" data-id="${candidate.id}">
+        <button class="candidate-card ai-picked gemini-picked ${candidate.id === state.selectedId ? "active" : ""} ${locked ? "locked-card" : ""}" type="button" data-id="${candidate.id}">
           <span>
             <strong>${locked ? "Pro限定のGemini候補" : `${themeIcons[candidate.id] || "●"} ${candidate.name || theme.name}`}</strong>
             <span>${locked ? "資金フローと材料が重なった候補を検出しました。" : candidate.reason || "Geminiが価格・出来高、ニュース、金利・為替材料から確認候補にしました。"}</span>
@@ -1382,6 +1382,7 @@ function renderGeminiResearchCandidates(source) {
   container.querySelectorAll("[data-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedId = button.dataset.id;
+      renderResearchCandidates(filteredThemes());
       renderList();
       renderDetail();
     });
@@ -1429,7 +1430,7 @@ function renderResearchCandidates(list) {
       .map(({ theme, stage, researchScore, reason }) => {
         const locked = !state.isPro && !allowedFreeIds.has(theme.id);
         return `
-        <button class="candidate-card ai-picked ${locked ? "locked-card" : ""}" type="button" data-id="${theme.id}">
+        <button class="candidate-card ai-picked ${theme.id === state.selectedId ? "active" : ""} ${locked ? "locked-card" : ""}" type="button" data-id="${theme.id}">
           <span>
             <strong>${locked ? "Pro限定の確認テーマ" : `${themeIcons[theme.id]} ${theme.name}`}</strong>
             <span>${locked ? "90日→30日→7日の変化が出ている候補です。詳細はProで表示されます。" : reason}</span>
@@ -1449,6 +1450,7 @@ function renderResearchCandidates(list) {
   container.querySelectorAll("[data-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedId = button.dataset.id;
+      renderResearchCandidates(filteredThemes());
       renderList();
       renderDetail();
       centerSelectedMapNode();

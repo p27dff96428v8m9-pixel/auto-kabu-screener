@@ -935,6 +935,7 @@ input[type="search"] {
   align-items: start;
   width: 100%;
   cursor: pointer;
+  position: relative;
   text-align: left;
 }
 
@@ -961,6 +962,34 @@ input[type="search"] {
 .candidate-card.gemini-picked {
   border-color: #7db7ac;
   background: #f3fbf9;
+}
+
+.candidate-card.active,
+.candidate-card.ai-picked.active {
+  border-color: #0f766e;
+  border-width: 2px;
+  background: #ecfdf8;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.18), 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.candidate-card.active::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 7px;
+  width: 4px;
+  border-radius: 999px;
+  background: #0f766e;
+}
+
+.candidate-card.active > span:first-child {
+  padding-left: 10px;
+}
+
+.candidate-card.active .candidate-decision {
+  background: #0f766e;
+  color: #ffffff;
 }
 
 .locked-card {
@@ -1366,10 +1395,16 @@ input[type="search"] {
   cursor: pointer;
 }
 
-.theme-card:hover,
-.theme-card.active {
+.theme-card:hover {
   border-color: #87bdb7;
   background: #f2f9f7;
+}
+
+.theme-card.active {
+  border-color: #0f766e;
+  border-width: 2px;
+  background: #ecfdf8;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16), 0 10px 24px rgba(15, 23, 42, 0.1);
 }
 
 .rank {
@@ -1385,6 +1420,11 @@ input[type="search"] {
 
 .rank strong {
   line-height: 1;
+}
+
+.theme-card.active .rank {
+  background: #0f766e;
+  color: #ffffff;
 }
 
 .rank-move {
