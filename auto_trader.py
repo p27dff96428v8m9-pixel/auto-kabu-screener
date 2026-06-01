@@ -1072,6 +1072,7 @@ def auto_screen_and_add():
         
         payload = {
             "action": "add_new", "code": str(s_code),
+            "name": ticker_name, "ticker_name": ticker_name,
             "ai_text": ai_text, "ai_color": ai_color,
             "buy": int(best_params['Buy']), "tp": int(best_params['TakeProfit']),
             "sl": int(best_params['StopLoss']), "current_price": float(current_price),
