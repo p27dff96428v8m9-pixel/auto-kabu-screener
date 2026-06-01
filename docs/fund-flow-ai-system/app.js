@@ -1075,8 +1075,11 @@ function renderPeriodFlow(theme) {
     ["30d", "30日", "資金移動の方向"],
     ["7d", "7日", "直近の加速度"]
   ];
+  const currentStage = lifecycleStageForPeriod(theme, state.period);
+  const currentAmount = fundAmount(theme, state.period);
+  const currentAccel = accelerationForPeriod(theme, state.period);
 
-  container.innerHTML = sequence
+  const cards = sequence
     .map(([period, label, caption], index) => {
       const amount = fundAmount(theme, period);
       const accel = accelerationForPeriod(theme, period);
@@ -1085,14 +1088,18 @@ function renderPeriodFlow(theme) {
       const delta = amount - prevAmount;
       const trendClass = delta >= 0 ? "trend-up" : "trend-down";
       const trend = index === 0 ? "基準" : `${delta >= 0 ? "+" : ""}${delta}`;
+      const isActive = period === state.period;
       return `
-        <article class="period-card ${period === state.period ? "active" : ""}">
+        <article class="period-card ${isActive ? "active" : ""}" ${isActive ? 'aria-current="true"' : ""}>
           <header>
             <span>
               <strong>${label}</strong>
               <small>${caption}</small>
             </span>
-            <span class="${trendClass}">${trend}</span>
+            <span class="period-card-flags">
+              ${isActive ? '<b class="period-selected">選択中</b>' : ""}
+              <span class="${trendClass}">${trend}</span>
+            </span>
           </header>
           <div class="period-stats">
             <span>資金 ${amount}</span>
@@ -1104,6 +1111,15 @@ function renderPeriodFlow(theme) {
       `;
     })
     .join("");
+
+  container.innerHTML = `
+    <div class="period-current">
+      <span>現在の表示</span>
+      <strong>${periodLabel()} / ${currentStage.icon} ${currentStage.label}</strong>
+      <small>${theme.name}の${periodLabel()}は、資金 ${currentAmount}、加速 ${currentAccel >= 0 ? "+" : ""}${currentAccel} を選択中です。</small>
+    </div>
+    ${cards}
+  `;
 }
 
 function renderAiMarkers(container, visibleIds) {

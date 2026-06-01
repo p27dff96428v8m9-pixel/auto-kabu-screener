@@ -549,6 +549,30 @@ input[type="search"] {
   margin-top: 14px;
 }
 
+.period-current {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(150px, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #b7d7d2;
+  border-radius: 8px;
+  background: #f2f9f7;
+}
+
+.period-current span,
+.period-current small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.period-current strong {
+  color: var(--accent);
+  font-size: 14px;
+}
+
 .period-card {
   position: relative;
   min-height: 116px;
@@ -583,6 +607,29 @@ input[type="search"] {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 9px;
+}
+
+.period-card-flags {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 54px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.period-selected {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .period-card strong {
@@ -1594,6 +1641,11 @@ footer p {
 
   .period-flow {
     grid-template-columns: 1fr;
+  }
+
+  .period-current {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .period-card::after {
