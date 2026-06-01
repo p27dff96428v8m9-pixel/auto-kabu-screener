@@ -804,8 +804,8 @@ def auto_switch_strategy():
     else:  # strong_up
         if perf == "good":
             new_key = "A"  # 強上昇×好調 → 強気
-        elif perf == "normal":
-            new_key = "B"  # 強上昇×普通 → 通常
+        elif perf in ("normal", "unknown"):
+            new_key = "B"  # 強上昇×普通/実績少 → 通常
         else:
             new_key = "C"  # 強上昇×不調 → 慎重
 
@@ -1003,6 +1003,21 @@ TSE_ACTIVE_RANGES = [str(c) for c in TSE_ACTIVE_RANGES]
 def auto_screen_and_add():
     """全自動スクリーニングと有望銘柄の追加"""
     logging.info("--- 全自動スクリーニングと有望銘柄の追加開始 ---")
+
+    def fetch_history(code, period):
+        """yfinanceの単一銘柄取得をMultiIndex差異込みで正規化する。"""
+        ticker = f"{code}.T"
+        hist = yf.download(ticker, period=period, progress=False, threads=False)
+        if hist.empty or not hasattr(hist.columns, "levels"):
+            return hist
+
+        level1_vals = hist.columns.get_level_values(1)
+        level0_vals = hist.columns.get_level_values(0)
+        if ticker in level1_vals:
+            return hist.xs(ticker, axis=1, level=1).copy()
+        if ticker in level0_vals:
+            return hist[ticker].copy()
+        return hist
     
     # 銘柄を処理してスプレッドシート・HP・Twitterに追加するヘルパー関数
     def process_and_add_stock(cand, best_params, best_win_rate, existing_codes_list):
@@ -1022,15 +1037,15 @@ def auto_screen_and_add():
         invest_amount = int(best_params['Buy'] * lot_size)
         max_loss = int((best_params['Buy'] - best_params['StopLoss']) * lot_size)
         max_gain = int((best_params['TakeProfit'] - best_params['Buy']) * lot_size)
+        fin_score = cand.get('financial_score', 1)
+        fin_reason = cand.get('financial_reason', '')
+        fin_label = {2: "良好", 1: "要注意", 0: "不良"}.get(fin_score, "不明")
         ai_text = (
             f"【AI判定】勝率{best_win_rate:.0f}% RR比{rr_ratio:.1f}:1 | "
             f"財務:{fin_label}（{fin_reason}）| "
             f"推奨{lot_size}株（投資額約{invest_amount:,}円）| "
             f"最大損失-{max_loss:,}円 / 利確+{max_gain:,}円"
         )
-        fin_score = cand.get('financial_score', 1)
-        fin_reason = cand.get('financial_reason', '')
-        fin_label = {2: "良好", 1: "要注意", 0: "不良"}.get(fin_score, "不明")
         ai_color = "orange" if best_win_rate < 70 or fin_score < 2 else "green"
         
         hp_article = generate_ai_article(
@@ -1090,29 +1105,31 @@ def auto_screen_and_add():
     logging.info(f"市場トレンド判定: {trend_msg}")
 
     import random
-    # 実在コード範囲からランダムサンプリング（1300-9999全列挙より大幅に効率化）
-    target_codes = random.sample(TSE_ACTIVE_RANGES, min(2500, len(TSE_ACTIVE_RANGES)))
-    
-    # yfinanceへの負荷を抑えるために100銘柄ずつのチャンクに分ける
-    chunk_size = 100
+    # yfinanceのレート制限を避けるため、1回の探索対象を絞る。
+    # 多すぎると候補検証前にToo Many Requestsで実質ゼロ件になる。
+    sample_size = int(os.environ.get("SCREEN_SAMPLE_SIZE", "600"))
+    target_codes = random.sample(TSE_ACTIVE_RANGES, min(sample_size, len(TSE_ACTIVE_RANGES)))
+
+    chunk_size = int(os.environ.get("SCREEN_CHUNK_SIZE", "40"))
     candidates = []
-    
+
     for i in range(0, len(target_codes), chunk_size):
         chunk = target_codes[i:i + chunk_size]
         ticker_str = " ".join([f"{c}.T" for c in chunk])
-        logging.info(f"スクリーニング中: {i} to {i+chunk_size} 銘柄目...")
+        logging.info(f"スクリーニング中: {i} to {min(i+chunk_size, len(target_codes))} 銘柄目...")
         
         try:
             # リトライロジックを追加
             retries = 3
             for attempt in range(retries):
                 try:
-                    # yfinance 1.x対応: group_by/threads/sessionパラメータは廃止
-                    data = yf.download(ticker_str, period="3mo", progress=False)
+                    data = yf.download(ticker_str, period="3mo", progress=False, threads=False)
                     break
                 except Exception as e:
                     if attempt < retries - 1:
-                        time.sleep(5) # APIエラー時は5秒待機してリトライ
+                        wait_seconds = 10 * (attempt + 1)
+                        logging.warning(f"yfinance取得失敗。{wait_seconds}秒待機してリトライします: {e}")
+                        time.sleep(wait_seconds)
                     else:
                         raise e
 
@@ -1151,9 +1168,9 @@ def auto_screen_and_add():
                     if current_price < 100:
                         continue  # 極端に安い銘柄は除外
 
-                    # 流動性フィルター: 直近20日平均出来高が5万株未満は除外
+                    # 流動性フィルター: 直近20日平均出来高が3万株未満は除外
                     avg_volume = float(vol_s.iloc[-20:].mean()) if len(vol_s) >= 20 else 0
-                    if avg_volume < 50000:
+                    if avg_volume < 30000:
                         continue
 
                     sma25 = close_s.rolling(window=25).mean().iloc[-1]
@@ -1176,7 +1193,7 @@ def auto_screen_and_add():
                         info = ticker_obj.info
                         pbr = info.get('priceToBook') or 0
                         mc = info.get('marketCap') or 0
-                        if 10_000_000_000 <= mc <= 3_000_000_000_000:
+                        if 5_000_000_000 <= mc <= 5_000_000_000_000:
                             candidates.append({
                                 "code": code, "pbr": pbr, "deviation": deviation,
                                 "rsi": rsi, "current_price": current_price, "mc": mc,
@@ -1188,17 +1205,15 @@ def auto_screen_and_add():
         except Exception as e:
             logging.error(f"チャンク取得エラー: {e}")
         
-        # チャンクごとに少し休憩
-        time.sleep(2)
+        time.sleep(6)
     
     logging.info(f"テクニカルフィルタ通過候補: {len(candidates)} 銘柄")
 
     # ── 財務スコアをGeminiで付与（上位30件のみ、API負荷対策）──
-    top_candidates = sorted(candidates, key=lambda x: abs(x['deviation']))[:30]
+    top_candidates = sorted(candidates, key=lambda x: abs(x['deviation']))[:20]
     for cand in top_candidates:
         try:
-            t_obj = yf.Ticker(f"{cand['code']}.T")
-            t_name = t_obj.info.get('shortName') or cand['code']
+            t_name = str(cand['code'])
             score, reason = gemini_analyze_financials(cand['code'], t_name)
             cand['financial_score'] = score
             cand['financial_reason'] = reason
@@ -1239,6 +1254,8 @@ def auto_screen_and_add():
     near_miss_count = 0  # 惜しかった件数（勝率不足で弾かれた）
     trend_fail_count = 0  # トレンド/押し目条件で弾かれた件数
 
+    candidates = candidates[:80]
+
     # ===== 第1段階: 【最高品質】上昇トレンド(75日線上) + 25日線押し目 + 勝率閾値以上 =====
     logging.info(f"--- 第1段階: 上昇トレンド×押し目×勝率{min_winrate_stage1}%以上を探索 ---")
     for cand in candidates:
@@ -1249,7 +1266,7 @@ def auto_screen_and_add():
             continue
             
         try:
-            hist_6m = yf.Ticker(f"{s_code}.T").history(period="6mo")
+            hist_6m = fetch_history(s_code, "6mo")
             if len(hist_6m) < 75:
                 continue
             
@@ -1270,7 +1287,7 @@ def auto_screen_and_add():
             is_dip = (abs(curr_p - curr_sma25) / curr_sma25 <= 0.05)
 
             if is_uptrend and is_dip:
-                hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
+                hist_2y = fetch_history(s_code, "2y")
                 if len(hist_2y) < 60:
                     continue
 
@@ -1300,6 +1317,8 @@ def auto_screen_and_add():
 
         except Exception as e:
             logging.error(f"第1段階エラー ({s_code}): {e}")
+            if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                time.sleep(20)
             continue
 
     # ===== 第2段階: 目標未達の場合 - 25日線付近(条件緩和) + 勝率55%以上 =====
@@ -1313,7 +1332,7 @@ def auto_screen_and_add():
                 continue
             
             try:
-                hist_6m = yf.Ticker(f"{s_code}.T").history(period="6mo")
+                hist_6m = fetch_history(s_code, "6mo")
                 if len(hist_6m) < 60:
                     continue
                 
@@ -1335,7 +1354,7 @@ def auto_screen_and_add():
                 is_near_dip = (abs(curr_p - curr_sma25) / curr_sma25 <= 0.08)
                 
                 if is_uptrend_or_flat and is_near_dip:
-                    hist_2y = yf.Ticker(f"{s_code}.T").history(period="2y")
+                    hist_2y = fetch_history(s_code, "2y")
                     if len(hist_2y) < 60:
                         continue
                     atr = calc_atr(hist_2y)
@@ -1357,6 +1376,8 @@ def auto_screen_and_add():
                             
             except Exception as e:
                 logging.error(f"第2段階エラー ({s_code}): {e}")
+                if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                    time.sleep(20)
                 continue
 
     # ===== 最終結果の記録 & LINE サマリー送信 =====
