@@ -1107,10 +1107,10 @@ def auto_screen_and_add():
     import random
     # yfinanceのレート制限を避けるため、1回の探索対象を絞る。
     # 多すぎると候補検証前にToo Many Requestsで実質ゼロ件になる。
-    sample_size = int(os.environ.get("SCREEN_SAMPLE_SIZE", "600"))
+    sample_size = int(os.environ.get("SCREEN_SAMPLE_SIZE", "240"))
     target_codes = random.sample(TSE_ACTIVE_RANGES, min(sample_size, len(TSE_ACTIVE_RANGES)))
 
-    chunk_size = int(os.environ.get("SCREEN_CHUNK_SIZE", "40"))
+    chunk_size = int(os.environ.get("SCREEN_CHUNK_SIZE", "30"))
     candidates = []
 
     for i in range(0, len(target_codes), chunk_size):
@@ -1189,39 +1189,35 @@ def auto_screen_and_add():
                     deviation = (current_price - sma25) / sma25 * 100
 
                     if deviation <= 5 and rsi <= 65:
-                        ticker_obj = yf.Ticker(t_code)
-                        info = ticker_obj.info
-                        pbr = info.get('priceToBook') or 0
-                        mc = info.get('marketCap') or 0
-                        if 5_000_000_000 <= mc <= 5_000_000_000_000:
-                            candidates.append({
-                                "code": code, "pbr": pbr, "deviation": deviation,
-                                "rsi": rsi, "current_price": current_price, "mc": mc,
-                                "dividend": info.get('dividendYield') or 0,
-                                "avg_volume": avg_volume
-                            })
+                        candidates.append({
+                            "code": code, "pbr": 0, "deviation": deviation,
+                            "rsi": rsi, "current_price": current_price, "mc": 0,
+                            "dividend": 0, "avg_volume": avg_volume
+                        })
                 except Exception:
                     continue
         except Exception as e:
             logging.error(f"チャンク取得エラー: {e}")
         
-        time.sleep(6)
+        time.sleep(4)
     
     logging.info(f"テクニカルフィルタ通過候補: {len(candidates)} 銘柄")
 
-    # ── 財務スコアをGeminiで付与（上位30件のみ、API負荷対策）──
-    top_candidates = sorted(candidates, key=lambda x: abs(x['deviation']))[:20]
-    for cand in top_candidates:
-        try:
-            t_name = str(cand['code'])
-            score, reason = gemini_analyze_financials(cand['code'], t_name)
-            cand['financial_score'] = score
-            cand['financial_reason'] = reason
-            logging.info(f"財務スコア {cand['code']}: {score}点 ({reason})")
-            time.sleep(1)  # API負荷対策
-        except Exception:
-            cand['financial_score'] = 1
-            cand['financial_reason'] = "取得エラー"
+    # 日次スクリーニングではyfinanceの追加API呼び出しを抑えるため、
+    # 財務Gemini判定は既定で無効化する。必要な場合だけ環境変数で有効化する。
+    if os.environ.get("ENABLE_FINANCIAL_GEMINI", "0") == "1":
+        top_candidates = sorted(candidates, key=lambda x: abs(x['deviation']))[:10]
+        for cand in top_candidates:
+            try:
+                t_name = str(cand['code'])
+                score, reason = gemini_analyze_financials(cand['code'], t_name)
+                cand['financial_score'] = score
+                cand['financial_reason'] = reason
+                logging.info(f"財務スコア {cand['code']}: {score}点 ({reason})")
+                time.sleep(1)
+            except Exception:
+                cand['financial_score'] = 1
+                cand['financial_reason'] = "取得エラー"
 
     # 財務スコアがない銘柄はデフォルト1点
     for cand in candidates:
@@ -1254,7 +1250,7 @@ def auto_screen_and_add():
     near_miss_count = 0  # 惜しかった件数（勝率不足で弾かれた）
     trend_fail_count = 0  # トレンド/押し目条件で弾かれた件数
 
-    candidates = candidates[:80]
+    candidates = candidates[:40]
 
     # ===== 第1段階: 【最高品質】上昇トレンド(75日線上) + 25日線押し目 + 勝率閾値以上 =====
     logging.info(f"--- 第1段階: 上昇トレンド×押し目×勝率{min_winrate_stage1}%以上を探索 ---")
