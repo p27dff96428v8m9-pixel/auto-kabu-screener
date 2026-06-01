@@ -1242,7 +1242,7 @@ function renderGeminiResearchCandidates(source) {
             <span class="candidate-next">次に確認: ${candidate.nextCheck || "関連銘柄とニュースの継続確認"}</span>
             <span class="candidate-risk">注意: ${candidate.risk || "過熱度と材料の変化を確認"}</span>
           </span>
-          <span class="candidate-decision">${candidate.decision || "Gemini確認"} ${candidate.score ?? ""}</span>
+          <span class="candidate-decision">${candidate.decision || "Gemini確認"} ${candidate.score != null ? `Geminiスコア ${candidate.score}` : ""}</span>
         </button>
       `;
     })
