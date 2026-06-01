@@ -383,10 +383,12 @@ const state = {
   mapFullscreen: false,
   dataSource: "sample",
   dataMessage: "",
+  macroSignals: null,
   aiResearch: null,
   aiResearchMessage: "",
   marketStatus: { state: "pending", text: "確認中" },
   geminiStatus: { state: "pending", text: "確認中" },
+  macroStatus: { state: "pending", text: "確認中" },
   previousRanks: {},
   publicRankHistory: null
 };
@@ -1670,6 +1672,9 @@ function loadDailyCache() {
 }
 
 function applyMarketDataPayload(payload) {
+  state.macroSignals = payload?.macro || null;
+  state.macroStatus = macroStatusFromPayload(payload);
+
   if (!payload || !Array.isArray(payload.themes) || !payload.themes.length) {
     state.dataSource = payload?.source || "sample";
     state.dataMessage = payload?.message || "";
@@ -1693,6 +1698,8 @@ function applyMarketDataPayload(payload) {
 
   state.dataSource = payload.source || "api";
   state.dataMessage = payload.message || "";
+  state.macroSignals = payload.macro || null;
+  state.macroStatus = macroStatusFromPayload(payload);
   state.marketStatus = {
     state: "success",
     text: `${marketDataSourceLabel(false)} / ${applied}テーマ / ${formatStatusTime(payload.updatedAt)}`
@@ -1735,9 +1742,29 @@ function formatStatusTime(value) {
   }
 }
 
+function macroStatusFromPayload(payload) {
+  const alpha = payload?.macro?.alpha;
+  if (!alpha || alpha.source === "not_configured") {
+    return { state: "pending", text: "未設定: ALPHA_VANTAGE_API_KEY" };
+  }
+
+  const fxCount = Object.keys(alpha.fx || {}).length;
+  const commodityCount = Object.keys(alpha.commodities || {}).length;
+  const errorCount = Array.isArray(alpha.errors) ? alpha.errors.length : 0;
+  if (fxCount + commodityCount > 0) {
+    return {
+      state: errorCount ? "pending" : "success",
+      text: `取得済み: 為替${fxCount} / 商品${commodityCount}${errorCount ? ` / 一部失敗${errorCount}` : ""}`
+    };
+  }
+
+  return { state: "error", text: errorCount ? `取得失敗: ${errorCount}件` : "マクロデータなし" };
+}
+
 function renderApiStatus() {
   const pairs = [
     ["marketApiStatus", state.marketStatus],
+    ["macroApiStatus", state.macroStatus],
     ["geminiApiStatus", state.geminiStatus]
   ];
 

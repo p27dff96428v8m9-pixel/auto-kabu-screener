@@ -13,6 +13,11 @@ async function main() {
   console.log(JSON.stringify({
     source: data.source,
     themes: data.themes.length,
+    macro: {
+      fx: Object.keys(data.macro?.alpha?.fx || {}).length,
+      commodities: Object.keys(data.macro?.alpha?.commodities || {}).length,
+      errors: data.macro?.alpha?.errors?.length || 0
+    },
     updatedAt: data.updatedAt,
     message: data.message || ""
   }));

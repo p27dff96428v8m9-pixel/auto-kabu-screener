@@ -24,6 +24,10 @@ loadLocalEnv();
 const JQUANTS_V1_BASE_URL = process.env.JQUANTS_V1_BASE_URL || "https://api.jquants.com/v1";
 const JQUANTS_V2_BASE_URL = process.env.JQUANTS_V2_BASE_URL || "https://api.jquants.com/v2";
 const ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query";
+const ALPHA_MACRO_COMMODITIES = (process.env.ALPHA_VANTAGE_COMMODITIES || "WTI,COPPER,GOLD")
+  .split(",")
+  .map((item) => item.trim().toUpperCase())
+  .filter(Boolean);
 
 const THEME_UNIVERSE = [
   { id: "jp-semiconductor", tickers: ["8035", "6857", "7735", "1321"], news: ["semiconductor", "AI", "Tokyo Electron"] },
@@ -62,6 +66,98 @@ async function fetchJson(url, options = {}) {
     throw new Error(`${response.status} ${response.statusText}: ${url}`);
   }
   return response.json();
+}
+
+function newestFirstPoints(points) {
+  return points
+    .filter((point) => point.date && Number.isFinite(point.value))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function pointChanges(points) {
+  const ordered = newestFirstPoints(points);
+  if (ordered.length < 2) return { latest: null, changes: {} };
+  const latest = ordered[0];
+  const valueAt = (days) => ordered[Math.min(days, ordered.length - 1)] || ordered[ordered.length - 1];
+  const change = (days) => {
+    const base = valueAt(days);
+    if (!base?.value) return null;
+    return Number((((latest.value - base.value) / Math.max(0.0001, base.value)) * 100).toFixed(2));
+  };
+
+  return {
+    latest,
+    changes: {
+      "7d": change(7),
+      "30d": change(30),
+      "90d": change(90)
+    }
+  };
+}
+
+function parseAlphaFxDaily(data) {
+  const series = data?.["Time Series FX (Daily)"] || {};
+  return pointChanges(Object.entries(series).map(([date, row]) => ({
+    date,
+    value: Number(row["4. close"] || row.close)
+  })));
+}
+
+function parseAlphaCommodity(data) {
+  return pointChanges((data?.data || []).map((row) => ({
+    date: row.date,
+    value: Number(row.value)
+  })));
+}
+
+async function fetchAlphaVantage(params) {
+  const key = process.env.ALPHA_VANTAGE_API_KEY;
+  if (!key) return null;
+  const query = new URLSearchParams({ ...params, apikey: key });
+  const data = await fetchJson(`${ALPHA_VANTAGE_BASE_URL}?${query.toString()}`);
+  if (data?.Information || data?.Note || data?.["Error Message"]) {
+    throw new Error(data.Information || data.Note || data["Error Message"]);
+  }
+  return data;
+}
+
+async function fetchAlphaMacroSignals() {
+  if (!process.env.ALPHA_VANTAGE_API_KEY) {
+    return { source: "not_configured" };
+  }
+
+  const alpha = {
+    source: "alpha_vantage",
+    fx: {},
+    commodities: {},
+    errors: []
+  };
+
+  try {
+    const usdJpy = await fetchAlphaVantage({
+      function: "FX_DAILY",
+      from_symbol: "USD",
+      to_symbol: "JPY",
+      outputsize: "compact"
+    });
+    alpha.fx.usdjpy = parseAlphaFxDaily(usdJpy);
+  } catch (error) {
+    alpha.errors.push(`USDJPY:${error.message}`);
+  }
+
+  for (const commodity of ALPHA_MACRO_COMMODITIES) {
+    try {
+      const data = await fetchAlphaVantage({
+        function: commodity,
+        interval: "daily"
+      });
+      alpha.commodities[commodity.toLowerCase()] = parseAlphaCommodity(data);
+    } catch (error) {
+      alpha.errors.push(`${commodity}:${error.message}`);
+    }
+  }
+
+  return alpha;
 }
 
 async function getJQuantsToken() {
@@ -177,9 +273,79 @@ function summarizeThemeQuotes(themeQuotes) {
   return metrics;
 }
 
+function macroChange(macro, group, key, period) {
+  const value = macro?.alpha?.[group]?.[key]?.changes?.[period];
+  return Number.isFinite(value) ? value : 0;
+}
+
+function macroAdjustmentForTheme(themeId, macro, period) {
+  const usdJpy = macroChange(macro, "fx", "usdjpy", period);
+  const wti = macroChange(macro, "commodities", "wti", period);
+  const brent = macroChange(macro, "commodities", "brent", period);
+  const copper = macroChange(macro, "commodities", "copper", period);
+  const gas = macroChange(macro, "commodities", "natural_gas", period);
+  const gold = macroChange(macro, "commodities", "gold", period);
+  const oil = (wti + brent) / 2;
+  const adjustments = {
+    fundFlow: 0,
+    momentum: 0,
+    news: 0,
+    ai: 0,
+    crowdedness: 0
+  };
+
+  const add = (key, value) => {
+    adjustments[key] += value;
+  };
+
+  if (["jpy-exporters", "jp-auto"].includes(themeId)) {
+    add("fundFlow", usdJpy * 0.55);
+    add("ai", usdJpy * 0.25);
+    add("crowdedness", Math.max(0, usdJpy) * 0.12);
+  }
+
+  if (["jp-trading-houses", "jp-low-pbr"].includes(themeId)) {
+    add("fundFlow", oil * 0.25 + copper * 0.22 + usdJpy * 0.18);
+    add("news", Math.max(0, oil + copper) * 0.16);
+    add("ai", Math.max(0, oil + copper) * 0.12);
+  }
+
+  if (themeId === "jp-gold") {
+    add("fundFlow", gold * 0.65 + usdJpy * 0.14);
+    add("momentum", gold * 0.35);
+    add("crowdedness", Math.max(0, gold) * 0.2);
+  }
+
+  if (themeId === "jp-electric-power") {
+    add("fundFlow", gas * 0.16 - oil * 0.08);
+    add("news", Math.max(0, gas) * 0.1);
+  }
+
+  if (["jp-reits", "jp-small-growth"].includes(themeId)) {
+    add("fundFlow", -Math.max(0, usdJpy) * 0.18 - Math.max(0, oil) * 0.08);
+    add("crowdedness", -Math.max(0, usdJpy) * 0.05);
+  }
+
+  if (["jp-inbound", "jp-retail"].includes(themeId)) {
+    add("fundFlow", -Math.max(0, oil) * 0.12);
+    add("news", -Math.max(0, oil) * 0.08);
+  }
+
+  return adjustments;
+}
+
+function applyMacroAdjustments(metrics, themeId, macro) {
+  Object.entries(metrics).forEach(([period, metric]) => {
+    const adjustment = macroAdjustmentForTheme(themeId, macro, period);
+    Object.entries(adjustment).forEach(([key, value]) => {
+      metric[key] = clamp((metric[key] || 0) + value);
+    });
+  });
+}
+
 async function fetchNewsScores() {
   const key = process.env.ALPHA_VANTAGE_API_KEY;
-  if (!key) return {};
+  if (!key || process.env.ALPHA_VANTAGE_ENABLE_NEWS !== "1") return {};
 
   const scores = {};
   await Promise.all(THEME_UNIVERSE.map(async (theme) => {
@@ -200,6 +366,7 @@ async function fetchMacroSignals() {
   const macro = {};
   const fxUrl = process.env.FX_API_URL;
   const ratesUrl = process.env.RATES_API_URL || process.env.BOJ_STAT_API_URL;
+  macro.alpha = await fetchAlphaMacroSignals();
 
   if (fxUrl) {
     try {
@@ -262,6 +429,7 @@ async function buildMarketData() {
     Object.values(metrics).forEach((metric) => {
       metric.news = newsScores[theme.id] || metric.news;
     });
+    applyMacroAdjustments(metrics, theme.id, macro);
     themes.push({ id: theme.id, metrics });
   }
 
