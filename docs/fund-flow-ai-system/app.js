@@ -1626,8 +1626,8 @@ function renderInstrumentMarketBlock(instrument, quote) {
     <div class="instrument-market">
       <div class="instrument-stage ${stage.tone}">
         <span>段階</span>
-        <strong>${stage.label}</strong>
-        <small class="trend-badge">${stage.badge}</small>
+        <strong class="stage-label">${stage.label}</strong>
+        <div class="trend-badge">${stage.badge}</div>
         <small>${stage.detail}</small>
       </div>
       <div class="trend-card">
