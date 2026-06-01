@@ -339,12 +339,12 @@ function summarizeThemeQuotes(themeQuotes) {
   return metrics;
 }
 
-function percentChangeFromRows(rows, days) {
+function percentChangeFromRows(rows, days, key = "close") {
   if (rows.length < 2) return null;
   const latest = rows[rows.length - 1];
   const start = rows[Math.max(0, rows.length - days)] || rows[0];
-  if (!start?.close) return null;
-  return Number((((latest.close - start.close) / Math.max(1, start.close)) * 100).toFixed(2));
+  if (!start?.[key]) return null;
+  return Number((((latest[key] - start[key]) / Math.max(1, start[key])) * 100).toFixed(2));
 }
 
 function summarizeInstrumentQuote(ticker, rows) {
@@ -363,13 +363,17 @@ function summarizeInstrumentQuote(ticker, rows) {
       volume: Number.isFinite(latest.volume) ? latest.volume : null
     },
     changes: {
-      "7d": percentChangeFromRows(ordered, 7),
-      "30d": percentChangeFromRows(ordered, 30),
-      "90d": percentChangeFromRows(ordered, 90)
+      "7d": percentChangeFromRows(ordered, 7, "close"),
+      "30d": percentChangeFromRows(ordered, 30, "close"),
+      "90d": percentChangeFromRows(ordered, 90, "close"),
+      volume7d: percentChangeFromRows(ordered, 7, "volume"),
+      volume30d: percentChangeFromRows(ordered, 30, "volume"),
+      volume90d: percentChangeFromRows(ordered, 90, "volume")
     },
     history: ordered.slice(-60).map((row) => ({
       date: row.date,
-      close: row.close
+      close: row.close,
+      volume: row.volume
     }))
   };
 }

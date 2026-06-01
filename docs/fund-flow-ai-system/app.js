@@ -751,9 +751,7 @@ function relatedInstruments(theme) {
     }
   });
   return [...byTicker.values()]
-    .filter((instrument) => !instrument.warning)
-    .filter((instrument) => (instrument.newsRisk || "悪材料未検出") === "悪材料未検出")
-    .filter((instrument) => instrument.strength >= 60 && instrument.strength <= 78)
+    .filter((instrument) => instrument.strength >= 55)
     .sort((a, b) => instrumentScore(b) - instrumentScore(a))
     .slice(0, 7);
 }
@@ -1552,7 +1550,6 @@ function renderDetail() {
   document.querySelector("#instrumentList").innerHTML = treasureInstruments.length
     ? treasureInstruments.map((instrument, index) => {
       const instrumentLocked = locked || (!state.isPro && index > 0);
-      const quote = instrumentLocked ? null : stockQuoteFor(instrument.ticker);
       return `
       <div class="instrument">
         <span class="ticker">${instrumentLocked ? "LOCK" : instrument.ticker}</span>
@@ -1560,7 +1557,7 @@ function renderDetail() {
           ${instrumentLocked ? "Pro限定の関連銘柄" : instrument.name}
           <small>${instrumentLocked ? "銘柄名・お宝度・悪材料確認はProで表示されます" : `${instrument.type} / お宝度 ${instrumentScore(instrument)} / ${instrument.quality || "業績良好候補"} / ${instrument.newsRisk || "悪材料未検出"}`}</small>
         </span>
-        ${instrumentLocked ? "" : renderInstrumentMarketBlock(instrument, quote)}
+        ${instrumentLocked ? "" : renderInstrumentMarketBlock(instrument, stockQuoteFor(instrument.ticker))}
       </div>
     `;
     })
@@ -1585,115 +1582,54 @@ function stockQuoteFor(ticker) {
   return state.instrumentQuotes?.[String(ticker)] || null;
 }
 
-function formatStockDate(value) {
-  if (!value) return "-";
-  const text = String(value);
-  if (/^\d{8}$/.test(text)) {
-    return `${text.slice(0, 4)}/${text.slice(4, 6)}/${text.slice(6, 8)}`;
-  }
-  return text.replace(/-/g, "/");
-}
-
-function formatYen(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return "-";
-  return `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits: number >= 1000 ? 0 : 1 }).format(number)}円`;
-}
-
 function formatChange(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "-";
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}%`;
 }
 
-function stockChartUrl(ticker) {
-  return `https://finance.yahoo.co.jp/quote/${encodeURIComponent(ticker)}.T/chart`;
-}
-
-function renderMiniStockChart(quote) {
-  const history = Array.isArray(quote?.history) ? quote.history.filter((point) => Number.isFinite(Number(point.close))).slice(-24) : [];
-  if (history.length < 2) {
-    return '<div class="stock-mini-chart empty">更新待ち</div>';
-  }
-  const values = history.map((point) => Number(point.close));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(1, max - min);
-  return `
-    <div class="stock-mini-chart" aria-label="簡易チャート">
-      ${values.map((value) => {
-        const height = 18 + ((value - min) / range) * 34;
-        return `<i style="--h:${height.toFixed(1)}px"></i>`;
-      }).join("")}
-    </div>
-  `;
-}
-
 function renderInstrumentMarketBlock(instrument, quote) {
-  const latest = quote?.latest;
-  const change7 = quote?.changes?.["7d"];
-  const change30 = quote?.changes?.["30d"];
+  const p90 = quote?.changes?.["90d"];
+  const p30 = quote?.changes?.["30d"];
+  const p7 = quote?.changes?.["7d"];
+  const v30 = quote?.changes?.volume30d;
+  const v7 = quote?.changes?.volume7d;
+  const stage = (() => {
+    const priceReady = [p90, p30, p7].every((value) => Number.isFinite(Number(value)));
+    const volumeImproving = Number.isFinite(Number(v30)) && Number.isFinite(Number(v7)) && Number(v7) > Number(v30);
+    if (!priceReady) return { label: "更新待ち", tone: "neutral", detail: "履歴不足" };
+    if (p90 > 0 && p30 > p90 && p7 > p30) return { label: "加速", tone: "good", detail: volumeImproving ? "価格と出来高が加速" : "短中期で加速" };
+    if (p90 > 0 && p30 > 0 && p7 > 0) return { label: "継続", tone: "good", detail: "上昇基調を維持" };
+    if (p90 > 0 && p30 > 0 && p7 <= 0) return { label: "失速", tone: "warn", detail: "短期で鈍化" };
+    if (p90 <= 0 && p30 > 0) return { label: "発芽", tone: "warn", detail: "中期で立ち上がり" };
+    return { label: "様子見", tone: "neutral", detail: "まだ不安定" };
+  })();
   return `
     <div class="instrument-market">
-      <div class="instrument-price">
-        <span>現在値</span>
-        <strong>${latest ? formatYen(latest.close) : "更新待ち"}</strong>
-        <small>${latest ? formatStockDate(latest.date) : "次回の市場データ更新で取得"}</small>
+      <div class="instrument-stage ${stage.tone}">
+        <span>段階</span>
+        <strong>${stage.label}</strong>
+        <small>${stage.detail}</small>
       </div>
-      <div class="instrument-change ${Number(change7) >= 0 ? "positive" : "negative"}">
-        <span>7日</span>
-        <strong>${formatChange(change7)}</strong>
+      <div class="trend-card">
+        <span>90日</span>
+        <strong>${formatChange(p90)}</strong>
       </div>
-      <div class="instrument-change ${Number(change30) >= 0 ? "positive" : "negative"}">
+      <div class="trend-card">
         <span>30日</span>
-        <strong>${formatChange(change30)}</strong>
+        <strong>${formatChange(p30)}</strong>
       </div>
-      ${renderMiniStockChart(quote)}
-      <div class="instrument-actions">
-        <button class="text-button compact" type="button" data-chart-ticker="${instrument.ticker}" data-chart-name="${instrument.name}">チャート確認</button>
-        <a class="text-button compact secondary-link" href="${stockChartUrl(instrument.ticker)}" target="_blank" rel="noopener">外部で開く</a>
+      <div class="trend-card">
+        <span>7日</span>
+        <strong>${formatChange(p7)}</strong>
+      </div>
+      <div class="trend-card trend-wide">
+        <span>出来高</span>
+        <strong>${formatChange(v30)}</strong>
+        <small>30日平均との差</small>
       </div>
     </div>
   `;
-}
-
-function renderStockChartPanel(ticker, name) {
-  const panel = document.querySelector("#stockChartPanel");
-  const title = document.querySelector("#stockChartTitle");
-  const body = document.querySelector("#stockChartBody");
-  if (!panel || !title || !body) return;
-
-  const quote = stockQuoteFor(ticker);
-  const history = Array.isArray(quote?.history) ? quote.history.filter((point) => Number.isFinite(Number(point.close))).slice(-60) : [];
-  title.textContent = `${ticker} ${name || ""}`.trim();
-  body.innerHTML = `
-    <div class="stock-chart-summary">
-      <div><span>現在値</span><strong>${quote?.latest ? formatYen(quote.latest.close) : "更新待ち"}</strong><small>${quote?.latest ? formatStockDate(quote.latest.date) : "市場データ未取得"}</small></div>
-      <div><span>7日</span><strong>${formatChange(quote?.changes?.["7d"])}</strong></div>
-      <div><span>30日</span><strong>${formatChange(quote?.changes?.["30d"])}</strong></div>
-      <div><span>90日</span><strong>${formatChange(quote?.changes?.["90d"])}</strong></div>
-    </div>
-    <div class="stock-chart-large">
-      ${renderLargeStockChart(history)}
-    </div>
-    <a class="text-button compact" href="${stockChartUrl(ticker)}" target="_blank" rel="noopener">Yahooファイナンスで詳しく確認</a>
-  `;
-  panel.classList.remove("hidden");
-  panel.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-function renderLargeStockChart(history) {
-  if (history.length < 2) {
-    return '<p class="empty">チャート用データは次回以降の市場データ更新で表示されます。</p>';
-  }
-  const values = history.map((point) => Number(point.close));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(1, max - min);
-  return history.map((point) => {
-    const height = 22 + ((Number(point.close) - min) / range) * 118;
-    return `<span title="${formatStockDate(point.date)} ${formatYen(point.close)}" style="--h:${height.toFixed(1)}px"></span>`;
-  }).join("");
 }
 
 function buildAiSummary(theme, score) {
@@ -1720,18 +1656,6 @@ function buildAiSummary(theme, score) {
 
 function bindEvents() {
   document.addEventListener("click", (event) => {
-    const chartButton = event.target.closest("[data-chart-ticker]");
-    if (chartButton) {
-      renderStockChartPanel(chartButton.dataset.chartTicker, chartButton.dataset.chartName);
-      return;
-    }
-
-    const closeChartButton = event.target.closest("[data-close-stock-chart]");
-    if (closeChartButton) {
-      document.querySelector("#stockChartPanel")?.classList.add("hidden");
-      return;
-    }
-
     const target = event.target.closest("[data-upgrade]");
     if (!target) return;
     event.preventDefault();
