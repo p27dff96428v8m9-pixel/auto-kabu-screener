@@ -860,9 +860,9 @@ input[type="search"] {
 
 .candidate-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
-  align-items: center;
+  align-items: start;
   width: 100%;
   cursor: pointer;
   text-align: left;
@@ -903,6 +903,7 @@ input[type="search"] {
   color: #233449;
   font-size: 13px;
   line-height: 1.55;
+  word-break: normal;
 }
 
 .gemini-summary strong {
@@ -948,6 +949,7 @@ input[type="search"] {
 }
 
 .candidate-decision {
+  justify-self: start;
   min-width: 112px;
   padding: 5px 8px;
   border-radius: 999px;
@@ -1477,7 +1479,7 @@ input[type="search"] {
 
 .data-points {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(88px, max-content) minmax(0, 1fr);
   gap: 7px 12px;
   margin: 0;
   font-size: 14px;
@@ -1485,11 +1487,14 @@ input[type="search"] {
 
 .data-points dt {
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .data-points dd {
   margin: 0;
   font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .action-stage {
