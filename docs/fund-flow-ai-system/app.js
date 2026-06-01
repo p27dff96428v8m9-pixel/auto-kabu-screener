@@ -744,8 +744,8 @@ function relatedInstruments(theme) {
     const current = byTicker.get(instrument.ticker);
     if (!current || instrumentScore(instrument) > instrumentScore(current)) {
       byTicker.set(instrument.ticker, {
-        quality: instrument.warning ? "????" : "??????",
-        newsRisk: instrument.warning ? "???????" : "??????",
+        quality: instrument.warning ? "注意あり" : "業績良好候補",
+        newsRisk: instrument.warning ? "悪材料確認あり" : "悪材料未検出",
         ...instrument
       });
     }
@@ -1616,25 +1616,25 @@ function instrumentFinalSignal(instrument, quote) {
   const ready = [p90, p30, p7, v30, v7].every(Number.isFinite);
 
   if (!ready) {
-    return { label: "????", tone: "neutral", kind: "neutral" };
+    return { label: "更新待ち", tone: "neutral", kind: "neutral" };
   }
 
   const aligned = p90 > 0 && p30 > p90 && p7 > p30 && v7 > v30 && instrumentScore(instrument) >= 70;
   if (aligned) {
-    return { label: "??", tone: "buy", kind: "buy" };
+    return { label: "買い", tone: "buy", kind: "buy" };
   }
 
   const riding = p90 > 0 && p30 > 0 && p7 > 0;
   if (riding) {
-    return { label: "??", tone: "watch", kind: "watch" };
+    return { label: "監視", tone: "watch", kind: "watch" };
   }
 
   const early = p90 <= 0 && p30 > 0;
   if (early) {
-    return { label: "???", tone: "watch", kind: "early" };
+    return { label: "出遅れ", tone: "watch", kind: "early" };
   }
 
-  return { label: "???", tone: "neutral", kind: "neutral" };
+  return { label: "様子見", tone: "neutral", kind: "neutral" };
 }
 
 function renderInstrumentMarketBlock(instrument, quote) {
