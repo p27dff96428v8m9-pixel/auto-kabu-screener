@@ -1591,7 +1591,7 @@ function instrumentFinalSignal(instrument, quote) {
   const ready = [p90, p30, p7, v30, v7].every(Number.isFinite);
 
   if (!ready) {
-    return { label: "更新待ち", tone: "neutral", kind: "neutral" };
+    return { label: "履歴不足", tone: "neutral", kind: "neutral" };
   }
 
   const aligned = p90 > 0 && p30 > p90 && p7 > p30 && v7 > v30 && instrumentScore(instrument) >= 70;
@@ -1621,7 +1621,7 @@ function renderInstrumentMarketBlock(instrument, quote) {
   const stage = (() => {
     const priceReady = [p90, p30, p7].every((value) => Number.isFinite(Number(value)));
     const volumeImproving = Number.isFinite(Number(v30)) && Number.isFinite(Number(v7)) && Number(v7) > Number(v30);
-    if (!priceReady) return { state: "更新待ち", label: "更新待ち", badge: "履歴不足", tone: "neutral", detail: "株価データがまだ足りません" };
+    if (!priceReady) return { state: "履歴不足", label: "履歴不足", badge: "履歴不足", tone: "neutral", detail: "株価データがまだ足りません" };
     if (p90 > 0 && p30 > p90 && p7 > p30) {
       return {
         state: "判定あり",
