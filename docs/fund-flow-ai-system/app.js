@@ -1558,31 +1558,6 @@ function renderDetail() {
   document.querySelector("#aiSummary").innerHTML = locked
     ? `<div class="locked-detail">${proLockMarkup("資金フロー詳細を解除")}<p>このテーマは流入または流出の候補ルートが複数あるため、無料プレビューでは詳細を伏せています。</p><button class="text-button compact" data-upgrade type="button">Proで見る</button></div>`
     : buildAiSummary(theme, score);
-  const treasureInstruments = relatedInstruments(theme);
-  document.querySelector("#instrumentList").innerHTML = treasureInstruments.length
-    ? treasureInstruments.map((instrument, index) => {
-      const instrumentLocked = locked || (!state.isPro && index > 0);
-      const signal = instrumentFinalSignal(instrument, stockQuoteFor(instrument.ticker));
-      return `
-      <div class="instrument">
-        <span class="ticker">${instrumentLocked ? "LOCK" : instrument.ticker}</span>
-        <span>
-          ${instrumentLocked ? "" : `
-            <span class="instrument-meta">
-              <span class="order-pill">確認順 ${index + 1}</span>
-              <span class="final-pill ${signal.tone}">${signal.label}</span>
-            </span>
-          `}
-          ${instrumentLocked ? "Pro限定の関連銘柄" : instrument.name}
-          <small>${instrumentLocked ? "銘柄名・お宝度・悪材料確認はProで表示されます" : `${instrument.type} / お宝度 ${instrumentScore(instrument)} / ${instrument.quality || "業績良好候補"} / ${instrument.newsRisk || "悪材料未検出"}`}</small>
-        </span>
-        ${instrumentLocked ? "" : renderInstrumentMarketBlock(instrument, stockQuoteFor(instrument.ticker))}
-      </div>
-    `;
-    })
-      .join("")
-    : '<p class="empty">上がりすぎ・悪材料・値動き注意を除外すると、今すぐ表示できるお宝候補はありません。</p>';
-
   document.querySelector("#dataPoints").innerHTML = `
     <dt>判断</dt><dd><span class="action-stage ${locked ? "observe" : actionStage.className}">${locked ? "Pro限定" : actionStage.label}</span></dd>
     <dt>理由</dt><dd>${locked ? "重要な資金フロー候補のため無料プレビューでは伏せています。" : actionStage.reason}</dd>
