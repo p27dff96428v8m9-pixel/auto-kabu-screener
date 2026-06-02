@@ -30,6 +30,21 @@ const ALPHA_MACRO_COMMODITIES = (process.env.ALPHA_VANTAGE_COMMODITIES || "WTI,C
   .filter(Boolean);
 const ALPHA_COMMODITY_BATCH_COUNT = Math.max(1, Number(process.env.ALPHA_VANTAGE_COMMODITY_BATCH_COUNT || 2) || 2);
 const ALPHA_REQUEST_DELAY_MS = Math.max(0, Number(process.env.ALPHA_VANTAGE_REQUEST_DELAY_MS || 1200) || 1200);
+const JQUANTS_PLAN_LIMITS = {
+  free: { requestsPerRun: 5, instrumentQuoteRequests: 6, historyDays: 730 },
+  light: { requestsPerRun: 18, instrumentQuoteRequests: 36, historyDays: 1825 },
+  standard: { requestsPerRun: 18, instrumentQuoteRequests: 72, historyDays: 3650 },
+  premium: { requestsPerRun: 18, instrumentQuoteRequests: 120, historyDays: 7300 }
+};
+
+function jquantsPlan() {
+  const plan = String(process.env.JQUANTS_PLAN || "light").trim().toLowerCase();
+  return JQUANTS_PLAN_LIMITS[plan] ? plan : "light";
+}
+
+function jquantsPlanConfig() {
+  return JQUANTS_PLAN_LIMITS[jquantsPlan()];
+}
 
 const THEME_UNIVERSE = [
   { id: "jp-semiconductor", tickers: ["8035", "6857", "7735", "1321"], news: ["semiconductor", "AI", "Tokyo Electron"] },
@@ -70,6 +85,10 @@ function dateDaysAgo(days) {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() - days);
   return date.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+function jquantsHistoryDays() {
+  return Math.max(30, Number(process.env.JQUANTS_HISTORY_DAYS || jquantsPlanConfig().historyDays) || jquantsPlanConfig().historyDays);
 }
 
 async function fetchJson(url, options = {}) {
@@ -278,7 +297,7 @@ function normalizeJQuantsCode(code) {
 }
 
 async function fetchDailyQuotes(code, auth) {
-  const from = dateDaysAgo(520);
+  const from = dateDaysAgo(jquantsHistoryDays());
   const to = dateDaysAgo(0);
 
   if (auth.mode === "v2") {
@@ -514,7 +533,8 @@ async function buildMarketData() {
   const newsScores = await fetchNewsScores();
   const themes = [];
   const errors = [];
-  const requestLimit = Number(process.env.JQUANTS_MAX_REQUESTS_PER_RUN || (auth.mode === "v2" ? 5 : 80));
+  const planConfig = jquantsPlanConfig();
+  const requestLimit = Number(process.env.JQUANTS_MAX_REQUESTS_PER_RUN || (auth.mode === "v2" ? planConfig.requestsPerRun : 80));
   let requestCount = 0;
 
   for (const theme of THEME_UNIVERSE) {
@@ -547,7 +567,7 @@ async function buildMarketData() {
     ...THEME_UNIVERSE.flatMap((theme) => theme.tickers),
     ...TREASURE_TICKERS
   ]));
-  const quoteRequestLimit = Number(process.env.JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN || (auth.mode === "v2" ? 6 : 20));
+  const quoteRequestLimit = Number(process.env.JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN || (auth.mode === "v2" ? planConfig.instrumentQuoteRequests : 20));
   const runNumber = Number(process.env.GITHUB_RUN_NUMBER);
   const batchSeed = Number.isFinite(runNumber) ? runNumber - 1 : Math.floor(Date.now() / (20 * 60 * 1000));
   const batchStart = ((Math.trunc(batchSeed) * quoteRequestLimit) % allInstrumentTickers.length + allInstrumentTickers.length) % allInstrumentTickers.length;
@@ -567,6 +587,8 @@ async function buildMarketData() {
 
   return {
     source: auth.mode === "v2" ? "jquants-v2" : "jquants-v1",
+    jquantsPlan: auth.mode === "v2" ? jquantsPlan() : "v1",
+    jquantsHistoryDays: jquantsHistoryDays(),
     updatedAt: new Date().toISOString(),
     message: themes.length ? "" : errors.slice(0, 3).join(" / "),
     macro,

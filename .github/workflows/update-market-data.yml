@@ -21,7 +21,10 @@ jobs:
       - name: Fetch J-Quants data
         env:
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
-          JQUANTS_MAX_REQUESTS_PER_RUN: "5"
+          JQUANTS_PLAN: light
+          JQUANTS_HISTORY_DAYS: "1825"
+          JQUANTS_MAX_REQUESTS_PER_RUN: "18"
+          JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN: "36"
           MARKET_DATA_OUTPUT_PATH: docs/fund-flow-ai-system/data/market-data.json
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
           FX_API_URL: ${{ secrets.FX_API_URL }}
