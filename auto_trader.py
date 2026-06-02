@@ -80,7 +80,7 @@ def generate_ai_article(ticker_name, code, current_price, buy_price, tp_price, s
 【銘柄データ】
 銘柄名: {ticker_name}
 証券コード: {code}
-現在の株価: {int(current_price)}円（100株で約{unit_price:,}円）
+現在の株価: {int(current_price)}円
 AI算出 買い目標: {int(buy_price)}円
 AI算出 利確目標: {int(tp_price)}円
 AI算出 損切りライン: {int(sl_price)}円
@@ -133,7 +133,7 @@ def generate_fallback_article(ticker_name, code, current_price, buy_price, tp_pr
 
 🔍 銘柄選定理由
 本日のAIスクリーニングにより、{ticker_name}（証券コード: {code}）が有望銘柄として選出されました。
-現在の株価は{int(current_price)}円で、100株で約{unit_price:,}円です。
+現在の株価は{int(current_price)}円です。
 テクニカル指標が買いシグナルを示しており、過去データの検証でも高い勝率を記録しています。
 
 📊 AIテクニカル分析の結果
@@ -147,9 +147,7 @@ def generate_fallback_article(ticker_name, code, current_price, buy_price, tp_pr
 💡 投資のポイント
 リスクリワード比が{rr_ratio:.1f}:1と{'良好' if rr_ratio >= 1.5 else '妥当'}な水準です。
 損切りラインを{int(sl_price)}円に設定し、リスク管理を徹底しましょう。
-少額から始められるので、投資初心者の方にもおすすめの銘柄です。
-
-👇ここから先は有料エリアとなります
+投資判断はご自身の基準で行ってください。
 
 📈 エントリー戦略の詳細
 買い目標の{int(buy_price)}円付近まで下落した場合にエントリーを検討します。
@@ -215,7 +213,7 @@ def post_to_twitter(base_text, link_url=None):
                 "AI分析勝率: ○○%\n\n"
                 "詳しくはブログで👇\n"
                 "(リンク)\n\n"
-                "#日本株 #少額投資 #AI分析\n\n"
+                "#日本株 #AI分析\n\n"
                 f"【元の情報】\n{base_text}"
             )
             response = client.models.generate_content(
@@ -270,15 +268,7 @@ def post_to_wordpress(title, hp_content):
         logging.warning(f"  WP_APP_PASSWORD: {'設定あり' if WP_APP_PASSWORD else '未設定'}")
         return None
     
-    # 記事の有料エリアをcodocショートコードで囲む
-    split_keyword = "👇ここから先は有料エリアとなります"
-    if split_keyword in hp_content:
-        parts = hp_content.split(split_keyword, 1)
-        public_text = parts[0].strip()
-        premium_text = split_keyword + "\n" + parts[1].strip()
-        content_html = public_text.replace("\n", "<br>") + "\n\n[codoc]\n" + premium_text.replace("\n", "<br>") + "\n[/codoc]"
-    else:
-        content_html = hp_content.replace("\n", "<br>")
+    content_html = hp_content.replace("\n", "<br>")
     
     # === 方法1: REST API (推奨) ===
     rest_url = f"{WP_URL}/wp-json/wp/v2/posts"
@@ -348,7 +338,6 @@ def post_to_github_pages(ticker_name, code, current_price, buy_price, tp_price, 
     # 新しい記事データ
     new_post = {
         "date": today,
-        "date_key": today_key,
         "title": f"{ticker_name}（{code}）",
         "code": code,
         "name": ticker_name,
@@ -378,7 +367,7 @@ def post_to_github_pages(ticker_name, code, current_price, buy_price, tp_price, 
             posts = []
         
         # 2. 同じ日付のポストがある場合は置き換え、なければ先頭に追加
-        posts = [p for p in posts if p.get('date_key') != today_key]
+        posts = [p for p in posts if str(p.get('code')) != str(code)]
         posts.insert(0, new_post)
         
         # 最大30件に制限
@@ -1064,9 +1053,9 @@ def auto_screen_and_add():
         x_base_text = (
             f"{x_title}"
             f"{ticker_name}（{s_code}）\n"
-            f"現在値: {int(current_price)}円（100株で{int(current_price*100):,}円）\n"
+            f"現在値: {int(current_price)}円\n"
             f"AI分析勝率: {best_win_rate:.0f}%\n\n"
-            f"詳しくはブログで👇\n(リンク)\n\n#日本株 #少額投資 #AI分析"
+            f"詳しくはブログで👇\n(リンク)\n\n#日本株 #AI分析"
         )
         x_text = post_to_twitter(x_base_text, link_url=homepage_url)
         
