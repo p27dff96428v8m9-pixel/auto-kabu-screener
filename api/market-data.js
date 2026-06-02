@@ -565,17 +565,9 @@ async function buildMarketData() {
 
   const themeInstrumentTickers = Array.from(new Set(THEME_UNIVERSE.flatMap((theme) => theme.tickers)));
   const treasureTickers = Array.from(new Set(TREASURE_TICKERS));
-  const quoteRequestLimit = Number(process.env.JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN || (auth.mode === "v2" ? planConfig.instrumentQuoteRequests : 20));
-  const rotatedRequestLimit = Math.max(0, quoteRequestLimit - treasureTickers.length);
-  const runNumber = Number(process.env.GITHUB_RUN_NUMBER);
-  const batchSeed = Number.isFinite(runNumber) ? runNumber - 1 : Math.floor(Date.now() / (20 * 60 * 1000));
-  const batchStart = themeInstrumentTickers.length
-    ? ((Math.trunc(batchSeed) * Math.max(1, rotatedRequestLimit)) % themeInstrumentTickers.length + themeInstrumentTickers.length) % themeInstrumentTickers.length
-    : 0;
-  const rotatedTickers = Array.from({ length: Math.min(rotatedRequestLimit, themeInstrumentTickers.length) }, (_, index) => {
-    return themeInstrumentTickers[(batchStart + index) % themeInstrumentTickers.length];
-  });
-  const quoteBatch = Array.from(new Set([...treasureTickers, ...rotatedTickers]));
+  const allInstrumentTickers = Array.from(new Set([...themeInstrumentTickers, ...treasureTickers]));
+  const quoteRequestLimit = allInstrumentTickers.length;
+  const quoteBatch = allInstrumentTickers;
 
   for (const ticker of quoteBatch) {
     try {
@@ -599,7 +591,7 @@ async function buildMarketData() {
       count: quoteRequestLimit,
       tickers: quoteBatch,
       treasureTickers,
-      rotatedTickers
+      rotatedTickers: themeInstrumentTickers.filter((ticker) => !treasureTickers.includes(ticker))
     },
     themes
   };
