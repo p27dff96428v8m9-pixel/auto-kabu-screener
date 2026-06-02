@@ -1831,7 +1831,7 @@ function loadRankHistory() {
 async function loadPublicRankHistory({ force = false } = {}) {
   if (typeof window === "undefined" || window.location.protocol === "file:") return false;
   try {
-    const cacheBust = force ? `?t=${Date.now()}` : "";
+    const cacheBust = `?t=${Date.now()}`;
     const response = await fetch(`data/ranking-history.json${cacheBust}`, { cache: "no-store" });
     if (!response.ok) return false;
     state.publicRankHistory = await response.json();
@@ -2021,7 +2021,7 @@ function marketDataSourceLabel(refreshed = false) {
 }
 
 async function fetchMarketDataPayload(force) {
-  const cacheBust = force ? `?t=${Date.now()}` : "";
+  const cacheBust = `?t=${Date.now()}`;
   const suffix = force ? "?refresh=1" : "";
   const isGitHubPages = window.location.hostname.endsWith("github.io");
   const endpoints = isGitHubPages
@@ -2046,7 +2046,7 @@ async function fetchMarketDataPayload(force) {
 }
 
 async function fetchAiResearchPayload(force) {
-  const cacheBust = force ? `?t=${Date.now()}` : "";
+  const cacheBust = `?t=${Date.now()}`;
   const endpoints = [`data/ai-research.json${cacheBust}`];
   let lastError = null;
 
