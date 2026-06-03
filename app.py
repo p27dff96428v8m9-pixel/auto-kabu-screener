@@ -1125,9 +1125,6 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                             f"※本レポートはAIによる過去統計の解析結果であり、実際の投資判断は自己責任にてお願いいたします。"
                         )
 
-                        # SNS用
-                        x_text = f"【AI厳選】{ticker_name}({s_code}) 現在値:{int(current_price)}円 目安:{int(best_params['Buy'])}円 勝率:{best_win_rate:.0f}% 詳細はHPへ"
-
                         # WordPress投稿（ホームページ追加）
                         import xmlrpc.client
                         try:
@@ -1157,11 +1154,10 @@ if st.button("🚀 リアルタイム監視 ＆ スクリーニングを実行")
                             "buy": int(best_params['Buy']),
                             "tp": int(best_params['TakeProfit']),
                             "sl": int(best_params['StopLoss']),
-                            "x_post_text": x_text,
                             "hp_text": hp_draft,
-                            "sns_done": True, # 手動追加でも一旦完了扱い
-                            "sheet_sns": "SNS配信済",
-                            "sheet_x": "X配信テキスト",
+                            "sns_done": False,
+                            "sheet_sns": "",
+                            "sheet_x": "",
                             "sheet_hp": "ホームページへの自動記載"
                         }
                         res = requests.post(live_webhook_url, json=payload)

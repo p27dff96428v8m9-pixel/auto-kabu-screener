@@ -183,78 +183,18 @@ def send_line(message):
         logging.error(f"LINE通知エラー: {e}")
 
 
-def post_to_twitter(base_text, link_url=None):
-    """Geminiで文章を推敲し、Xに自動投稿する関数"""
-    if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET]):
-        logging.warning("Twitterの環境変数が不足しています。スキップします。")
-        logging.warning(f"  API_KEY: {'設定あり' if TWITTER_API_KEY else '未設定'}")
-        logging.warning(f"  API_SECRET: {'設定あり' if TWITTER_API_SECRET else '未設定'}")
-        logging.warning(f"  ACCESS_TOKEN: {'設定あり' if TWITTER_ACCESS_TOKEN else '未設定'}")
-        logging.warning(f"  ACCESS_SECRET: {'設定あり' if TWITTER_ACCESS_SECRET else '未設定'}")
-        return base_text
-        
+def build_share_text(base_text, link_url=None):
+    """共有用の本文だけ返す。"""
     final_text = base_text
-    
-    # 1. Geminiによるツイート文の生成
-    if genai and GEMINI_API_KEY:
-        try:
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            title_text = "📈AI厳選！本日の注目銘柄✨"
-            prompt = (
-                "以下の株式情報をもとに、X（Twitter）用の投稿文を作成してください。\n"
-                "必ず以下のルールを守ること：\n"
-                "1. 全角140文字以内に収める\n"
-                "2. 絵文字を2〜3個使う\n"
-                "3. 必ず以下の形式を守る\n\n"
-                "【形式】\n"
-                f"{title_text}\n\n"
-                "銘柄名（コード）\n"
-                "現在値: ○○○円\n"
-                "AI分析勝率: ○○%\n\n"
-                "詳しくはブログで👇\n"
-                "(リンク)\n\n"
-                "#日本株 #AI分析\n\n"
-                f"【元の情報】\n{base_text}"
-            )
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            if response.text:
-                final_text = response.text.strip()
-                logging.info("Geminiによるツイート文の推敲が成功しました。")
-        except Exception as e:
-            logging.error(f"Gemini APIでのテキスト生成に失敗: {e}")
-            
-    # 2. リンクの埋め込み
     if link_url:
         if "(リンク)" in final_text:
             final_text = final_text.replace("(リンク)", link_url)
         elif "(ホームページのリンクはこちら)" in final_text:
             final_text = final_text.replace("(ホームページのリンクはこちら)", link_url)
         else:
-            # リンクがテキストにない場合、末尾に追加
             final_text = final_text.rstrip() + f"\n{link_url}"
     else:
         final_text = final_text.replace("(リンク)", "").replace("(ホームページのリンクはこちら)", "").strip()
-
-    # 3. X (Twitter) への送信処理
-    try:
-        t_client = tweepy.Client(
-            consumer_key=TWITTER_API_KEY,
-            consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN,
-            access_token_secret=TWITTER_ACCESS_SECRET
-        )
-        t_client.create_tweet(text=final_text)
-        logging.info(f"Twitterへの自動投稿に成功しました！ 文字数: {len(final_text)}")
-    except Exception as e:
-        logging.error(f"Twitterへの自動投稿に失敗: {e}")
-        # エラー内容を詳しくログ出力
-        if hasattr(e, 'response') and e.response is not None:
-            logging.error(f"  Status: {e.response.status_code}")
-            logging.error(f"  Body: {e.response.text}")
-        
     return final_text
 
 
@@ -1015,7 +955,7 @@ def auto_screen_and_add():
             return hist[ticker].copy()
         return hist
     
-    # 銘柄を処理してスプレッドシート・HP・Twitterに追加するヘルパー関数
+    # 銘柄を処理してスプレッドシート・HPに追加するヘルパー関数
     def process_and_add_stock(cand, best_params, best_win_rate, existing_codes_list):
         """候補銘柄を全チャネルに投稿・追加する"""
         s_code = cand['code']
@@ -1056,16 +996,6 @@ def auto_screen_and_add():
         )
         homepage_url = pages_url
         
-        x_title = "📈AI厳選！本日の注目銘柄✨\n\n"
-        x_base_text = (
-            f"{x_title}"
-            f"{ticker_name}（{s_code}）\n"
-            f"現在値: {int(current_price)}円\n"
-            f"AI分析勝率: {best_win_rate:.0f}%\n\n"
-            f"詳しくはブログで👇\n(リンク)\n\n#日本株 #AI分析"
-        )
-        x_text = post_to_twitter(x_base_text, link_url=homepage_url)
-        
         payload = {
             "action": "add_new", "code": str(s_code),
             "name": ticker_name, "ticker_name": ticker_name,
@@ -1074,8 +1004,9 @@ def auto_screen_and_add():
             "sl": int(best_params['StopLoss']), "current_price": float(current_price),
             "lot_size": lot_size, "invest_amount": invest_amount,
             "max_loss": max_loss, "max_gain": max_gain,
-            "x_post_text": x_text, "hp_text": hp_article, "sns_done": True,
-            "sheet_sns": "SNS配信済", "sheet_x": "X配信テキスト", "sheet_hp": "ホームページへの自動記載"
+            "hp_text": hp_article,
+            "sns_done": False,
+            "sheet_sns": "", "sheet_x": "", "sheet_hp": "ホームページへの自動記載"
         }
         try:
             res = requests.post(WEBHOOK_URL, json=payload)
