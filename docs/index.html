@@ -318,16 +318,12 @@
             <p>市場クローズ後、AIがテクニカル指標とバックテストで有望銘柄を自動分析。条件を満たしたおすすめ銘柄を厳選してお届けします。</p>
             <div class="hero-stats">
                 <div class="hero-stat">
-                    <div class="hero-stat-value">¥100,000</div>
-                    <div class="hero-stat-label">投資上限</div>
-                </div>
-                <div class="hero-stat">
                     <div class="hero-stat-value" id="total-posts">-</div>
                     <div class="hero-stat-label">累計レポート数</div>
                 </div>
                 <div class="hero-stat">
-                    <div class="hero-stat-value">毎日更新</div>
-                    <div class="hero-stat-label">月〜金 16:15</div>
+                    <div class="hero-stat-value">公開中</div>
+                    <div class="hero-stat-label">レポート一覧</div>
                 </div>
             </div>
         </div>
@@ -356,7 +352,7 @@
 
     <footer class="footer">
         <p>© 2026 AI株分析 - Powered by Gemini AI & GitHub Actions</p>
-        <p style="margin-top: 8px;">毎日自動更新 | データソース: Yahoo Finance</p>
+        <p style="margin-top: 8px;">データソース: Yahoo Finance</p>
     </footer>
 
     <script>
@@ -385,7 +381,7 @@
                     <h2 class="post-title">${post.title}</h2>
                     <div class="post-meta">
                         <span class="tag tag-code">📌 ${post.code}</span>
-                        <span class="tag tag-price">💰 ${post.price}円 (100株: ${post.unit_price}円)</span>
+                        <span class="tag tag-price">💰 ${post.price}円</span>
                         <span class="tag tag-winrate">📈 勝率: ${post.win_rate}%</span>
                     </div>
                     <div class="data-grid">
@@ -413,7 +409,7 @@
             container.innerHTML = `
                 <div class="no-post">
                     <div class="icon">📭</div>
-                    <p>まだレポートがありません。次回の自動更新（平日16:15）をお待ちください。</p>
+                    <p>まだレポートがありません。</p>
                 </div>`;
             document.getElementById('total-posts').textContent = '0';
         }
