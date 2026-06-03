@@ -98,8 +98,7 @@ function doPost(e) {
         nameColIdx = j + 1;
 
       } else if (colName.indexOf('現在値') >= 0) {
-        newRow[j] = '=ROUND(VALUE(REGEXREPLACE(INDEX(IMPORTXML("https://www.google.com/finance/quote/" & '
-          + codeLetter + rowIdx + '&":TYO","//div[@class=\'YMlKec fxKbKc\']"),1), "[^0-9.]", "")))';
+        newRow[j] = data.current_price ? Math.round(Number(data.current_price)) : '';
 
       } else if (colName.indexOf('出来高') >= 0) {
         newRow[j] = '=IFERROR(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(INDEX(IMPORTXML("https://www.google.com/finance/quote/" & '
@@ -201,6 +200,7 @@ function doPost(e) {
     if (data.action === "update" || !data.action) {
       for (var c = 0; c < h.length; c++) {
         var colN = String(h[c]).replace(/[\u200b\s]/g, '');
+        if (colN.indexOf('現在値')  >= 0 && data.current_price !== undefined) sheet.getRange(i + 1, c + 1).setValue(Math.round(data.current_price));
         if (colN.indexOf('買い目標') >= 0 && data.buy !== undefined) sheet.getRange(i + 1, c + 1).setValue(Math.round(data.buy));
         if (colN.indexOf('利確目標') >= 0 && data.tp  !== undefined) sheet.getRange(i + 1, c + 1).setValue(Math.round(data.tp));
         if (colN.indexOf('損切り')   >= 0 && data.sl  !== undefined) sheet.getRange(i + 1, c + 1).setValue(Math.round(data.sl));

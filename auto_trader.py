@@ -634,6 +634,13 @@ def check_portfolio_status():
                 last_low = float(hist['Low'].iloc[-1])
                 hist_low = float(hist['Low'].min())
 
+                # 現在値を毎回シートへ戻す
+                requests.post(WEBHOOK_URL, json={
+                    "action": "update",
+                    "code": str(code),
+                    "current_price": last_close
+                })
+
                 entered_flag = False
                 if buy_val and hist_low <= buy_val:
                     entered_flag = True
