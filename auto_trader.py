@@ -539,6 +539,7 @@ def check_portfolio_status():
         # ヘッダー名からインデックスを探す
         col_idx = {str(h).replace('\u200b', '').replace(' ', ''): i for i, h in enumerate(headers)}
         
+        c_name = col_idx.get('銘柄名', -1)
         c_code = col_idx.get('コード', -1)
         c_buy = col_idx.get('買い目標', -1)
         c_tp = col_idx.get('利確目標', -1)
@@ -554,6 +555,7 @@ def check_portfolio_status():
             if len(row) <= c_code: continue
             
             code = str(row[c_code]).strip()
+            name = str(row[c_name]).strip() if c_name != -1 and len(row) > c_name else code
             if not code or code == 'None': continue
             
             # 各値を取得
@@ -587,29 +589,46 @@ def check_portfolio_status():
 
                 action = None
                 if tp_val and last_high >= tp_val:
-                    action = "hit_tp" if entered_flag else "delete"
+                    action = "hit_tp"
                 elif sl_val and last_low <= sl_val:
-                    action = "hit_sl" if entered_flag else "delete"
+                    action = "hit_sl"
 
                 if action:
-                    req_p = {"action": action, "code": str(code)}
+                    if action == "hit_tp":
+                        send_line(
+                            f"✅ 利確達成！\n\n"
+                            f"{name} ({code})\n"
+                            f"現在値: {last_close:.0f}円 ≥ 利確: {tp_val:.0f}円\n"
+                            f"────────────\n"
+                            f"利益を確定してください。"
+                        )
+                    elif action == "hit_sl":
+                        send_line(
+                            f"⚠️ 損切りライン到達\n\n"
+                            f"{name} ({code})\n"
+                            f"現在値: {last_close:.0f}円 ≤ 損切り: {sl_val:.0f}円\n"
+                            f"────────────\n"
+                            f"迷わず損切りしてください。"
+                        )
+
+                    req_p = {"action": "delete", "code": str(code)}
                     requests.post(WEBHOOK_URL, json=req_p)
                     removed_count += 1
                     logging.info(f"{code}: {action} により削除しました")
-                    # 実績を記録
-                    result = "win" if action == "hit_tp" else "loss"
-                    predicted_wr = 0
-                    try:
-                        c_ai = col_idx.get('AIテキスト', col_idx.get('ai_text', -1))
-                        if c_ai != -1 and len(row) > c_ai:
-                            import re
-                            m = re.search(r'勝率(\d+)', str(row[c_ai]))
-                            if m:
-                                predicted_wr = int(m.group(1))
-                    except Exception:
-                        pass
-                    record_trade_result(code, predicted_wr, result)
-                    # LINE通知は GAS の checkAndNotify() に一本化（二重通知防止）
+                    if entered_flag:
+                        # 実績を記録
+                        result = "win" if action == "hit_tp" else "loss"
+                        predicted_wr = 0
+                        try:
+                            c_ai = col_idx.get('AIテキスト', col_idx.get('ai_text', -1))
+                            if c_ai != -1 and len(row) > c_ai:
+                                import re
+                                m = re.search(r'勝率(\d+)', str(row[c_ai]))
+                                if m:
+                                    predicted_wr = int(m.group(1))
+                        except Exception:
+                            pass
+                        record_trade_result(code, predicted_wr, result)
                     time.sleep(1)
                 else:
                     # 出来高急増チェック（LINE通知は GAS 側で行う）

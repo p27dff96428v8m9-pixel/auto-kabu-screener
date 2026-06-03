@@ -246,7 +246,7 @@ function checkStockTargets() {
     if (n.indexOf('判定')     >= 0) idx.status = j;
   }
 
-  for (let i = 1; i < data.length; i++) {
+  for (let i = data.length - 1; i >= 1; i--) {
     const price  = data[i][idx.price];
     const buy    = data[i][idx.buy];
     const tp     = data[i][idx.tp];
@@ -319,7 +319,6 @@ function checkAndNotify() {
 
     // 1. 損切りライン到達
     if (sl && price <= sl) {
-      statusCell.setBackground("#4a86e8").setFontColor("white").setValue("【通知済】損切り");
       sendLineMessage(
         "⚠️ 損切りライン到達\n" +
         name + "\n" +
@@ -327,12 +326,13 @@ function checkAndNotify() {
         "────────────\n" +
         "迷わず損切りしてください。"
       );
+      SpreadsheetApp.flush();
+      sheet.deleteRow(i + 1);
       continue;
     }
 
     // 2. 利確ライン到達
     if (tp && price >= tp) {
-      statusCell.setBackground("#e06666").setFontColor("white").setValue("【通知済】利確");
       sendLineMessage(
         "✅ 利確達成！\n" +
         name + "\n" +
@@ -340,6 +340,8 @@ function checkAndNotify() {
         "────────────\n" +
         "利益を確定してください。"
       );
+      SpreadsheetApp.flush();
+      sheet.deleteRow(i + 1);
       continue;
     }
 
