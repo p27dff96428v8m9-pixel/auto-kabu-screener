@@ -5,6 +5,7 @@ import pandas as pd
 import json
 import logging
 import os
+import re
 import tweepy
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -48,10 +49,56 @@ LINE_USER_ID = os.environ.get("LINE_USER_ID")
 # GitHub Pages設定
 GITHUB_REPO = "p27dff96428v8m9-pixel/auto-kabu-screener"
 GITHUB_PAGES_URL = f"https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FUND_FLOW_APP_JS = os.path.join(BASE_DIR, "docs", "fund-flow-ai-system", "app.js")
+TREASURE_STOCKS_JSON = os.path.join(BASE_DIR, "docs", "fund-flow-ai-system", "data", "treasure-stocks.json")
 
 if not WEBHOOK_URL:
     logging.error("WEBHOOK_URL が設定されていません。終了します。")
     sys.exit(1)
+
+
+def _looks_japanese(value):
+    return bool(re.search(r"[\u3040-\u30ff\u3400-\u9fff]", str(value or "")))
+
+
+def resolve_japanese_ticker_name(code, fallback=None):
+    code = str(code).strip()
+
+    if os.path.exists(TREASURE_STOCKS_JSON):
+        try:
+            with open(TREASURE_STOCKS_JSON, "r", encoding="utf-8", errors="ignore") as f:
+                payload = json.load(f)
+            for stock in payload.get("stocks", []):
+                if str(stock.get("code", "")).strip() == code:
+                    name = str(stock.get("name", "")).strip()
+                    if name and _looks_japanese(name):
+                        return name
+        except Exception:
+            pass
+
+    if os.path.exists(FUND_FLOW_APP_JS):
+        try:
+            with open(FUND_FLOW_APP_JS, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+            for found_code, name in re.findall(r'ticker:\s*"(\d{4})"\s*,\s*name:\s*"([^"]+)"', text):
+                if found_code == code and name.strip() and _looks_japanese(name):
+                    return name.strip()
+        except Exception:
+            pass
+
+    overrides = {
+        "9432": "日本電信電話",
+        "9433": "KDDI",
+        "8630": "SOMPOホールディングス",
+        "8725": "MS&ADインシュアランスグループ",
+    }
+    if code in overrides:
+        return overrides[code]
+
+    if fallback:
+        return fallback
+    return code
 
 
 def generate_ai_article(ticker_name, code, current_price, buy_price, tp_price, sl_price, win_rate, pbr=None, dividend=None):
@@ -981,9 +1028,10 @@ def auto_screen_and_add():
         current_price = cand['current_price']
         try:
             ticker_obj = yf.Ticker(f"{s_code}.T")
-            ticker_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
+            raw_name = ticker_obj.info.get('shortName') or ticker_obj.info.get('longName') or s_code
+            ticker_name = resolve_japanese_ticker_name(s_code, raw_name)
         except:
-            ticker_name = s_code
+            ticker_name = resolve_japanese_ticker_name(s_code, s_code)
         
         logging.info(f"有望銘柄発見: {ticker_name}({s_code}) 現在値:{int(current_price)}円 (100株で{int(current_price*100):,}円) 勝率:{best_win_rate:.0f}%")
         
