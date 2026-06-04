@@ -46,10 +46,16 @@ jobs:
           RANKING_HISTORY_OUTPUT_PATH: docs/fund-flow-ai-system/data/ranking-history.json
         run: node scripts/update-ranking-history.js
 
+      - name: Update integrated stock ranking
+        env:
+          MARKET_DATA_INPUT_PATH: docs/fund-flow-ai-system/data/market-data.json
+          TREASURE_STOCKS_OUTPUT_PATH: docs/fund-flow-ai-system/data/treasure-stocks.json
+        run: node scripts/update-treasure-stocks.js
+
       - name: Commit market data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json docs/fund-flow-ai-system/data/ranking-history.json
+          git add docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json docs/fund-flow-ai-system/data/ranking-history.json docs/fund-flow-ai-system/data/treasure-stocks.json
           git diff --cached --quiet || git commit -m "Update market data"
           git push

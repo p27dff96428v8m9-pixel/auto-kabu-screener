@@ -385,6 +385,7 @@ const state = {
   dataMessage: "",
   macroSignals: null,
   instrumentQuotes: {},
+  stockRanking: null,
   aiResearch: null,
   aiResearchMessage: "",
   marketStatus: { state: "pending", text: "確認中" },
@@ -1576,6 +1577,44 @@ function stockQuoteFor(ticker) {
   return state.instrumentQuotes?.[String(ticker)] || null;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+function renderStockRanking() {
+  const status = document.querySelector("#stockRankingStatus");
+  const list = document.querySelector("#stockRankingList");
+  if (!status || !list) return;
+
+  const stocks = state.stockRanking?.stocks || [];
+  if (!stocks.length) {
+    status.textContent = "統合銘柄ランキングのデータがありません。";
+    list.innerHTML = "";
+    return;
+  }
+
+  status.textContent = `${stocks.length}銘柄 / 更新 ${formatStatusTime(state.stockRanking.updatedAt)}`;
+  list.innerHTML = stocks.slice(0, 10).map((stock, index) => `
+    <article class="stock-row">
+      <span class="rank"><strong>${index + 1}</strong></span>
+      <span class="stock-main">
+        <strong>${escapeHtml(stock.code)} ${escapeHtml(stock.name)}</strong>
+        <span>${escapeHtml(stock.signal || "監視")} / 現在値 ${stock.price != null ? Number(stock.price).toLocaleString("ja-JP") : "-"}円 / 7日 ${formatChange(stock.changes?.["7d"])} / 30日 ${formatChange(stock.changes?.["30d"])}</span>
+      </span>
+      <span class="stock-score">
+        <strong>${stock.score}</strong>
+        <span>score</span>
+      </span>
+    </article>
+  `).join("");
+}
+
 function formatChange(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "-";
@@ -2082,6 +2121,28 @@ async function loadAiResearch({ force = false } = {}) {
   }
 }
 
+async function loadStockRanking() {
+  if (typeof window === "undefined" || window.location.protocol === "file:") {
+    renderStockRanking();
+    return false;
+  }
+
+  try {
+    const response = await fetch(`data/treasure-stocks.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    state.stockRanking = await response.json();
+    renderStockRanking();
+    return true;
+  } catch (error) {
+    state.stockRanking = null;
+    const status = document.querySelector("#stockRankingStatus");
+    const list = document.querySelector("#stockRankingList");
+    if (status) status.textContent = `統合銘柄ランキングを取得できませんでした: ${error.message}`;
+    if (list) list.innerHTML = "";
+    return false;
+  }
+}
+
 async function loadMarketData({ force = false } = {}) {
   if (typeof window === "undefined" || window.location.protocol === "file:") {
     state.dataSource = "sample";
@@ -2144,6 +2205,7 @@ async function init() {
     setUpdatedAt();
   }
   await loadMarketData();
+  await loadStockRanking();
   await loadAiResearch();
   await loadPublicRankHistory();
   renderList();

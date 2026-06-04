@@ -1461,6 +1461,63 @@ input[type="search"] {
   color: #64748b;
 }
 
+.stock-ranking-panel {
+  margin-top: 14px;
+}
+
+.stock-ranking-status {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stock-ranking-list {
+  display: grid;
+  gap: 8px;
+}
+
+.stock-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 74px;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.stock-row strong,
+.stock-row span {
+  min-width: 0;
+}
+
+.stock-main {
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+.stock-main strong {
+  font-size: 14px;
+}
+
+.stock-main span,
+.stock-score span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stock-score {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+}
+
+.stock-score strong {
+  color: var(--accent-strong);
+}
+
 .theme-title {
   display: block;
   margin: 0 0 4px;
@@ -1969,6 +2026,15 @@ footer p {
   .visual-grid,
   .score-row {
     grid-template-columns: 1fr;
+  }
+
+  .stock-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .stock-score {
+    grid-column: 2;
+    justify-items: start;
   }
 
   .score-chart {
