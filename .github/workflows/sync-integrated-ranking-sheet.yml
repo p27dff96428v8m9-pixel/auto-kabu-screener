@@ -1,0 +1,35 @@
+﻿name: Sync integrated ranking to sheet
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "35 8 * * 1-5"
+
+permissions:
+  contents: read
+
+jobs:
+  sync-integrated-ranking-sheet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Rebuild integrated stock ranking
+        env:
+          MARKET_DATA_INPUT_PATH: docs/fund-flow-ai-system/data/market-data.json
+          TREASURE_STOCKS_OUTPUT_PATH: docs/fund-flow-ai-system/data/treasure-stocks.json
+        run: node scripts/update-treasure-stocks.js
+
+      - name: Add integrated ranking rows to Google Sheet
+        env:
+          INTEGRATED_RANKING_WEBHOOK_URL: ${{ secrets.INTEGRATED_RANKING_WEBHOOK_URL }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          TREASURE_STOCKS_INPUT_PATH: docs/fund-flow-ai-system/data/treasure-stocks.json
+          INTEGRATED_RANKING_LIMIT: "10"
+          INTEGRATED_RANKING_FORCE_APPEND: "1"
+        run: node scripts/sync-integrated-ranking-sheet.js
+
