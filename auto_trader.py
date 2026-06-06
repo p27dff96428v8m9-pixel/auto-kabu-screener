@@ -30,13 +30,22 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Webhook URLは環境変数（GitHub Secrets）から取得
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+def read_config_value(key, fallback=None):
+    try:
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f).get(key, fallback)
+    except Exception:
+        return fallback
+
+
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL") or read_config_value("webhook_url")
 
 TWITTER_API_KEY = os.environ.get("TWITTER_API_KEY")
 TWITTER_API_SECRET = os.environ.get("TWITTER_API_SECRET")
 TWITTER_ACCESS_TOKEN = os.environ.get("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_SECRET = os.environ.get("TWITTER_ACCESS_SECRET")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAObH_0naD4yuSa0xltuR6-xGzBOL_JUdg")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
 WP_URL = os.environ.get("WP_URL")
@@ -52,6 +61,15 @@ GITHUB_PAGES_URL = f"https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FUND_FLOW_APP_JS = os.path.join(BASE_DIR, "docs", "fund-flow-ai-system", "app.js")
 TREASURE_STOCKS_JSON = os.path.join(BASE_DIR, "docs", "fund-flow-ai-system", "data", "treasure-stocks.json")
+FUND_FLOW_RANKING_URL = os.environ.get(
+    "FUND_FLOW_RANKING_URL",
+    "https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/treasure-stocks.json"
+)
+FUND_FLOW_RANKING_LOCAL_PATHS = [
+    os.environ.get("FUND_FLOW_RANKING_PATH", ""),
+    TREASURE_STOCKS_JSON,
+    os.path.join(os.path.dirname(BASE_DIR), "fund-flow-ai-system", "data", "treasure-stocks.json")
+]
 
 if not WEBHOOK_URL:
     logging.error("WEBHOOK_URL が設定されていません。終了します。")
@@ -1002,6 +1020,110 @@ TSE_ACTIVE_RANGES = list(range(1301, 2000)) + list(range(2001, 3000)) + \
 TSE_ACTIVE_RANGES = [str(c) for c in TSE_ACTIVE_RANGES]
 
 
+def load_json_file(path_value):
+    if not path_value:
+        return None
+    try:
+        if os.path.exists(path_value):
+            with open(path_value, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logging.warning(f"統合ランキングJSONの読み込み失敗: {path_value} ({e})")
+    return None
+
+
+def label_financial_score(stock):
+    earnings = (stock.get("checks") or {}).get("earnings") or {}
+    label = str(earnings.get("label") or "")
+    score = earnings.get("score")
+    if "弱" in label or "注意" in label:
+        return 0
+    if "良好" in label or "確認OK" in label:
+        return 2
+    if isinstance(score, (int, float)):
+        if score >= 75:
+            return 2
+        if score < 55:
+            return 0
+    return 1
+
+
+def financial_reason_from_stock(stock):
+    earnings = (stock.get("checks") or {}).get("earnings") or {}
+    actual = earnings.get("actual") or ((stock.get("financial") or {}).get("latestStatement") or {})
+    parts = []
+    if earnings.get("label"):
+        parts.append(str(earnings.get("label")))
+    if actual.get("disclosedDate"):
+        parts.append(f"決算日{actual.get('disclosedDate')}")
+    if actual.get("eps") is not None:
+        try:
+            parts.append(f"EPS{float(actual.get('eps')):.2f}")
+        except Exception:
+            parts.append(f"EPS{actual.get('eps')}")
+    if actual.get("progressBasis") is not None:
+        try:
+            parts.append(f"進捗{float(actual.get('progressBasis')):.1f}%")
+        except Exception:
+            parts.append(f"進捗{actual.get('progressBasis')}")
+    return " / ".join(parts) if parts else "統合ランキング確認"
+
+
+def load_integrated_ranking_candidates():
+    payload = None
+    for path_value in FUND_FLOW_RANKING_LOCAL_PATHS:
+        payload = load_json_file(path_value)
+        if payload:
+            logging.info(f"統合ランキング母集団をローカルから読み込み: {path_value}")
+            break
+
+    if payload is None:
+        try:
+            response = requests.get(FUND_FLOW_RANKING_URL, timeout=20)
+            response.raise_for_status()
+            payload = response.json()
+            logging.info(f"統合ランキング母集団を公開URLから読み込み: {FUND_FLOW_RANKING_URL}")
+        except Exception as e:
+            logging.warning(f"統合ランキング母集団の取得失敗。ランダム抽出へフォールバック: {e}")
+            return []
+
+    stocks = payload.get("stocks") or []
+    candidates = []
+    for stock in stocks:
+        code = str(stock.get("code") or "").strip()
+        if not re.match(r"^\d{4}$", code):
+            continue
+        if str(stock.get("signal") or "") == "見送り":
+            continue
+        score = float(stock.get("score") or 0)
+        if score < float(os.environ.get("MIN_INTEGRATED_SCORE", "56")):
+            continue
+        candidates.append({
+            "code": code,
+            "name": stock.get("name") or code,
+            "integrated_score": score,
+            "integrated_signal": stock.get("signal") or "",
+            "flow_score": stock.get("flowScore"),
+            "confirmation_score": stock.get("confirmationScore"),
+            "financial_score": label_financial_score(stock),
+            "financial_reason": financial_reason_from_stock(stock),
+            "financial": stock.get("financial"),
+            "checks": stock.get("checks") or {},
+            "source_stock": stock
+        })
+
+    candidates = sorted(
+        candidates,
+        key=lambda item: (
+            -float(item.get("integrated_score") or 0),
+            -float(item.get("confirmation_score") or 0),
+            item["code"]
+        )
+    )
+    max_count = int(os.environ.get("INTEGRATED_UNIVERSE_LIMIT", "80"))
+    return candidates[:max_count]
+
+
 def auto_screen_and_add():
     """全自動スクリーニングと有望銘柄の追加"""
     logging.info("--- 全自動スクリーニングと有望銘柄の追加開始 ---")
@@ -1043,9 +1165,15 @@ def auto_screen_and_add():
         fin_score = cand.get('financial_score', 1)
         fin_reason = cand.get('financial_reason', '')
         fin_label = {2: "良好", 1: "要注意", 0: "不良"}.get(fin_score, "不明")
+        integrated_score = cand.get("integrated_score")
+        integrated_signal = cand.get("integrated_signal") or ""
+        confirmation_score = cand.get("confirmation_score")
+        integrated_note = ""
+        if integrated_score is not None:
+            integrated_note = f"統合{float(integrated_score):.0f} {integrated_signal} 確認{confirmation_score if confirmation_score is not None else '-'} | "
         ai_text = (
-            f"【AI判定】勝率{best_win_rate:.0f}% RR比{rr_ratio:.1f}:1 | "
-            f"財務:{fin_label}（{fin_reason}）| "
+            f"【AI判定】{integrated_note}Kabu勝率{best_win_rate:.0f}% RR比{rr_ratio:.1f}:1 | "
+            f"決算/財務:{fin_label}（{fin_reason}）| "
             f"推奨{lot_size}株（投資額約{invest_amount:,}円）| "
             f"最大損失-{max_loss:,}円 / 利確+{max_gain:,}円"
         )
@@ -1071,6 +1199,9 @@ def auto_screen_and_add():
             "sl": int(best_params['StopLoss']), "current_price": float(current_price),
             "lot_size": lot_size, "invest_amount": invest_amount,
             "max_loss": max_loss, "max_gain": max_gain,
+            "integrated_score": integrated_score,
+            "integrated_signal": integrated_signal,
+            "confirmation_score": confirmation_score,
             "hp_text": hp_article,
             "sns_done": False,
             "sheet_sns": "", "sheet_x": "", "sheet_hp": "ホームページへの自動記載"
@@ -1104,6 +1235,14 @@ def auto_screen_and_add():
     # 多すぎると候補検証前にToo Many Requestsで実質ゼロ件になる。
     sample_size = int(os.environ.get("SCREEN_SAMPLE_SIZE", "240"))
     target_codes = random.sample(TSE_ACTIVE_RANGES, min(sample_size, len(TSE_ACTIVE_RANGES)))
+    integrated_candidates = load_integrated_ranking_candidates()
+    integrated_meta = {item["code"]: item for item in integrated_candidates}
+    if integrated_candidates:
+        target_codes = [item["code"] for item in integrated_candidates]
+        logging.info(f"統合ランキング母集団から候補を抽出: {len(target_codes)}銘柄")
+    else:
+        integrated_meta = {}
+        logging.info(f"統合ランキング未取得のためランダム抽出: {len(target_codes)}銘柄")
 
     chunk_size = int(os.environ.get("SCREEN_CHUNK_SIZE", "30"))
     candidates = []
@@ -1184,11 +1323,13 @@ def auto_screen_and_add():
                     deviation = (current_price - sma25) / sma25 * 100
 
                     if deviation <= 5 and rsi <= 65:
-                        candidates.append({
+                        candidate = {
                             "code": code, "pbr": 0, "deviation": deviation,
                             "rsi": rsi, "current_price": current_price, "mc": 0,
                             "dividend": 0, "avg_volume": avg_volume
-                        })
+                        }
+                        candidate.update(integrated_meta.get(str(code), {}))
+                        candidates.append(candidate)
                 except Exception:
                     continue
         except Exception as e:
@@ -1220,9 +1361,17 @@ def auto_screen_and_add():
             cand['financial_score'] = 1
             cand['financial_reason'] = "未評価"
 
-    # 財務不良（0点）は除外し、財務スコア降順×乖離率昇順で並び替え
+    # 財務不良（0点）は除外し、統合ランキング優先×Kabuのチャート乖離で並び替え
     candidates = [c for c in candidates if c.get('financial_score', 1) >= 1]
-    candidates = sorted(candidates, key=lambda x: (-x.get('financial_score', 1), abs(x['deviation'])))
+    candidates = sorted(
+        candidates,
+        key=lambda x: (
+            -float(x.get('integrated_score') or 0),
+            -float(x.get('confirmation_score') or 0),
+            -float(x.get('financial_score', 1)),
+            abs(x['deviation'])
+        )
+    )
     try:
         res = requests.post(WEBHOOK_URL, json={"action": "get_all"})
         all_rows = res.json()
