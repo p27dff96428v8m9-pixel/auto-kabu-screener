@@ -25,6 +25,11 @@ jobs:
           JQUANTS_HISTORY_DAYS: "1825"
           JQUANTS_MAX_REQUESTS_PER_RUN: "18"
           JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN: "36"
+          JQUANTS_ENABLE_FINANCIALS: "1"
+          JQUANTS_FINANCIALS_PER_RUN: "12"
+          JQUANTS_PRO_ACCESS_KEY: ${{ secrets.JQUANTS_PRO_ACCESS_KEY }}
+          JQUANTS_PRO_BASE_URL: ${{ secrets.JQUANTS_PRO_BASE_URL }}
+          JQUANTS_FINANCIALS_BASE_URL: ${{ secrets.JQUANTS_FINANCIALS_BASE_URL }}
           MARKET_DATA_OUTPUT_PATH: docs/fund-flow-ai-system/data/market-data.json
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
           FX_API_URL: ${{ secrets.FX_API_URL }}

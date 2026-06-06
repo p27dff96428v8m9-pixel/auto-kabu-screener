@@ -31,6 +31,7 @@ function buildPayload(stock, index, rankingUpdatedAt) {
   const score = Number(stock.score);
   const changes = stock.changes || {};
   const checks = stock.checks || {};
+  const actual = checks.earnings?.actual || stock.financial?.latestStatement || null;
   const rankingDate = new Date(rankingUpdatedAt || Date.now()).toISOString().slice(0, 10);
   const summary = [
     `\u7d71\u5408\u30e9\u30f3\u30ad\u30f3\u30b0 ${rankingDate}`,
@@ -41,6 +42,10 @@ function buildPayload(stock, index, rankingUpdatedAt) {
     stock.kabuScore != null ? `Kabu ${stock.kabuScore}` : null,
     stock.confirmationScore != null ? `確認 ${stock.confirmationScore}` : null,
     checks.earnings?.label ? `決算 ${checks.earnings.label}` : null,
+    actual?.disclosedDate ? `実決算日 ${actual.disclosedDate}` : null,
+    actual?.eps != null ? `EPS ${Number(actual.eps).toFixed(2)}` : null,
+    actual?.progressBasis != null ? `進捗 ${Number(actual.progressBasis).toFixed(1)}%` : null,
+    actual?.progressVsExpectedPct != null ? `期待比 ${Number(actual.progressVsExpectedPct).toFixed(1)}pt` : null,
     checks.material?.label ? `材料 ${checks.material.label}` : null,
     checks.volume?.label ? `出来高 ${checks.volume.label}` : null,
     checks.chart?.label ? `チャート ${checks.chart.label}` : null,

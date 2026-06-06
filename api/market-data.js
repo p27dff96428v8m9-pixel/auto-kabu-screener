@@ -23,6 +23,7 @@ loadLocalEnv();
 
 const JQUANTS_V1_BASE_URL = process.env.JQUANTS_V1_BASE_URL || "https://api.jquants.com/v1";
 const JQUANTS_V2_BASE_URL = process.env.JQUANTS_V2_BASE_URL || "https://api.jquants.com/v2";
+const JQUANTS_PRO_BASE_URL = process.env.JQUANTS_PRO_BASE_URL || "https://api.jquants-pro.com/v2";
 const ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query";
 const ALPHA_MACRO_COMMODITIES = (process.env.ALPHA_VANTAGE_COMMODITIES || "WTI,COPPER,GOLD")
   .split(",")
@@ -90,6 +91,23 @@ function dateDaysAgo(days) {
 
 function jquantsHistoryDays() {
   return Math.max(30, Number(process.env.JQUANTS_HISTORY_DAYS || jquantsPlanConfig().historyDays) || jquantsPlanConfig().historyDays);
+}
+
+function jquantsFinancialsPerRun() {
+  return Math.max(0, Number(process.env.JQUANTS_FINANCIALS_PER_RUN || 12) || 0);
+}
+
+function jquantsFinancialsEnabled(auth) {
+  if (process.env.JQUANTS_ENABLE_FINANCIALS === "0") return false;
+  return Boolean(
+    auth &&
+    (process.env.JQUANTS_ENABLE_FINANCIALS === "1" ||
+      process.env.JQUANTS_PRO_ACCESS_KEY ||
+      process.env.JQUANTS_PRO_ID_TOKEN ||
+      process.env.JQUANTS_FINANCIALS_ACCESS_KEY ||
+      process.env.JQUANTS_FINANCIALS_BASE_URL ||
+      auth.mode === "v2")
+  );
 }
 
 async function fetchJson(url, options = {}) {
@@ -297,6 +315,10 @@ function normalizeJQuantsCode(code) {
   return /^\d{4}$/.test(value) ? `${value}0` : value;
 }
 
+function denormalizeJQuantsCode(code) {
+  return String(code || "").slice(0, 4);
+}
+
 async function fetchDailyQuotes(code, auth) {
   const from = dateDaysAgo(jquantsHistoryDays());
   const to = dateDaysAgo(0);
@@ -314,6 +336,127 @@ async function fetchDailyQuotes(code, auth) {
     headers: { Authorization: `Bearer ${auth.idToken}` }
   });
   return mapDailyQuoteRows(data);
+}
+
+function financialAccessHeaders(auth) {
+  const configured = process.env.JQUANTS_PRO_ACCESS_KEY || process.env.JQUANTS_PRO_ID_TOKEN || process.env.JQUANTS_FINANCIALS_ACCESS_KEY;
+  if (configured) {
+    return {
+      Authorization: configured.startsWith("Bearer ") ? configured : `Bearer ${configured}`
+    };
+  }
+  if (auth?.mode === "v1" && auth.idToken) {
+    return { Authorization: `Bearer ${auth.idToken}` };
+  }
+  if (auth?.mode === "v2" && auth.apiKey) {
+    return { "x-api-key": auth.apiKey };
+  }
+  return {};
+}
+
+function financialBaseUrl(auth) {
+  if (process.env.JQUANTS_FINANCIALS_BASE_URL) return process.env.JQUANTS_FINANCIALS_BASE_URL;
+  return auth?.mode === "v2" && !process.env.JQUANTS_PRO_ACCESS_KEY && !process.env.JQUANTS_PRO_ID_TOKEN
+    ? JQUANTS_V2_BASE_URL
+    : JQUANTS_PRO_BASE_URL;
+}
+
+async function fetchFinancialStatements(code, auth) {
+  const url = `${financialBaseUrl(auth)}/fins/statements?code=${encodeURIComponent(normalizeJQuantsCode(code))}`;
+  const data = await fetchJson(url, {
+    headers: financialAccessHeaders(auth)
+  });
+  return data.statements || data.data || [];
+}
+
+function numericFinancial(value) {
+  if (value == null || value === "") return null;
+  const n = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function pct(numerator, denominator) {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return null;
+  return Number(((numerator / denominator) * 100).toFixed(1));
+}
+
+function expectedProgressForPeriod(period) {
+  return ({ "1Q": 25, "2Q": 50, "3Q": 75, "4Q": 100, "5Q": 100, FY: 100 })[period] || null;
+}
+
+function normalizeFinancialStatement(row) {
+  const profit = numericFinancial(row.Profit || row.NonConsolidatedProfit);
+  const forecastProfit = numericFinancial(row.ForecastProfit || row.ForecastNonConsolidatedProfit);
+  const eps = numericFinancial(row.EarningsPerShare || row.NonConsolidatedEarningsPerShare);
+  const forecastEps = numericFinancial(row.ForecastEarningsPerShare || row.ForecastNonConsolidatedEarningsPerShare);
+  const netSales = numericFinancial(row.NetSales || row.NonConsolidatedNetSales);
+  const forecastNetSales = numericFinancial(row.ForecastNetSales || row.ForecastNonConsolidatedNetSales);
+  const operatingProfit = numericFinancial(row.OperatingProfit || row.NonConsolidatedOperatingProfit);
+  const forecastOperatingProfit = numericFinancial(row.ForecastOperatingProfit || row.ForecastNonConsolidatedOperatingProfit);
+  const expectedProgressPct = expectedProgressForPeriod(row.TypeOfCurrentPeriod);
+  const profitProgressPct = pct(profit, forecastProfit);
+  const epsProgressPct = pct(eps, forecastEps);
+  const netSalesProgressPct = pct(netSales, forecastNetSales);
+  const operatingProfitProgressPct = pct(operatingProfit, forecastOperatingProfit);
+  const progressBasis = [profitProgressPct, epsProgressPct, operatingProfitProgressPct, netSalesProgressPct]
+    .filter(Number.isFinite)[0] ?? null;
+
+  return {
+    disclosedDate: row.DisclosedDate || null,
+    disclosedTime: row.DisclosedTime || null,
+    localCode: row.LocalCode || null,
+    documentType: row.TypeOfDocument || null,
+    period: row.TypeOfCurrentPeriod || null,
+    fiscalYearEnd: row.CurrentFiscalYearEndDate || null,
+    periodEnd: row.CurrentPeriodEndDate || null,
+    netSales,
+    operatingProfit,
+    ordinaryProfit: numericFinancial(row.OrdinaryProfit || row.NonConsolidatedOrdinaryProfit),
+    profit,
+    eps,
+    forecastNetSales,
+    forecastOperatingProfit,
+    forecastProfit,
+    forecastEps,
+    expectedProgressPct,
+    profitProgressPct,
+    epsProgressPct,
+    netSalesProgressPct,
+    operatingProfitProgressPct,
+    progressBasis,
+    progressVsExpectedPct: progressBasis != null && expectedProgressPct != null
+      ? Number((progressBasis - expectedProgressPct).toFixed(1))
+      : null
+  };
+}
+
+function summarizeFinancialStatements(code, rows) {
+  const sorted = rows
+    .filter((row) => row && (row.DisclosedDate || row.disclosedDate))
+    .sort((a, b) => {
+      const aKey = `${a.DisclosedDate || ""} ${a.DisclosedTime || ""} ${a.DisclosureNumber || ""}`;
+      const bKey = `${b.DisclosedDate || ""} ${b.DisclosedTime || ""} ${b.DisclosureNumber || ""}`;
+      return bKey.localeCompare(aKey);
+    });
+  const latest = sorted[0] ? normalizeFinancialStatement(sorted[0]) : null;
+  if (!latest) return null;
+  return {
+    ticker: denormalizeJQuantsCode(code),
+    source: "jquants-fins-statements",
+    updatedAt: new Date().toISOString(),
+    latestStatement: latest
+  };
+}
+
+function selectedFinancialTickerBatch(tickers) {
+  const limit = jquantsFinancialsPerRun();
+  if (!limit) return [];
+  const unique = Array.from(new Set(tickers.map(String))).sort();
+  if (unique.length <= limit) return unique;
+  const runNumber = Number(process.env.GITHUB_RUN_NUMBER);
+  const rawIndex = Number.isFinite(runNumber) ? runNumber - 1 : Math.floor(Date.now() / (20 * 60 * 1000));
+  const start = ((Math.trunc(rawIndex) * limit) % unique.length + unique.length) % unique.length;
+  return Array.from({ length: limit }, (_, index) => unique[(start + index) % unique.length]);
 }
 
 function periodChange(rows, days) {
@@ -521,12 +664,14 @@ async function buildMarketData() {
   const macro = await fetchMacroSignals();
   const previousMarketData = loadPreviousMarketData();
   const instrumentQuotes = { ...(previousMarketData?.instrumentQuotes || {}) };
+  const financials = { ...(previousMarketData?.financials || {}) };
   if (!auth) {
     return {
       source: "sample",
       message: "J-Quants credentials are not configured. Set JQUANTS_API_KEY on the server.",
       macro,
       instrumentQuotes,
+      financials,
       themes: []
     };
   }
@@ -580,6 +725,19 @@ async function buildMarketData() {
     }
   }
 
+  const financialBatch = jquantsFinancialsEnabled(auth)
+    ? selectedFinancialTickerBatch(allInstrumentTickers)
+    : [];
+  for (const ticker of financialBatch) {
+    try {
+      const rows = await fetchFinancialStatements(ticker, auth);
+      const financial = summarizeFinancialStatements(ticker, rows);
+      if (financial) financials[String(ticker)] = financial;
+    } catch (error) {
+      errors.push(`financial:${ticker}:${error.message}`);
+    }
+  }
+
   return {
     source: auth.mode === "v2" ? "jquants-v2" : "jquants-v1",
     jquantsPlan: auth.mode === "v2" ? jquantsPlan() : "v1",
@@ -588,11 +746,16 @@ async function buildMarketData() {
     message: themes.length ? "" : errors.slice(0, 3).join(" / "),
     macro,
     instrumentQuotes,
+    financials,
     instrumentQuoteBatch: {
       count: quoteRequestLimit,
       tickers: quoteBatch,
       treasureTickers,
       rotatedTickers: themeInstrumentTickers.filter((ticker) => !treasureTickers.includes(ticker))
+    },
+    financialBatch: {
+      count: financialBatch.length,
+      tickers: financialBatch
     },
     themes
   };

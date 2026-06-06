@@ -1603,6 +1603,7 @@ function renderStockRanking() {
   status.textContent = `${stocks.length}銘柄 / 更新 ${formatStatusTime(state.stockRanking.updatedAt)}${logic}`;
   list.innerHTML = stocks.slice(0, 10).map((stock, index) => {
     const checks = stock.checks || {};
+    const actual = checks.earnings?.actual || stock.financial?.latestStatement || null;
     return `
     <article class="stock-row">
       <span class="rank"><strong>${index + 1}</strong></span>
@@ -1627,6 +1628,13 @@ function renderStockRanking() {
           / 出来高 ${escapeHtml(checks.volume?.label || "-")}
           / チャート ${escapeHtml(checks.chart?.label || "-")}
         </span>
+        ${actual ? `
+        <span>
+          実決算 ${escapeHtml(actual.disclosedDate || "-")}
+          / EPS ${actual.eps != null ? Number(actual.eps).toFixed(2) : "-"}
+          / 進捗 ${actual.progressBasis != null ? `${Number(actual.progressBasis).toFixed(1)}%` : "-"}
+          / 期待比 ${actual.progressVsExpectedPct != null ? `${Number(actual.progressVsExpectedPct).toFixed(1)}pt` : "-"}
+        </span>` : ""}
       </span>
       <span class="stock-score">
         <strong>${stock.score}</strong>

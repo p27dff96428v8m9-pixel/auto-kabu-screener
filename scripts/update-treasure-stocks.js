@@ -231,7 +231,49 @@ function estimateTradePlan(technical, quote) {
   return { buy, tp, sl, rr, winRate: clamp(Math.round(winRate), 35, 82) };
 }
 
-function scoreEarnings(instrument) {
+function formatFinancialValue(value, digits = 1, suffix = "") {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return `${number.toFixed(digits)}${suffix}`;
+}
+
+function finiteFinancialValue(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function scoreEarnings(instrument, financial = null) {
+  const actual = financial?.latestStatement || null;
+  if (actual) {
+    const progressVsExpected = finiteFinancialValue(actual.progressVsExpectedPct);
+    const progress = finiteFinancialValue(actual.progressBasis);
+    let score = 64;
+    if (progressVsExpected != null) {
+      if (progressVsExpected >= 10) score = 84;
+      else if (progressVsExpected >= 0) score = 74;
+      else if (progressVsExpected >= -10) score = 62;
+      else score = 46;
+    } else if (progress != null) {
+      score = progress >= 75 ? 76 : progress >= 50 ? 68 : progress >= 25 ? 60 : 52;
+    }
+    if (actual.eps != null && Number(actual.eps) > 0) score += 4;
+    if (actual.profit != null && Number(actual.profit) > 0) score += 4;
+    const finalScore = clamp(score);
+    return {
+      score: finalScore,
+      ok: finalScore >= 65,
+      label: finalScore >= 78 ? "実決算良好" : finalScore >= 65 ? "実決算確認OK" : finalScore >= 55 ? "進捗注意" : "実決算弱い",
+      reason: [
+        actual.disclosedDate ? `決算日 ${actual.disclosedDate}` : null,
+        actual.eps != null ? `EPS ${formatFinancialValue(actual.eps, 2)}` : null,
+        progress != null ? `進捗 ${formatFinancialValue(progress, 1, "%")}` : null,
+        progressVsExpected != null ? `期待比 ${formatFinancialValue(progressVsExpected, 1, "pt")}` : null
+      ].filter(Boolean).join(" / "),
+      actual
+    };
+  }
+
   const quality = instrument.quality || "";
   const warning = instrument.warning || "";
   let score = 58;
@@ -306,8 +348,8 @@ function scoreChartPosition(technical) {
   };
 }
 
-function confirmationChecks(instrument, technical, quote) {
-  const earnings = scoreEarnings(instrument);
+function confirmationChecks(instrument, technical, quote, financial = null) {
+  const earnings = scoreEarnings(instrument, financial);
   const material = scoreMaterial(instrument);
   const volume = scoreVolume(technical, quote);
   const chart = scoreChartPosition(technical);
@@ -414,14 +456,14 @@ function signalFor(stock) {
   return "見送り";
 }
 
-function buildStock(ticker, instrument, quote) {
+function buildStock(ticker, instrument, quote, financial = null) {
   const flow = fundFlowScore(quote);
   const baseTreasure = instrumentScore(instrument);
   const kind = stockSignalKind(instrument, quote);
   const signalBonus = kind === "buy" ? 18 : kind === "watch" ? 12 : kind === "early" ? 7 : -8;
   const technical = technicalSignal(quote);
   const trade = estimateTradePlan(technical, quote);
-  const checks = confirmationChecks(instrument, technical, quote);
+  const checks = confirmationChecks(instrument, technical, quote, financial);
   const technicalScore = technical?.score || 0;
   const kabuScore = trade.winRate != null
     ? clamp(technicalScore * 0.62 + trade.winRate * 0.38)
@@ -445,6 +487,7 @@ function buildStock(ticker, instrument, quote) {
     type: instrument.type || "日本株",
     quality: instrument.quality || null,
     newsRisk: instrument.newsRisk || null,
+    financial: financial || null,
     buy: trade.buy,
     tp: trade.tp,
     sl: trade.sl,
@@ -482,13 +525,14 @@ function main() {
   );
   const marketData = readJson(marketPath, {});
   const quotes = marketData.instrumentQuotes || {};
+  const financials = marketData.financials || {};
   const instruments = collectInstrumentMap(marketData);
 
   const stocks = [...instruments.entries()]
     .map(([ticker, instrument]) => {
       const quote = quotes[String(ticker)];
       if (!quote) return null;
-      return buildStock(ticker, instrument, quote);
+      return buildStock(ticker, instrument, quote, financials[String(ticker)] || null);
     })
     .filter((stock) => stock && stock.price != null)
     .filter((stock) => stock.treasureScore >= 50 || stock.flowScore >= 52 || stock.kabuScore >= 45)
@@ -496,7 +540,7 @@ function main() {
 
   writeJson(outputPath, {
     source: "fund-flow-treasure-kabukazidou",
-    logic: "fund-flowお宝候補 + kabukazidou型テクニカル + 決算/材料/出来高/チャート位置確認",
+    logic: "fund-flowお宝候補 + kabukazidou型テクニカル + 実決算/EPS/進捗率 + 材料/出来高/チャート位置確認",
     updatedAt: new Date().toISOString(),
     marketUpdatedAt: marketData.updatedAt || null,
     stocks
