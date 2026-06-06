@@ -24,9 +24,9 @@ function round(value, fallback = null) {
 
 function buildPayload(stock, index, rankingUpdatedAt) {
   const price = Number(stock.price);
-  const buy = round(price * 0.99);
-  const tp = round(price * 1.1);
-  const sl = round(price * 0.95);
+  const buy = round(stock.buy, round(price * 0.99));
+  const tp = round(stock.tp, round(price * 1.1));
+  const sl = round(stock.sl, round(price * 0.95));
   const rank = index + 1;
   const score = Number(stock.score);
   const changes = stock.changes || {};
@@ -35,7 +35,11 @@ function buildPayload(stock, index, rankingUpdatedAt) {
     `\u7d71\u5408\u30e9\u30f3\u30ad\u30f3\u30b0 ${rankingDate}`,
     `\u9806\u4f4d${rank}`,
     `${stock.name}(${stock.code})`,
-    Number.isFinite(score) ? `score ${score}` : null,
+    Number.isFinite(score) ? `総合 ${score}` : null,
+    stock.flowScore != null ? `資金 ${stock.flowScore}` : null,
+    stock.kabuScore != null ? `Kabu ${stock.kabuScore}` : null,
+    stock.winRate != null ? `勝率 ${stock.winRate}%` : null,
+    stock.rr != null ? `RR ${stock.rr}` : null,
     stock.signal || null,
     `7\u65e5 ${changes["7d"] ?? "-"}%`,
     `30\u65e5 ${changes["30d"] ?? "-"}%`

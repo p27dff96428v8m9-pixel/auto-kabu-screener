@@ -1599,17 +1599,31 @@ function renderStockRanking() {
     return;
   }
 
-  status.textContent = `${stocks.length}銘柄 / 更新 ${formatStatusTime(state.stockRanking.updatedAt)}`;
+  const logic = state.stockRanking.logic ? ` / ${state.stockRanking.logic}` : "";
+  status.textContent = `${stocks.length}銘柄 / 更新 ${formatStatusTime(state.stockRanking.updatedAt)}${logic}`;
   list.innerHTML = stocks.slice(0, 10).map((stock, index) => `
     <article class="stock-row">
       <span class="rank"><strong>${index + 1}</strong></span>
       <span class="stock-main">
         <strong>${escapeHtml(stock.code)} ${escapeHtml(stock.name)}</strong>
-        <span>${escapeHtml(stock.signal || "監視")} / 現在値 ${stock.price != null ? Number(stock.price).toLocaleString("ja-JP") : "-"}円 / 7日 ${formatChange(stock.changes?.["7d"])} / 30日 ${formatChange(stock.changes?.["30d"])}</span>
+        <span>
+          ${escapeHtml(stock.signal || "監視")}
+          / 現在値 ${stock.price != null ? Number(stock.price).toLocaleString("ja-JP") : "-"}円
+          / 勝率 ${stock.winRate != null ? `${Number(stock.winRate).toFixed(0)}%` : "-"}
+          / RR ${stock.rr != null ? Number(stock.rr).toFixed(2) : "-"}
+        </span>
+        <span>
+          買い ${stock.buy != null ? Number(stock.buy).toLocaleString("ja-JP") : "-"}
+          / 利確 ${stock.tp != null ? Number(stock.tp).toLocaleString("ja-JP") : "-"}
+          / 損切 ${stock.sl != null ? Number(stock.sl).toLocaleString("ja-JP") : "-"}
+          / 25日乖離 ${stock.technical?.deviation != null ? `${Number(stock.technical.deviation).toFixed(1)}%` : "-"}
+          / RSI ${stock.technical?.rsi != null ? Number(stock.technical.rsi).toFixed(1) : "-"}
+        </span>
       </span>
       <span class="stock-score">
         <strong>${stock.score}</strong>
-        <span>score</span>
+        <span>総合</span>
+        <small>資金${stock.flowScore ?? "-"} / お宝${stock.treasureScore ?? "-"} / Kabu${stock.kabuScore ?? "-"}</small>
       </span>
     </article>
   `).join("");
