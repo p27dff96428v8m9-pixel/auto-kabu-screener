@@ -30,6 +30,7 @@ function buildPayload(stock, index, rankingUpdatedAt) {
   const rank = index + 1;
   const score = Number(stock.score);
   const changes = stock.changes || {};
+  const checks = stock.checks || {};
   const rankingDate = new Date(rankingUpdatedAt || Date.now()).toISOString().slice(0, 10);
   const summary = [
     `\u7d71\u5408\u30e9\u30f3\u30ad\u30f3\u30b0 ${rankingDate}`,
@@ -38,6 +39,11 @@ function buildPayload(stock, index, rankingUpdatedAt) {
     Number.isFinite(score) ? `総合 ${score}` : null,
     stock.flowScore != null ? `資金 ${stock.flowScore}` : null,
     stock.kabuScore != null ? `Kabu ${stock.kabuScore}` : null,
+    stock.confirmationScore != null ? `確認 ${stock.confirmationScore}` : null,
+    checks.earnings?.label ? `決算 ${checks.earnings.label}` : null,
+    checks.material?.label ? `材料 ${checks.material.label}` : null,
+    checks.volume?.label ? `出来高 ${checks.volume.label}` : null,
+    checks.chart?.label ? `チャート ${checks.chart.label}` : null,
     stock.winRate != null ? `勝率 ${stock.winRate}%` : null,
     stock.rr != null ? `RR ${stock.rr}` : null,
     stock.signal || null,

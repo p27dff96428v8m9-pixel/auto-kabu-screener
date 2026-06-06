@@ -2,32 +2,68 @@ const fs = require("fs");
 const path = require("path");
 
 const STOCK_NAMES = {
-  "6723": "ルネサスエレクトロニクス",
-  "6146": "ディスコ",
-  "6920": "レーザーテック",
-  "8308": "りそなホールディングス",
-  "7182": "ゆうちょ銀行",
-  "7167": "めぶきフィナンシャルグループ",
-  "9508": "九州電力",
-  "9506": "東北電力",
-  "9504": "中国電力",
-  "8015": "豊田通商",
-  "8053": "住友商事",
+  "1306": "TOPIX連動型上場投信",
+  "1321": "日経225連動型上場投信",
+  "1615": "東証銀行業株価指数連動型ETF",
+  "1801": "大成建設",
+  "1802": "大林組",
+  "1803": "清水建設",
+  "2516": "東証グロース250 ETF",
   "2768": "双日",
-  "8952": "ジャパンリアルエステイト投資法人",
-  "8953": "日本都市ファンド投資法人",
+  "3099": "三越伊勢丹ホールディングス",
+  "3283": "日本プロロジスリート投資法人",
   "3462": "野村不動産マスターファンド投資法人",
+  "4063": "信越化学工業",
+  "4478": "フリー",
+  "4483": "JMDC",
+  "5713": "住友金属鉱山",
+  "6146": "ディスコ",
+  "6208": "石川製作所",
   "6301": "小松製作所",
   "6501": "日立製作所",
+  "6503": "三菱電機",
+  "6723": "ルネサスエレクトロニクス",
+  "6857": "アドバンテスト",
+  "6902": "デンソー",
+  "6920": "レーザーテック",
+  "6954": "ファナック",
   "6981": "村田製作所",
+  "7011": "三菱重工業",
+  "7012": "川崎重工業",
+  "7013": "IHI",
   "7201": "日産自動車",
+  "7203": "トヨタ自動車",
+  "7267": "ホンダ",
   "7270": "SUBARU",
+  "7532": "パン・パシフィック",
+  "7735": "SCREENホールディングス",
+  "8001": "伊藤忠商事",
+  "8015": "豊田通商",
+  "8031": "三井物産",
+  "8035": "東京エレクトロン",
+  "8053": "住友商事",
+  "8058": "三菱商事",
+  "8267": "イオン",
+  "8306": "三菱UFJフィナンシャル・グループ",
+  "8308": "りそなホールディングス",
+  "8316": "三井住友フィナンシャルグループ",
+  "8411": "みずほフィナンシャルグループ",
   "8750": "第一生命ホールディングス",
-  "8795": "T&Dホールディングス",
   "8766": "東京海上ホールディングス",
-  "8630": "SOMPOホールディングス",
-  "8725": "MS&ADインシュアランスグループ",
-  "4063": "信越化学工業",
+  "8795": "T&Dホールディングス",
+  "8951": "日本ビルファンド投資法人",
+  "8952": "ジャパンリアルエステイト投資法人",
+  "8953": "日本都市ファンド投資法人",
+  "9201": "日本航空",
+  "9432": "NTT",
+  "9433": "KDDI",
+  "9434": "ソフトバンク",
+  "9501": "東京電力ホールディングス",
+  "9502": "中部電力",
+  "9503": "関西電力",
+  "9504": "中国電力",
+  "9506": "東北電力",
+  "9508": "九州電力",
   "9983": "ファーストリテイリング"
 };
 
@@ -63,6 +99,11 @@ function last(values, count) {
   return values.slice(Math.max(0, values.length - count));
 }
 
+function includesAny(value, words) {
+  const text = String(value || "");
+  return words.some((word) => text.includes(word));
+}
+
 function calcRsi(closes, window = 14) {
   if (closes.length < window + 1) return null;
   const gains = [];
@@ -92,8 +133,8 @@ function quoteHistory(quote) {
 function instrumentScore(instrument) {
   const warningPenalty = instrument.warning ? 12 : 0;
   const quality = instrument.quality || "";
-  const qualityBonus = quality.includes("業績良好") ? 8 : quality ? 4 : 0;
-  const newsBonus = instrument.newsRisk === "悪材料未検出" ? 6 : 0;
+  const qualityBonus = includesAny(quality, ["業績良好", "安定業績", "高成長", "改善", "高配当", "割安", "回復"]) ? 8 : quality ? 4 : 0;
+  const newsBonus = includesAny(instrument.newsRisk, ["悪材料未検出"]) ? 6 : 0;
   return num(instrument.strength) + qualityBonus + newsBonus - warningPenalty;
 }
 
@@ -190,18 +231,114 @@ function estimateTradePlan(technical, quote) {
   return { buy, tp, sl, rr, winRate: clamp(Math.round(winRate), 35, 82) };
 }
 
+function scoreEarnings(instrument) {
+  const quality = instrument.quality || "";
+  const warning = instrument.warning || "";
+  let score = 58;
+  if (includesAny(quality, ["業績良好", "安定業績", "高成長", "改善", "高配当", "割安", "回復"])) score += 22;
+  if (includesAny(quality, ["市場データ候補", "お宝候補"])) score += 8;
+  if (includesAny(warning, ["注意", "材料確認", "値動き", "混雑"])) score -= 10;
+  const finalScore = clamp(score);
+  return {
+    score: finalScore,
+    ok: finalScore >= 65,
+    label: finalScore >= 75 ? "業績良好" : finalScore >= 62 ? "業績確認OK" : "決算確認待ち",
+    reason: quality || "業績ラベル未確認"
+  };
+}
+
+function scoreMaterial(instrument) {
+  const newsRisk = instrument.newsRisk || "";
+  const warning = instrument.warning || "";
+  let score = 60;
+  if (includesAny(newsRisk, ["悪材料未検出"])) score += 22;
+  if (includesAny(newsRisk, ["未確認", "材料確認"])) score -= 6;
+  if (includesAny(newsRisk, ["悪材料", "過熱", "注意"])) score -= 18;
+  if (includesAny(warning, ["混雑", "値動き", "注意"])) score -= 8;
+  const finalScore = clamp(score);
+  return {
+    score: finalScore,
+    ok: finalScore >= 62,
+    label: finalScore >= 76 ? "悪材料未検出" : finalScore >= 62 ? "材料確認OK" : "材料確認待ち",
+    reason: newsRisk || warning || "材料ラベル未確認"
+  };
+}
+
+function scoreVolume(technical, quote) {
+  const changes = quote?.changes || {};
+  const volumeRatio = num(technical?.volumeRatio, null);
+  const volume7d = num(changes.volume7d, null);
+  const volume30d = num(changes.volume30d, null);
+  let score = 50;
+  if (volumeRatio != null) score += clamp((volumeRatio - 0.8) * 35, -18, 28);
+  if (volume7d != null) score += clamp(volume7d * 0.06, -10, 18);
+  if (volume30d != null) score += clamp(volume30d * 0.035, -8, 14);
+  const finalScore = clamp(Math.round(score));
+  return {
+    score: finalScore,
+    ok: finalScore >= 60,
+    label: finalScore >= 75 ? "出来高増加" : finalScore >= 60 ? "出来高確認OK" : "出来高不足",
+    ratio: volumeRatio == null ? null : Number(volumeRatio.toFixed(2)),
+    volume7d,
+    volume30d
+  };
+}
+
+function scoreChartPosition(technical) {
+  if (!technical) {
+    return { score: 45, ok: false, label: "チャート不足", reason: "履歴不足" };
+  }
+  const deviation = num(technical.deviation, null);
+  const rsi = num(technical.rsi, null);
+  let score = 48;
+  if (technical.trendOk) score += 22;
+  if (technical.pullbackOk) score += 16;
+  if (rsi != null && rsi >= 35 && rsi <= 62) score += 12;
+  if (rsi != null && rsi > 72) score -= 14;
+  if (deviation != null && deviation >= -5 && deviation <= 5) score += 10;
+  if (deviation != null && deviation > 10) score -= 12;
+  const finalScore = clamp(Math.round(score));
+  return {
+    score: finalScore,
+    ok: finalScore >= 65,
+    label: finalScore >= 78 ? "好位置" : finalScore >= 65 ? "確認OK" : finalScore >= 55 ? "押し目待ち" : "位置悪い",
+    reason: `25日乖離 ${deviation == null ? "-" : deviation.toFixed(1)}% / RSI ${rsi == null ? "-" : rsi.toFixed(1)}`
+  };
+}
+
+function confirmationChecks(instrument, technical, quote) {
+  const earnings = scoreEarnings(instrument);
+  const material = scoreMaterial(instrument);
+  const volume = scoreVolume(technical, quote);
+  const chart = scoreChartPosition(technical);
+  const score = clamp(Math.round(
+    earnings.score * 0.25 +
+    material.score * 0.23 +
+    volume.score * 0.24 +
+    chart.score * 0.28
+  ));
+  const passed = [earnings, material, volume, chart].filter((item) => item.ok).length;
+  return { score, passed, earnings, material, volume, chart };
+}
+
+function normalizeInstrument(instrument, theme = null) {
+  const warning = instrument.warning || "";
+  return {
+    quality: warning ? "注意あり" : "業績良好候補",
+    newsRisk: warning ? "悪材料確認あり" : "悪材料未検出",
+    themeId: theme?.id || null,
+    themeName: theme?.name || null,
+    ...instrument,
+    ticker: String(instrument.ticker || "")
+  };
+}
+
 function collectInstrumentMap(marketData) {
   const map = new Map();
   const add = (instrument, theme) => {
     if (!instrument?.ticker) return;
     const ticker = String(instrument.ticker);
-    const enriched = {
-      quality: instrument.warning ? "注意あり" : "業績良好候補",
-      newsRisk: instrument.warning ? "悪材料確認あり" : "悪材料未検出",
-      themeId: theme?.id || null,
-      themeName: theme?.name || null,
-      ...instrument
-    };
+    const enriched = normalizeInstrument(instrument, theme);
     const current = map.get(ticker);
     if (!current || instrumentScore(enriched) > instrumentScore(current)) {
       map.set(ticker, enriched);
@@ -215,9 +352,9 @@ function collectInstrumentMap(marketData) {
   const appPath = path.resolve(process.cwd(), "docs", "fund-flow-ai-system", "app.js");
   try {
     const appText = fs.readFileSync(appPath, "utf8");
-    const instrumentPattern = /\{\s*ticker:\s*"(\d{4})"\s*,\s*name:\s*"([^"]+)"\s*,\s*type:\s*"([^"]*)"\s*,\s*strength:\s*(\d+)\s*,\s*warning:\s*"([^"]*)"(?:\s*,\s*quality:\s*"([^"]*)")?(?:\s*,\s*newsRisk:\s*"([^"]*)")?/g;
+    const pattern = /\{\s*ticker:\s*"(\d{4})"\s*,\s*name:\s*"([^"]+)"\s*,\s*type:\s*"([^"]*)"\s*,\s*strength:\s*(\d+)\s*,\s*warning:\s*"([^"]*)"(?:\s*,\s*quality:\s*"([^"]*)")?(?:\s*,\s*newsRisk:\s*"([^"]*)")?/g;
     let match;
-    while ((match = instrumentPattern.exec(appText)) !== null) {
+    while ((match = pattern.exec(appText)) !== null) {
       const [, ticker, name, type, strength, warning, quality, newsRisk] = match;
       add({
         ticker,
@@ -270,8 +407,9 @@ function collectInstrumentMap(marketData) {
 }
 
 function signalFor(stock) {
-  if (stock.score >= 78 && stock.winRate >= 65 && stock.technical?.pullbackOk) return "統合買い候補";
-  if (stock.score >= 68 && stock.winRate >= 58) return "確認候補";
+  const checks = stock.checks || {};
+  if (stock.score >= 78 && stock.winRate >= 65 && checks.passed >= 3 && checks.chart?.ok) return "統合買い候補";
+  if (stock.score >= 68 && stock.winRate >= 58 && checks.passed >= 2) return "確認候補";
   if (stock.score >= 56) return "監視継続";
   return "見送り";
 }
@@ -283,14 +421,15 @@ function buildStock(ticker, instrument, quote) {
   const signalBonus = kind === "buy" ? 18 : kind === "watch" ? 12 : kind === "early" ? 7 : -8;
   const technical = technicalSignal(quote);
   const trade = estimateTradePlan(technical, quote);
-
+  const checks = confirmationChecks(instrument, technical, quote);
   const technicalScore = technical?.score || 0;
   const kabuScore = trade.winRate != null
     ? clamp(technicalScore * 0.62 + trade.winRate * 0.38)
     : technicalScore;
   const treasureScore = clamp(baseTreasure + signalBonus);
-  const rawScore = flow * 0.38 + treasureScore * 0.22 + kabuScore * 0.40;
+  const rawScore = flow * 0.30 + treasureScore * 0.18 + kabuScore * 0.32 + checks.score * 0.20;
   const latest = quote?.latest || {};
+
   const stock = {
     code: String(ticker),
     name: instrument.name || STOCK_NAMES[String(ticker)] || String(ticker),
@@ -298,6 +437,7 @@ function buildStock(ticker, instrument, quote) {
     flowScore: flow,
     treasureScore: Math.round(treasureScore),
     kabuScore: Math.round(kabuScore),
+    confirmationScore: checks.score,
     signal: "",
     price: num(latest.close, technical?.current ?? null),
     date: latest.date || technical?.date || null,
@@ -310,6 +450,7 @@ function buildStock(ticker, instrument, quote) {
     sl: trade.sl,
     rr: trade.rr,
     winRate: trade.winRate,
+    checks,
     changes: {
       "7d": num(quote?.changes?.["7d"], null),
       "30d": num(quote?.changes?.["30d"], null),
@@ -331,8 +472,14 @@ function buildStock(ticker, instrument, quote) {
 }
 
 function main() {
-  const marketPath = path.resolve(process.cwd(), process.env.MARKET_DATA_INPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "market-data.json"));
-  const outputPath = path.resolve(process.cwd(), process.env.TREASURE_STOCKS_OUTPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "treasure-stocks.json"));
+  const marketPath = path.resolve(
+    process.cwd(),
+    process.env.MARKET_DATA_INPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "market-data.json")
+  );
+  const outputPath = path.resolve(
+    process.cwd(),
+    process.env.TREASURE_STOCKS_OUTPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "treasure-stocks.json")
+  );
   const marketData = readJson(marketPath, {});
   const quotes = marketData.instrumentQuotes || {};
   const instruments = collectInstrumentMap(marketData);
@@ -349,7 +496,7 @@ function main() {
 
   writeJson(outputPath, {
     source: "fund-flow-treasure-kabukazidou",
-    logic: "fund-flowお宝候補銘柄 + kabukazidou型の25日線乖離/75日線トレンド/RSI/出来高/売買ライン推定",
+    logic: "fund-flowお宝候補 + kabukazidou型テクニカル + 決算/材料/出来高/チャート位置確認",
     updatedAt: new Date().toISOString(),
     marketUpdatedAt: marketData.updatedAt || null,
     stocks

@@ -1601,7 +1601,9 @@ function renderStockRanking() {
 
   const logic = state.stockRanking.logic ? ` / ${state.stockRanking.logic}` : "";
   status.textContent = `${stocks.length}銘柄 / 更新 ${formatStatusTime(state.stockRanking.updatedAt)}${logic}`;
-  list.innerHTML = stocks.slice(0, 10).map((stock, index) => `
+  list.innerHTML = stocks.slice(0, 10).map((stock, index) => {
+    const checks = stock.checks || {};
+    return `
     <article class="stock-row">
       <span class="rank"><strong>${index + 1}</strong></span>
       <span class="stock-main">
@@ -1619,6 +1621,12 @@ function renderStockRanking() {
           / 25日乖離 ${stock.technical?.deviation != null ? `${Number(stock.technical.deviation).toFixed(1)}%` : "-"}
           / RSI ${stock.technical?.rsi != null ? Number(stock.technical.rsi).toFixed(1) : "-"}
         </span>
+        <span>
+          決算 ${escapeHtml(checks.earnings?.label || "-")}
+          / 材料 ${escapeHtml(checks.material?.label || "-")}
+          / 出来高 ${escapeHtml(checks.volume?.label || "-")}
+          / チャート ${escapeHtml(checks.chart?.label || "-")}
+        </span>
       </span>
       <span class="stock-score">
         <strong>${stock.score}</strong>
@@ -1626,7 +1634,8 @@ function renderStockRanking() {
         <small>資金${stock.flowScore ?? "-"} / お宝${stock.treasureScore ?? "-"} / Kabu${stock.kabuScore ?? "-"}</small>
       </span>
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function formatChange(value) {
