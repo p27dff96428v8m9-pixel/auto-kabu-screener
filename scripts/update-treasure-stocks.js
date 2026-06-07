@@ -67,6 +67,145 @@ const STOCK_NAMES = {
   "9983": "ファーストリテイリング"
 };
 
+const THEME_UNIVERSE = [
+  { id: "jp-semiconductor", tickers: ["8035", "6857", "7735", "1321"] },
+  { id: "jp-defense", tickers: ["7011", "7012", "7013", "6208"] },
+  { id: "jp-banks", tickers: ["8306", "8316", "8411", "1615"] },
+  { id: "jp-electric-power", tickers: ["9501", "9503", "9502", "9513"] },
+  { id: "jp-trading-houses", tickers: ["8001", "8058", "8031", "1306"] },
+  { id: "jp-gold", tickers: ["1540", "1328", "5713"] },
+  { id: "jp-inbound", tickers: ["3099", "9201", "9020", "4661"] },
+  { id: "jp-small-growth", tickers: ["2516", "4483", "4478"] },
+  { id: "jpy-exporters", tickers: ["7203", "7267", "6954", "6503"] },
+  { id: "jp-reits", tickers: ["1343", "8951", "3283"] },
+  { id: "jp-auto", tickers: ["7203", "7267", "6902"] },
+  { id: "jp-pharma", tickers: ["4502", "4568", "4519"] },
+  { id: "jp-telecom", tickers: ["9432", "9433", "9434"] },
+  { id: "jp-retail", tickers: ["9983", "7532", "8267"] },
+  { id: "jp-construction", tickers: ["1801", "1802", "1803"] },
+  { id: "jp-insurance", tickers: ["8766", "8630", "8725"] },
+  { id: "jp-chemical", tickers: ["4063", "4188", "4004"] },
+  { id: "jp-low-pbr", tickers: ["1306", "8411", "8058"] }
+];
+
+const THEME_LABELS = {
+  "jp-semiconductor": "半導体",
+  "jp-defense": "防衛",
+  "jp-banks": "銀行",
+  "jp-electric-power": "電力",
+  "jp-trading-houses": "商社",
+  "jp-gold": "金",
+  "jp-inbound": "インバウンド",
+  "jp-small-growth": "グロース",
+  "jpy-exporters": "円安恩恵",
+  "jp-reits": "REIT",
+  "jp-auto": "自動車",
+  "jp-pharma": "製薬",
+  "jp-telecom": "通信",
+  "jp-retail": "小売",
+  "jp-construction": "建設",
+  "jp-insurance": "保険",
+  "jp-chemical": "化学",
+  "jp-low-pbr": "低PBR"
+};
+
+function buildThemeTickerMap() {
+  const map = new Map();
+  THEME_UNIVERSE.forEach((theme) => {
+    theme.tickers.forEach((ticker) => {
+      const key = String(ticker);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(theme.id);
+    });
+  });
+  return map;
+}
+
+function themeFlowBonus(themeIds, marketData) {
+  if (!themeIds?.length) return 0;
+  const themes = marketData?.themes || [];
+  let best = 0;
+  themeIds.forEach((id) => {
+    const theme = themes.find((item) => item.id === id);
+    const m7 = num(theme?.metrics?.["7d"]?.fundFlow, NaN);
+    const m30 = num(theme?.metrics?.["30d"]?.fundFlow, NaN);
+    if (Number.isFinite(m7) && Number.isFinite(m30)) {
+      best = Math.max(best, m7 * 0.4 + m30 * 0.6);
+    }
+  });
+  if (best <= 50) return 0;
+  return clamp(Math.round((best - 50) * 0.15), 0, 8);
+}
+
+function isIndexLinkedType(type = "", name = "") {
+  return /ETF|投信|連動|REIT|リート/i.test(`${type} ${name}`);
+}
+
+function overheatAdjustments(quote, technical) {
+  let flowPenalty = 0;
+  let scorePenalty = 0;
+  const p7 = num(quote?.changes?.["7d"], NaN);
+  const rsi = num(technical?.rsi, NaN);
+  if (Number.isFinite(rsi)) {
+    if (rsi > 70) {
+      flowPenalty += 8;
+      scorePenalty += 6;
+    } else if (rsi > 65) {
+      flowPenalty += 4;
+      scorePenalty += 3;
+    }
+  }
+  if (Number.isFinite(p7)) {
+    if (p7 > 15) {
+      flowPenalty += 10;
+      scorePenalty += 8;
+    } else if (p7 > 10) {
+      flowPenalty += 5;
+      scorePenalty += 4;
+    }
+  }
+  return { flowPenalty, scorePenalty };
+}
+
+function resolveMarketDataDefaultPath() {
+  const candidates = [
+    path.join("data", "market-data.json"),
+    path.join("docs", "fund-flow-ai-system", "data", "market-data.json"),
+    path.resolve(__dirname, "..", "data", "market-data.json"),
+    path.resolve(__dirname, "..", "docs", "fund-flow-ai-system", "data", "market-data.json"),
+    path.resolve(__dirname, "..", "..", ".gemini", "fund-flow-ai-system", "data", "market-data.json")
+  ];
+  for (const candidate of candidates) {
+    const resolved = path.isAbsolute(candidate) ? candidate : path.resolve(process.cwd(), candidate);
+    if (fs.existsSync(resolved)) return resolved;
+  }
+  return path.resolve(process.cwd(), "docs", "fund-flow-ai-system", "data", "market-data.json");
+}
+
+function resolveTreasureOutputDefaultPath() {
+  const input = resolveMarketDataDefaultPath();
+  if (input.includes(`${path.sep}data${path.sep}market-data.json`)) {
+    return input.replace(/market-data\.json$/, "treasure-stocks.json");
+  }
+  return path.resolve(process.cwd(), "docs", "fund-flow-ai-system", "data", "treasure-stocks.json");
+}
+
+function resolveAppJsPath() {
+  const candidates = [
+    process.env.APP_JS_PATH,
+    path.join("app.js"),
+    path.join("docs", "fund-flow-ai-system", "app.js"),
+    path.resolve(__dirname, "..", "app.js"),
+    path.resolve(__dirname, "..", "docs", "fund-flow-ai-system", "app.js"),
+    path.resolve(__dirname, "..", "..", ".gemini", "fund-flow-ai-system", "app.js")
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const resolved = path.isAbsolute(candidate) ? candidate : path.resolve(process.cwd(), candidate);
+    if (fs.existsSync(resolved)) return resolved;
+  }
+  return null;
+}
+
 function readJson(filePath, fallback = null) {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -145,7 +284,7 @@ function fundFlowScore(quote) {
   const p7 = num(c["7d"]);
   const v30 = num(c.volume30d);
   const v7 = num(c.volume7d);
-  const trend = p90 * 0.22 + p30 * 0.34 + p7 * 0.44;
+  const trend = p90 * 0.28 + p30 * 0.36 + p7 * 0.36;
   const volume = clamp(v30 * 0.25 + v7 * 0.35, -20, 40);
   return clamp(Math.round(50 + trend * 1.2 + volume));
 }
@@ -180,8 +319,8 @@ function technicalSignal(quote) {
   const volumeRatio = volume20 && currentVolume ? currentVolume / volume20 : null;
 
   const trendOk = current > (sma75 || 0) && (sma75 || 0) >= (prevSma75 || 0);
-  const momentumOk = rsi != null && rsi >= 28 && rsi <= 72;
-  const pullbackOk = deviation != null && deviation >= -8 && deviation <= 8;
+  const momentumOk = rsi != null && rsi >= 28 && rsi <= 65;
+  const pullbackOk = deviation != null && deviation >= -5 && deviation <= 5;
   const volumeOk = volumeRatio != null && volumeRatio >= 0.95;
 
   let score = 0;
@@ -189,7 +328,7 @@ function technicalSignal(quote) {
   score += momentumOk ? 18 : 6;
   score += pullbackOk ? 18 : 4;
   score += volumeOk ? 18 : 4;
-  if (deviation != null && deviation < -2 && deviation >= -8) score += 8;
+  if (deviation != null && deviation < -2 && deviation >= -5) score += 8;
   if (rsi != null && rsi >= 35 && rsi <= 58) score += 6;
   if (volumeRatio != null && volumeRatio >= 1.1) score += 4;
 
@@ -335,8 +474,9 @@ function scoreChartPosition(technical) {
   let score = 48;
   if (technical.trendOk) score += 22;
   if (technical.pullbackOk) score += 16;
-  if (rsi != null && rsi >= 35 && rsi <= 62) score += 12;
-  if (rsi != null && rsi > 72) score -= 14;
+  if (rsi != null && rsi >= 35 && rsi <= 58) score += 12;
+  if (rsi != null && rsi > 65) score -= 12;
+  else if (rsi != null && rsi > 58) score -= 4;
   if (deviation != null && deviation >= -5 && deviation <= 5) score += 10;
   if (deviation != null && deviation > 10) score -= 12;
   const finalScore = clamp(Math.round(score));
@@ -377,6 +517,7 @@ function normalizeInstrument(instrument, theme = null) {
 
 function collectInstrumentMap(marketData) {
   const map = new Map();
+  const themeTickerMap = buildThemeTickerMap();
   const add = (instrument, theme) => {
     if (!instrument?.ticker) return;
     const ticker = String(instrument.ticker);
@@ -391,8 +532,12 @@ function collectInstrumentMap(marketData) {
     (theme.instruments || []).forEach((instrument) => add(instrument, theme));
   });
 
-  const appPath = path.resolve(process.cwd(), "docs", "fund-flow-ai-system", "app.js");
+  const appPath = resolveAppJsPath();
+  if (!appPath) {
+    console.warn("app.js not found; using market-data instruments only.");
+  }
   try {
+    if (!appPath) throw new Error("skip");
     const appText = fs.readFileSync(appPath, "utf8");
     const pattern = /\{\s*ticker:\s*"(\d{4})"\s*,\s*name:\s*"([^"]+)"\s*,\s*type:\s*"([^"]*)"\s*,\s*strength:\s*(\d+)\s*,\s*warning:\s*"([^"]*)"(?:\s*,\s*quality:\s*"([^"]*)")?(?:\s*,\s*newsRisk:\s*"([^"]*)")?/g;
     let match;
@@ -445,23 +590,46 @@ function collectInstrumentMap(marketData) {
     }
   });
 
+  for (const [ticker, instrument] of map) {
+    const themeIds = themeTickerMap.get(ticker) || [];
+    instrument.themeIds = themeIds;
+    if (!instrument.themeName && themeIds.length) {
+      instrument.themeName = themeIds.map((id) => THEME_LABELS[id] || id).join(" / ");
+    }
+  }
+
   return map;
 }
 
 function signalFor(stock) {
   const checks = stock.checks || {};
-  if (stock.score >= 78 && stock.winRate >= 65 && checks.passed >= 3 && checks.chart?.ok) return "統合買い候補";
-  if (stock.score >= 68 && stock.winRate >= 58 && checks.passed >= 2) return "確認候補";
+  const rsi = num(stock.technical?.rsi, NaN);
+  const overbought = Number.isFinite(rsi) && rsi > 65;
+  const indexLinked = isIndexLinkedType(stock.type, stock.name);
+  if (
+    stock.score >= 78 &&
+    stock.winRate >= 65 &&
+    checks.passed >= 3 &&
+    checks.chart?.ok &&
+    !overbought &&
+    !indexLinked
+  ) {
+    return "統合買い候補";
+  }
+  if (stock.score >= 68 && stock.winRate >= 58 && checks.passed >= 2) {
+    return overbought || indexLinked ? "監視継続" : "確認候補";
+  }
   if (stock.score >= 56) return "監視継続";
   return "見送り";
 }
 
-function buildStock(ticker, instrument, quote, financial = null) {
-  const flow = fundFlowScore(quote);
+function buildStock(ticker, instrument, quote, financial = null, marketData = null) {
+  const technical = technicalSignal(quote);
+  const overheat = overheatAdjustments(quote, technical);
+  let flow = clamp(fundFlowScore(quote) - overheat.flowPenalty);
   const baseTreasure = instrumentScore(instrument);
   const kind = stockSignalKind(instrument, quote);
   const signalBonus = kind === "buy" ? 18 : kind === "watch" ? 12 : kind === "early" ? 7 : -8;
-  const technical = technicalSignal(quote);
   const trade = estimateTradePlan(technical, quote);
   const checks = confirmationChecks(instrument, technical, quote, financial);
   const technicalScore = technical?.score || 0;
@@ -469,7 +637,12 @@ function buildStock(ticker, instrument, quote, financial = null) {
     ? clamp(technicalScore * 0.62 + trade.winRate * 0.38)
     : technicalScore;
   const treasureScore = clamp(baseTreasure + signalBonus);
-  const rawScore = flow * 0.30 + treasureScore * 0.18 + kabuScore * 0.32 + checks.score * 0.20;
+  const themeIds = instrument.themeIds || [];
+  const themeBonus = themeFlowBonus(themeIds, marketData);
+  const indexLinked = isIndexLinkedType(instrument.type, instrument.name);
+  let rawScore = flow * 0.28 + treasureScore * 0.18 + kabuScore * 0.34 + checks.score * 0.20;
+  rawScore += themeBonus - overheat.scorePenalty;
+  if (indexLinked) rawScore -= 4;
   const latest = quote?.latest || {};
 
   const stock = {
@@ -480,10 +653,13 @@ function buildStock(ticker, instrument, quote, financial = null) {
     treasureScore: Math.round(treasureScore),
     kabuScore: Math.round(kabuScore),
     confirmationScore: checks.score,
+    themeFlowBonus: themeBonus,
+    overheatPenalty: overheat.scorePenalty,
     signal: "",
     price: num(latest.close, technical?.current ?? null),
     date: latest.date || technical?.date || null,
     theme: instrument.themeName || null,
+    themeIds,
     type: instrument.type || "日本株",
     quality: instrument.quality || null,
     newsRisk: instrument.newsRisk || null,
@@ -515,14 +691,12 @@ function buildStock(ticker, instrument, quote, financial = null) {
 }
 
 function main() {
-  const marketPath = path.resolve(
-    process.cwd(),
-    process.env.MARKET_DATA_INPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "market-data.json")
-  );
-  const outputPath = path.resolve(
-    process.cwd(),
-    process.env.TREASURE_STOCKS_OUTPUT_PATH || path.join("docs", "fund-flow-ai-system", "data", "treasure-stocks.json")
-  );
+  const marketPath = process.env.MARKET_DATA_INPUT_PATH
+    ? path.resolve(process.cwd(), process.env.MARKET_DATA_INPUT_PATH)
+    : resolveMarketDataDefaultPath();
+  const outputPath = process.env.TREASURE_STOCKS_OUTPUT_PATH
+    ? path.resolve(process.cwd(), process.env.TREASURE_STOCKS_OUTPUT_PATH)
+    : resolveTreasureOutputDefaultPath();
   const marketData = readJson(marketPath, {});
   const quotes = marketData.instrumentQuotes || {};
   const financials = marketData.financials || {};
@@ -532,15 +706,26 @@ function main() {
     .map(([ticker, instrument]) => {
       const quote = quotes[String(ticker)];
       if (!quote) return null;
-      return buildStock(ticker, instrument, quote, financials[String(ticker)] || null);
+      return buildStock(ticker, instrument, quote, financials[String(ticker)] || null, marketData);
     })
     .filter((stock) => stock && stock.price != null)
     .filter((stock) => stock.treasureScore >= 50 || stock.flowScore >= 52 || stock.kabuScore >= 45)
-    .sort((a, b) => b.score - a.score || b.flowScore - a.flowScore || b.kabuScore - a.kabuScore);
+    .sort((a, b) => {
+      // Strongly prefer individual stocks (non-ETF/REIT/index) at the front for 統合銘柄ランキング
+      const aIsIndex = isIndexLinkedType(a.type, a.name) ? 1 : 0;
+      const bIsIndex = isIndexLinkedType(b.type, b.name) ? 1 : 0;
+      if (aIsIndex !== bIsIndex) return aIsIndex - bIsIndex;
+      const aKabu = a.kabuScore - (aIsIndex ? 12 : 0);
+      const bKabu = b.kabuScore - (bIsIndex ? 12 : 0);
+      if (bKabu !== aKabu) return bKabu - aKabu;
+      const aScore = a.score - (aIsIndex ? 8 : 0);
+      const bScore = b.score - (bIsIndex ? 8 : 0);
+      return bScore - aScore || b.flowScore - a.flowScore;
+    });
 
   writeJson(outputPath, {
     source: "fund-flow-treasure-kabukazidou",
-    logic: "fund-flowお宝候補 + kabukazidou型テクニカル + 実決算/EPS/進捗率 + 材料/出来高/チャート位置確認",
+    logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ",
     updatedAt: new Date().toISOString(),
     marketUpdatedAt: marketData.updatedAt || null,
     stocks

@@ -2261,6 +2261,11 @@ function signalClass(signal = "") {
   return "neutral";
 }
 
+function isIndexLinkedStock(stock = {}) {
+  const text = `${stock.type || ""} ${stock.name || ""}`;
+  return /ETF|投信|連動|REIT|リート/i.test(text);
+}
+
 function formatNumber(value, digits = 0) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "-";
@@ -2317,7 +2322,8 @@ function buildIntegratedComparisons(ranking, historyPayload) {
   const priorDates = dates.filter((date) => date < effectiveTodayDate);
   const yesterdayDate = priorDates[priorDates.length - 1] || null;
   const dayBeforeDate = priorDates.length >= 2 ? priorDates[priorDates.length - 2] : null;
-  const stocks = Array.isArray(ranking?.stocks) ? ranking.stocks.slice(0, 10) : [];
+  const allStocks = Array.isArray(ranking?.stocks) ? ranking.stocks : [];
+  const stocks = allStocks.filter((s) => !isIndexLinkedStock(s)).slice(0, 10);
 
   const items = stocks.map((stock, index) => {
     const code = String(stock.code || "").trim();
@@ -2383,7 +2389,21 @@ function renderIntegratedRanking() {
   if (!container) return;
 
   const payload = state.integratedRanking;
-  const stocks = Array.isArray(payload?.stocks) ? payload.stocks.slice(0, 10) : [];
+  const relaxEl = document.getElementById('integratedRelaxToggle');
+  const isRelax = !!(relaxEl && relaxEl.checked);
+  if (relaxEl && !relaxEl._listenerAdded) {
+    relaxEl.addEventListener('change', () => {
+      try { localStorage.setItem('integratedRelaxMode', relaxEl.checked ? '1' : '0'); } catch {}
+      renderIntegratedRanking();
+    });
+    relaxEl._listenerAdded = true;
+    try {
+      if (localStorage.getItem('integratedRelaxMode') === '1') relaxEl.checked = true;
+    } catch {}
+  }
+  const maxItems = isRelax ? 15 : 10;
+  const allStocks = Array.isArray(payload?.stocks) ? payload.stocks : [];
+  const stocks = allStocks.filter((s) => !isIndexLinkedStock(s)).slice(0, maxItems);
   const comparisons = state.integratedRankingComparisons;
   const comparisonByCode = Object.fromEntries((comparisons?.items || []).map((item) => [item.code, item]));
 
@@ -2417,8 +2437,11 @@ function renderIntegratedRanking() {
     const actual = checks.earnings?.actual || stock.financial?.latestStatement || null;
     const comparison = comparisonByCode[String(stock.code)] || null;
     const move = comparison?.move;
+    const priceNum = Number(stock.price) || 0;
+    const buyNum = Number(stock.buy) || 0;
+    const isAtTarget = buyNum > 0 && priceNum > 0 && priceNum <= (isRelax ? buyNum * 1.02 : buyNum);
     return `
-      <article class="integrated-stock-card">
+      <article class="integrated-stock-card ${isAtTarget ? 'at-buy-target' : ''} ${isRelax ? 'relax-mode' : ''}">
         <div class="integrated-rank-block">
           <div class="integrated-rank">${index + 1}</div>
           ${move ? `<small class="rank-move ${move.className}" title="${move.title}">${move.label}</small>` : ""}
@@ -2427,6 +2450,7 @@ function renderIntegratedRanking() {
           <div class="integrated-stock-title">
             <strong>${stock.code || "-"}</strong>
             <span>${stock.name || "-"}</span>
+            ${isAtTarget ? `<span class="buy-target-badge">🎯 目標到達</span>` : ""}
           </div>
           <div class="integrated-stock-meta">
             <span>${stock.type || "-"}</span>
@@ -2478,7 +2502,8 @@ function renderIntegratedRanking() {
 
   if (status) {
     const updated = payload.updatedAt ? formatStatusTime(payload.updatedAt) : "時刻不明";
-    status.textContent = `${stocks.length}件表示 / 全${payload.stocks.length}件 / ${updated}`;
+    const totalIntegrated = Array.isArray(payload?.stocks) ? payload.stocks.filter((s) => !isIndexLinkedStock(s)).length : stocks.length;
+    status.textContent = `${stocks.length}件表示 / 統合${totalIntegrated}件 / 全${payload.stocks ? payload.stocks.length : 0}件 / ${updated}`;
   }
 }
 
@@ -2493,6 +2518,13 @@ async function loadIntegratedRanking() {
       fetchIntegratedRankingPayload(),
       fetchIntegratedRankingHistoryPayload().catch(() => null)
     ]);
+
+    // 統合銘柄ランキング用に ETF/投信/連動/REIT を除外（スプレッドシートやローカル生成と一致させるため）
+    // これにより公開ページでも「ほかの取得」と同じ個別株のみが表示されるようになる
+    if (payload && Array.isArray(payload.stocks)) {
+      payload.stocks = payload.stocks.filter((s) => !isIndexLinkedStock(s));
+    }
+
     state.integratedRanking = payload;
     state.integratedRankingHistory = historyPayload;
     state.integratedRankingComparisons = historyPayload

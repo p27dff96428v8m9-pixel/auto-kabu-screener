@@ -1591,6 +1591,50 @@ input[type="search"] {
   background: #fbfcfd;
 }
 
+.integrated-stock-card.at-buy-target {
+  border-color: #16a34a;
+  border-width: 2px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.25);
+  animation: at-target-glow 1.8s ease-in-out infinite;
+}
+
+.integrated-stock-card.relax-mode {
+  opacity: 0.98;
+}
+
+@keyframes at-target-glow {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.25); }
+  50% { box-shadow: 0 0 0 7px rgba(22, 163, 74, 0.4); }
+}
+
+.buy-target-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: white;
+  font-weight: 600;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.relax-toggle {
+  font-size: 12px;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #334155;
+  user-select: none;
+}
+
+.relax-toggle input {
+  accent-color: #0ea5e9;
+}
+
 .integrated-rank-block {
   display: grid;
   gap: 4px;
