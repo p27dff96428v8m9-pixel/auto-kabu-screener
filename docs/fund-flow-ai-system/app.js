@@ -385,9 +385,12 @@ const state = {
   dataMessage: "",
   macroSignals: null,
   instrumentQuotes: {},
-  stockRanking: null,
   aiResearch: null,
   aiResearchMessage: "",
+  integratedRanking: null,
+  integratedRankingHistory: null,
+  integratedRankingComparisons: null,
+  integratedRankingMessage: "",
   marketStatus: { state: "pending", text: "確認中" },
   geminiStatus: { state: "pending", text: "確認中" },
   macroStatus: { state: "pending", text: "確認中" },
@@ -399,13 +402,13 @@ const state = {
 const PRO_CHECKOUT_URL = "";
 
 const weights = {
-  momentum: 0.25,
-  volume: 0.20,
-  fundFlow: 0.20,
-  breadth: 0.15,
+  momentum: 0.22,
+  volume: 0.18,
+  fundFlow: 0.24,
+  breadth: 0.16,
   news: 0.10,
   ai: 0.10,
-  crowdedness: -0.10
+  crowdedness: -0.12
 };
 
 const labels = {
@@ -530,9 +533,11 @@ function calculateScore(theme, period) {
 }
 
 function acceleration(theme) {
-  const short = calculateRaw(theme.metrics["7d"]);
-  const medium = calculateRaw(theme.metrics["30d"]);
-  return Math.round(short - medium + theme.metrics["7d"].volume * 0.08);
+  const m7 = theme.metrics["7d"];
+  const m30 = theme.metrics["30d"];
+  const flowDelta = m7.fundFlow - m30.fundFlow;
+  const scoreDelta = calculateRaw(m7) - calculateRaw(m30);
+  return Math.round(flowDelta * 0.55 + scoreDelta * 0.35 + m7.volume * 0.06);
 }
 
 function calculateRaw(m) {
@@ -549,7 +554,9 @@ function calculateRaw(m) {
 
 function fundAmount(theme, period = state.period) {
   const m = theme.metrics[period];
-  return Math.round(calculateScore(theme, period) * 0.65 + m.fundFlow * 0.35);
+  const overheatPenalty = Math.max(0, m.crowdedness - 65) * 0.35;
+  const shortSurgePenalty = period === "7d" && theme.metrics["7d"].fundFlow - theme.metrics["30d"].fundFlow > 12 ? 6 : 0;
+  return clamp(Math.round(calculateScore(theme, period) * 0.6 + m.fundFlow * 0.4 - overheatPenalty - shortSurgePenalty));
 }
 
 function spreadScore(theme, period = state.period) {
@@ -682,7 +689,15 @@ function flowRouteCandidates(list) {
       const end = mapPositionFor(to, mapList);
       const fromTheme = themeById(from);
       const toTheme = themeById(to);
-      const strength = Math.round((fundAmount(fromTheme) + accelerationForPeriod(toTheme, state.period) + spreadScore(toTheme)) / 3);
+      const outflowShift = fromTheme.metrics["7d"].fundFlow - fromTheme.metrics["30d"].fundFlow;
+      const inflowShift = toTheme.metrics["7d"].fundFlow - toTheme.metrics["30d"].fundFlow;
+      const rotationBoost = outflowShift < -3 && inflowShift > 3 ? 14 : 0;
+      const strength = Math.round(
+        fundAmount(fromTheme) * 0.35 +
+        accelerationForPeriod(toTheme, state.period) * 0.35 +
+        spreadScore(toTheme) * 0.3 +
+        rotationBoost
+      );
       const midX = (start.x + end.x) / 2;
       const midY = (start.y + end.y) / 2;
       const dx = end.x - start.x;
@@ -787,6 +802,8 @@ function filteredThemes() {
       return text.includes(needle);
     })
     .sort((a, b) => {
+      const flowDiff = fundAmount(b, state.period) - fundAmount(a, state.period);
+      if (flowDiff !== 0) return flowDiff;
       const scoreDiff = calculateScore(b, state.period) - calculateScore(a, state.period);
       if (scoreDiff !== 0) return scoreDiff;
       return aiResearchScore(b) - aiResearchScore(a);
@@ -819,7 +836,7 @@ function renderFilters() {
 }
 
 function renderSummary(list) {
-  const top = list[0] || themes[0];
+  const top = [...(list.length ? list : themes)].sort((a, b) => fundAmount(b, state.period) - fundAmount(a, state.period))[0] || themes[0];
   const emerging = list.filter((theme) => theme.stage === "emerging").length;
   const crowded = list.filter((theme) => theme.stage === "crowded").length;
   const avgConfidence = list.length
@@ -827,7 +844,7 @@ function renderSummary(list) {
     : 0;
 
   document.querySelector("#topTheme").textContent = top.name;
-  document.querySelector("#topThemeDetail").textContent = `${top.assetClass} / 総合スコア ${calculateScore(top, state.period)}`;
+  document.querySelector("#topThemeDetail").textContent = `${top.assetClass} / 資金量 ${fundAmount(top)} / ${lifecycleStage(top).label}`;
   document.querySelector("#emergingCount").textContent = `${emerging}件`;
   document.querySelector("#crowdedCount").textContent = `${crowded}件`;
   document.querySelector("#avgConfidence").textContent = `${avgConfidence}%`;
@@ -1223,49 +1240,113 @@ function geminiResearchCandidates(visibleIds = null) {
     .filter((candidate) => !visibleIds || visibleIds.has(candidate.id));
 }
 
+function flowLeaderThemes(list = []) {
+  const source = list.length ? list : themes;
+  const byAmount = [...source].sort((a, b) => fundAmount(b, state.period) - fundAmount(a, state.period));
+  const byMomentum = [...source].sort((a, b) => {
+    const aScore = accelerationForPeriod(a, state.period) - Math.max(0, a.metrics[state.period].crowdedness - 58) * 0.4;
+    const bScore = accelerationForPeriod(b, state.period) - Math.max(0, b.metrics[state.period].crowdedness - 58) * 0.4;
+    return bScore - aScore;
+  });
+  return {
+    leader: byAmount[0] || themes[0],
+    growth: byMomentum.find((theme) => {
+      const stage = lifecycleStage(theme).label;
+      return stage === "成長期" || stage === "発芽期";
+    }) || byMomentum[0] || byAmount[1] || byAmount[0],
+    crowded: byAmount.find((theme) => theme.stage === "crowded" || lifecycleStage(theme).label === "成熟期") || null
+  };
+}
+
+function renderCharacterCards(cards) {
+  return cards.map((card) => `
+    <div class="character-card">
+      <span class="character-icon">${card.icon}</span>
+      <span>
+        <strong>${card.title}</strong>
+        <span>${card.text}</span>
+      </span>
+    </div>
+  `).join("");
+}
+
 function renderCharacters() {
   const container = document.querySelector("#aiCharacters");
   const candidates = geminiResearchCandidates();
+  const leaders = flowLeaderThemes(filteredThemes());
+  const route = primaryRouteFor(filteredThemes());
 
-  if (!candidates.length) {
-    container.innerHTML = `
-      <div class="character-card">
-        <span class="character-icon">💎</span>
-        <span>
-          <strong>Gemini：調査待ち</strong>
-          <span>GitHub ActionsでGemini調査が実行されると、ここに注目テーマと次に確認するテーマが表示されます。</span>
-        </span>
-      </div>
-    `;
+  if (candidates.length) {
+    const current = candidates[0];
+    const next = candidates.find((candidate) => candidate.id !== current.id);
+    const currentTheme = themeById(current.id);
+    const nextTheme = next ? themeById(next.id) : null;
+    const evidence = Array.isArray(current.evidence) ? current.evidence.slice(0, 2).join(" / ") : "";
+    container.innerHTML = renderCharacterCards([
+      {
+        icon: "💎",
+        title: "Gemini：価格・出来高・ニュース・金利・為替の総合調査",
+        text: `注目 ${themeIcons[current.id]} ${current.name || currentTheme.name}。${nextTheme ? `次に確認 ${themeIcons[next.id]} ${next.name || nextTheme.name}。` : ""}${current.reason || ""}${evidence ? ` / ${evidence}` : ""}`
+      },
+      {
+        icon: "💰",
+        title: "資金の居場所",
+        text: `現在の主役は ${themeIcons[leaders.leader.id]} ${leaders.leader.name}（資金量 ${fundAmount(leaders.leader)}）。次の候補は ${themeIcons[leaders.growth.id]} ${leaders.growth.name}（加速度 ${accelerationForPeriod(leaders.growth, state.period) >= 0 ? "+" : ""}${accelerationForPeriod(leaders.growth, state.period)}）。`
+      }
+    ]);
     return;
   }
 
-  const current = candidates[0];
-  const next = candidates.find((candidate) => candidate.id !== current.id);
-  const currentTheme = themeById(current.id);
-  const nextTheme = next ? themeById(next.id) : null;
-  const evidence = Array.isArray(current.evidence) ? current.evidence.slice(0, 2).join(" / ") : "";
-  container.innerHTML = `
-    <div class="character-card">
-      <span class="character-icon">💎</span>
-      <span>
-        <strong>Gemini：価格・出来高・ニュース・金利・為替の総合調査</strong>
-        <span>注目 ${themeIcons[current.id]} ${current.name || currentTheme.name}。${nextTheme ? `次に確認 ${themeIcons[next.id]} ${next.name || nextTheme.name}。` : ""}${current.reason || ""}</span>
-        ${evidence ? `<span class="candidate-evidence">${evidence}</span>` : ""}
-      </span>
-    </div>
-  `;
+  const cards = [
+    {
+      icon: "💰",
+      title: "成長資金：いま資金が集まっているテーマ",
+      text: `${themeIcons[leaders.leader.id]} ${leaders.leader.name} / 資金量 ${fundAmount(leaders.leader)} / ${lifecycleStage(leaders.leader).label}`
+    },
+    {
+      icon: "🌿",
+      title: "次に広がりそうなテーマ",
+      text: `${themeIcons[leaders.growth.id]} ${leaders.growth.name} / 加速度 ${accelerationForPeriod(leaders.growth, state.period) >= 0 ? "+" : ""}${accelerationForPeriod(leaders.growth, state.period)} / 広がり ${spreadScore(leaders.growth)}`
+    }
+  ];
+  if (route) {
+    const rotation = route.fromTheme.metrics["7d"].fundFlow - route.fromTheme.metrics["30d"].fundFlow < -3 &&
+      route.toTheme.metrics["7d"].fundFlow - route.toTheme.metrics["30d"].fundFlow > 3;
+    cards.push({
+      icon: "↗",
+      title: rotation ? "資金シフト候補ルート" : "注目ルート",
+      text: `${themeIcons[route.from]} ${route.fromTheme.name} → ${themeIcons[route.to]} ${route.toTheme.name}`
+    });
+  }
+  if (leaders.crowded) {
+    cards.push({
+      icon: "⚠",
+      title: "過熱注意テーマ",
+      text: `${themeIcons[leaders.crowded.id]} ${leaders.crowded.name} / 過熱度 ${leaders.crowded.metrics[state.period].crowdedness}`
+    });
+  }
+  container.innerHTML = renderCharacterCards(cards);
 }
 
 function renderMarketStory(list) {
-  const sorted = list.length ? list : themes;
-  const mature = sorted.find((theme) => lifecycleStage(theme).label === "成熟期") || sorted[0];
-  const growth = sorted.find((theme) => lifecycleStage(theme).label === "成長期") || sorted[1] || sorted[0];
-  const seed = sorted.find((theme) => lifecycleStage(theme).label === "発芽期") || sorted[2] || sorted[0];
-  document.querySelector("#marketStory").textContent =
-    `${themeIcons[mature.id]} ${mature.name}にはまだ資金が残っていますが、過熱度や加速度の変化から追いかけ買いには注意が必要です。` +
-    ` 一方で、${themeIcons[growth.id]} ${growth.name}は資金量が中程度で加速度が強く、銘柄調査を始めやすい段階です。` +
-    ` 次の派生先として、${themeIcons[seed.id]} ${seed.name}のような周辺テーマへ資金が広がるかを確認します。`;
+  const leaders = flowLeaderThemes(list);
+  const route = primaryRouteFor(list);
+  const leader = leaders.leader;
+  const growth = leaders.growth;
+  const leaderFlow = `${leader.metrics["90d"].fundFlow}→${leader.metrics["30d"].fundFlow}→${leader.metrics["7d"].fundFlow}`;
+  const growthFlow = `${growth.metrics["90d"].fundFlow}→${growth.metrics["30d"].fundFlow}→${growth.metrics["7d"].fundFlow}`;
+  const leaderStage = lifecycleStage(leader);
+  const growthStage = lifecycleStage(growth);
+  let story = `${periodLabel()}の資金ストーリー: ${themeIcons[leader.id]} ${leader.name}が資金量${fundAmount(leader)}（${leaderFlow}）で主役ですが、${leaderStage.label}のため${leaderStage.decision}。`;
+  story += ` 一方、${themeIcons[growth.id]} ${growth.name}は資金量${fundAmount(growth)}（${growthFlow}）、加速度${accelerationForPeriod(growth, state.period) >= 0 ? "+" : ""}${accelerationForPeriod(growth, state.period)}、広がり${spreadScore(growth)}で${growthStage.decision}。`;
+  if (route) {
+    const rotation = route.fromTheme.metrics["7d"].fundFlow - route.fromTheme.metrics["30d"].fundFlow < -3 &&
+      route.toTheme.metrics["7d"].fundFlow - route.toTheme.metrics["30d"].fundFlow > 3;
+    story += rotation
+      ? ` マップ上では ${route.fromTheme.name} から ${route.toTheme.name} へ資金が移り始めている読みができます。`
+      : ` 注目ルートは ${route.fromTheme.name} → ${route.toTheme.name} です。`;
+  }
+  document.querySelector("#marketStory").textContent = story;
 }
 
 function aiResearchScore(theme) {
@@ -1493,7 +1574,8 @@ function renderList() {
 
   list.forEach((theme, index) => {
     const m = theme.metrics[state.period];
-    const score = calculateScore(theme, state.period);
+    const amount = fundAmount(theme, state.period);
+    const stage = lifecycleStage(theme);
     const rankMove = rankMoveFor(theme.id, index + 1);
     const card = document.createElement("button");
     card.type = "button";
@@ -1505,16 +1587,16 @@ function renderList() {
         <small class="rank-move ${rankMove.className}" title="${rankMove.title}">${rankMove.label}</small>
       </span>
       <span class="theme-main">
-        <span class="theme-title">${theme.name}</span>
+        <span class="theme-title">${themeIcons[theme.id]} ${theme.name}</span>
         <span class="theme-meta">
           <span class="pill">${theme.assetClass}</span>
-          <span class="pill">${theme.region}</span>
-          <span class="stage ${theme.stage}">${labels[theme.stage]}</span>
-          <span>加速度 ${accelerationForPeriod(theme, state.period)}</span>
-          <span>信頼度 ${m.confidence}%</span>
+          <span class="stage ${theme.stage}">${stage.icon} ${stage.label}</span>
+          <span>加速度 ${accelerationForPeriod(theme, state.period) >= 0 ? "+" : ""}${accelerationForPeriod(theme, state.period)}</span>
+          <span>広がり ${spreadScore(theme)}</span>
+          <span>過熱 ${m.crowdedness}</span>
         </span>
       </span>
-      <span class="score"><strong>${score}</strong><span>総合スコア</span></span>
+      <span class="score"><strong>${amount}</strong><span>資金量</span><small>総合 ${calculateScore(theme, state.period)}</small></span>
     `;
     card.addEventListener("click", () => {
       state.selectedId = theme.id;
@@ -1541,7 +1623,7 @@ function renderDetail() {
   document.querySelector("#detailName").textContent = locked ? "🔒 Pro限定テーマ" : `${themeIcons[theme.id]} ${theme.name}`;
   document.querySelector("#detailStage").textContent = locked ? "LOCK" : `${stage.icon} ${stage.label}`;
   document.querySelector("#detailStage").className = `stage ${theme.stage}`;
-  document.querySelector("#detailScore").textContent = locked ? "LOCK" : m.fundFlow;
+  document.querySelector("#detailScore").textContent = locked ? "LOCK" : fundAmount(theme, state.period);
   document.querySelector("#detailAcceleration").textContent = locked ? "LOCK" : accelerationForPeriod(theme, state.period);
   document.querySelector("#detailBreadth").textContent = locked ? "LOCK" : `${spreadScore(theme)}`;
   document.querySelector("#detailCrowdedness").textContent = locked ? "LOCK" : `${m.crowdedness}%`;
@@ -1559,6 +1641,31 @@ function renderDetail() {
   document.querySelector("#aiSummary").innerHTML = locked
     ? `<div class="locked-detail">${proLockMarkup("資金フロー詳細を解除")}<p>このテーマは流入または流出の候補ルートが複数あるため、無料プレビューでは詳細を伏せています。</p><button class="text-button compact" data-upgrade type="button">Proで見る</button></div>`
     : buildAiSummary(theme, score);
+  const treasureInstruments = relatedInstruments(theme);
+  document.querySelector("#instrumentList").innerHTML = treasureInstruments.length
+    ? treasureInstruments.map((instrument, index) => {
+      const instrumentLocked = locked || (!state.isPro && index > 0);
+      const signal = instrumentFinalSignal(instrument, stockQuoteFor(instrument.ticker));
+      return `
+      <div class="instrument">
+        <span class="ticker">${instrumentLocked ? "LOCK" : instrument.ticker}</span>
+        <span>
+          ${instrumentLocked ? "" : `
+            <span class="instrument-meta">
+              <span class="order-pill">確認順 ${index + 1}</span>
+              <span class="final-pill ${signal.tone}">${signal.label}</span>
+            </span>
+          `}
+          ${instrumentLocked ? "Pro限定の関連銘柄" : instrument.name}
+          <small>${instrumentLocked ? "銘柄名・お宝度・悪材料確認はProで表示されます" : `${instrument.type} / お宝度 ${instrumentScore(instrument)} / ${instrument.quality || "業績良好候補"} / ${instrument.newsRisk || "悪材料未検出"}`}</small>
+        </span>
+        ${instrumentLocked ? "" : renderInstrumentMarketBlock(instrument, stockQuoteFor(instrument.ticker))}
+      </div>
+    `;
+    })
+      .join("")
+    : '<p class="empty">上がりすぎ・悪材料・値動き注意を除外すると、今すぐ表示できるお宝候補はありません。</p>';
+
   document.querySelector("#dataPoints").innerHTML = `
     <dt>判断</dt><dd><span class="action-stage ${locked ? "observe" : actionStage.className}">${locked ? "Pro限定" : actionStage.label}</span></dd>
     <dt>理由</dt><dd>${locked ? "重要な資金フロー候補のため無料プレビューでは伏せています。" : actionStage.reason}</dd>
@@ -1575,75 +1682,6 @@ function renderDetail() {
 
 function stockQuoteFor(ticker) {
   return state.instrumentQuotes?.[String(ticker)] || null;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  })[char]);
-}
-
-function renderStockRanking() {
-  const status = document.querySelector("#stockRankingStatus");
-  const list = document.querySelector("#stockRankingList");
-  if (!status || !list) return;
-
-  const stocks = state.stockRanking?.stocks || [];
-  if (!stocks.length) {
-    status.textContent = "統合銘柄ランキングのデータがありません。";
-    list.innerHTML = "";
-    return;
-  }
-
-  const logic = state.stockRanking.logic ? ` / ${state.stockRanking.logic}` : "";
-  status.textContent = `${stocks.length}銘柄 / 更新 ${formatStatusTime(state.stockRanking.updatedAt)}${logic}`;
-  list.innerHTML = stocks.slice(0, 10).map((stock, index) => {
-    const checks = stock.checks || {};
-    const actual = checks.earnings?.actual || stock.financial?.latestStatement || null;
-    return `
-    <article class="stock-row">
-      <span class="rank"><strong>${index + 1}</strong></span>
-      <span class="stock-main">
-        <strong>${escapeHtml(stock.code)} ${escapeHtml(stock.name)}</strong>
-        <span>
-          ${escapeHtml(stock.signal || "監視")}
-          / 現在値 ${stock.price != null ? Number(stock.price).toLocaleString("ja-JP") : "-"}円
-          / 勝率 ${stock.winRate != null ? `${Number(stock.winRate).toFixed(0)}%` : "-"}
-          / RR ${stock.rr != null ? Number(stock.rr).toFixed(2) : "-"}
-        </span>
-        <span>
-          買い ${stock.buy != null ? Number(stock.buy).toLocaleString("ja-JP") : "-"}
-          / 利確 ${stock.tp != null ? Number(stock.tp).toLocaleString("ja-JP") : "-"}
-          / 損切 ${stock.sl != null ? Number(stock.sl).toLocaleString("ja-JP") : "-"}
-          / 25日乖離 ${stock.technical?.deviation != null ? `${Number(stock.technical.deviation).toFixed(1)}%` : "-"}
-          / RSI ${stock.technical?.rsi != null ? Number(stock.technical.rsi).toFixed(1) : "-"}
-        </span>
-        <span>
-          決算 ${escapeHtml(checks.earnings?.label || "-")}
-          / 材料 ${escapeHtml(checks.material?.label || "-")}
-          / 出来高 ${escapeHtml(checks.volume?.label || "-")}
-          / チャート ${escapeHtml(checks.chart?.label || "-")}
-        </span>
-        ${actual ? `
-        <span>
-          実決算 ${escapeHtml(actual.disclosedDate || "-")}
-          / EPS ${actual.eps != null ? Number(actual.eps).toFixed(2) : "-"}
-          / 進捗 ${actual.progressBasis != null ? `${Number(actual.progressBasis).toFixed(1)}%` : "-"}
-          / 期待比 ${actual.progressVsExpectedPct != null ? `${Number(actual.progressVsExpectedPct).toFixed(1)}pt` : "-"}
-        </span>` : ""}
-      </span>
-      <span class="stock-score">
-        <strong>${stock.score}</strong>
-        <span>総合</span>
-        <small>資金${stock.flowScore ?? "-"} / お宝${stock.treasureScore ?? "-"} / Kabu${stock.kabuScore ?? "-"}</small>
-      </span>
-    </article>
-  `;
-  }).join("");
 }
 
 function formatChange(value) {
@@ -1828,21 +1866,6 @@ function bindEvents() {
     renderList();
   });
 
-  document.querySelector("#refreshButton").addEventListener("click", async () => {
-    const loaded = await loadMarketData({ force: true });
-    await loadPublicRankHistory({ force: true });
-    if (!loaded) {
-      simulateDailyRefresh();
-    }
-    renderList();
-  });
-
-  document.querySelector("#runAiResearch").addEventListener("click", async () => {
-    document.querySelector("#aiResearchStatus").textContent = "公開済みのGemini調査データを再読み込みしています...";
-    await loadAiResearch({ force: true });
-    renderResearchCandidates(filteredThemes());
-  });
-
   document.querySelector("#mapZoomOut").addEventListener("click", () => {
     setMapZoom(state.mapZoom - 0.1);
   });
@@ -1853,6 +1876,28 @@ function bindEvents() {
 
   document.querySelector("#mapFullscreen").addEventListener("click", () => {
     setMapFullscreen(!state.mapFullscreen);
+  });
+
+  document.querySelector("#refreshData")?.addEventListener("click", async () => {
+    const button = document.querySelector("#refreshData");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "更新中...";
+    }
+    try {
+      if (isLocalDevHost()) {
+        await fetch("/api/recompute-themes", { method: "POST", cache: "no-store" }).catch(() => null);
+      }
+      await loadMarketData({ force: true });
+      await loadAiResearch({ force: true });
+      await loadIntegratedRanking();
+      renderList();
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "データ更新";
+      }
+    }
   });
 
 }
@@ -1958,12 +2003,30 @@ function loadDailyCache() {
       const theme = themeById(cachedTheme.id);
       if (theme && cachedTheme.metrics) {
         theme.metrics = cachedTheme.metrics;
+        refreshThemeStageFromMetrics(theme);
       }
     });
     return payload.savedAt;
   } catch {
     return null;
   }
+}
+
+function refreshThemeStageFromMetrics(theme) {
+  const m7 = theme.metrics["7d"];
+  const m30 = theme.metrics["30d"];
+  const m90 = theme.metrics["90d"];
+  const accel = m7.fundFlow - m30.fundFlow;
+  const trend = m30.fundFlow - m90.fundFlow;
+  if (m7.crowdedness >= 72 || (m7.fundFlow >= 76 && accel <= 4)) {
+    theme.stage = "crowded";
+    return;
+  }
+  if (accel >= 8 && trend >= 0 && m7.crowdedness < 68) {
+    theme.stage = "emerging";
+    return;
+  }
+  theme.stage = "continuing";
 }
 
 function applyMarketDataPayload(payload) {
@@ -1989,6 +2052,7 @@ function applyMarketDataPayload(payload) {
       ...theme.metrics,
       ...remoteTheme.metrics
     };
+    refreshThemeStageFromMetrics(theme);
     applied += 1;
   });
 
@@ -2077,11 +2141,17 @@ function renderApiStatus() {
   });
 }
 
+function isLocalDevHost() {
+  const host = window.location.hostname;
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
+
 function marketDataSourceLabel(refreshed = false) {
   const sourceNames = {
-    "jquants-v2": "実データ: J-Quants V2",
-    "jquants-v1": "実データ: J-Quants V1",
+    "jquants-v2": isLocalDevHost() ? "ローカル: J-Quants V2" : "実データ: J-Quants V2",
+    "jquants-v1": isLocalDevHost() ? "ローカル: J-Quants V1" : "実データ: J-Quants V1",
     "github-pages": "実データ: GitHub更新",
+    local: "ローカル保存データ",
     jquants: "実データ: J-Quants",
     api: "実データ: API",
     sample: "サンプル"
@@ -2093,10 +2163,15 @@ function marketDataSourceLabel(refreshed = false) {
 async function fetchMarketDataPayload(force) {
   const cacheBust = `?t=${Date.now()}`;
   const suffix = force ? "?refresh=1" : "";
+  const publicMarketData = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/market-data.json${cacheBust}`;
   const isGitHubPages = window.location.hostname.endsWith("github.io");
-  const endpoints = isGitHubPages
-    ? [`data/market-data.json${cacheBust}`, `api/market-data${suffix}`, `/api/market-data${suffix}`]
-    : [`api/market-data${suffix}`, `/api/market-data${suffix}`, `data/market-data.json${cacheBust}`];
+  const isLocal = isLocalDevHost();
+  const localEndpoints = [`data/market-data.json${cacheBust}`, `/api/market-data${suffix}`, `api/market-data${suffix}`];
+  const endpoints = isLocal
+    ? localEndpoints
+    : isGitHubPages
+      ? localEndpoints
+      : [publicMarketData, ...localEndpoints];
 
   let lastError = null;
   for (const endpoint of endpoints) {
@@ -2104,8 +2179,11 @@ async function fetchMarketDataPayload(force) {
       const response = await fetch(endpoint, { cache: "no-store" });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${endpoint}`);
       const payload = await response.json();
-      if (endpoint.includes("data/market-data.json") && payload.source?.startsWith("jquants")) {
+      if (!isLocal && isGitHubPages && endpoint.includes("data/market-data.json") && payload.source?.startsWith("jquants")) {
         payload.source = "github-pages";
+      }
+      if (isLocal && endpoint.includes("data/market-data.json") && payload.source?.startsWith("jquants")) {
+        payload.source = "local";
       }
       return payload;
     } catch (error) {
@@ -2117,7 +2195,10 @@ async function fetchMarketDataPayload(force) {
 
 async function fetchAiResearchPayload(force) {
   const cacheBust = `?t=${Date.now()}`;
-  const endpoints = [`data/ai-research.json${cacheBust}`];
+  const publicAiResearch = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/ai-research.json${cacheBust}`;
+  const endpoints = isLocalDevHost()
+    ? [`data/ai-research.json${cacheBust}`, publicAiResearch]
+    : [publicAiResearch, `data/ai-research.json${cacheBust}`];
   let lastError = null;
 
   for (const endpoint of endpoints) {
@@ -2152,24 +2233,280 @@ async function loadAiResearch({ force = false } = {}) {
   }
 }
 
-async function loadStockRanking() {
+async function fetchIntegratedRankingPayload() {
+  const cacheBust = `?t=${Date.now()}`;
+  const publicRanking = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/treasure-stocks.json${cacheBust}`;
+  const endpoints = isLocalDevHost()
+    ? [`data/treasure-stocks.json${cacheBust}`, publicRanking]
+    : [publicRanking, `data/treasure-stocks.json${cacheBust}`];
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${endpoint}`);
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("統合ランキングデータを取得できませんでした。");
+}
+
+function signalClass(signal = "") {
+  if (/買い|buy/i.test(signal)) return "buy";
+  if (/監視|watch/i.test(signal)) return "watch";
+  if (/初動|early/i.test(signal)) return "early";
+  return "neutral";
+}
+
+function formatNumber(value, digits = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return new Intl.NumberFormat("ja-JP", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits
+  }).format(number);
+}
+
+function formatSignedPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return `${number >= 0 ? "+" : ""}${number.toFixed(1)}%`;
+}
+
+function integratedRankingDateKey(value) {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
+function integratedSnapshotDates(snapshots = {}) {
+  return Object.keys(snapshots).filter((date) => snapshots[date]?.stocks).sort();
+}
+
+function integratedRankMoveLabel(previousRank, currentRank) {
+  if (!Number.isFinite(previousRank)) {
+    return { label: "新規", className: "new", title: "前日ランキング外" };
+  }
+  const diff = previousRank - currentRank;
+  if (diff > 0) return { label: `↑${diff}`, className: "up", title: `前日${previousRank}位→当日${currentRank}位` };
+  if (diff < 0) return { label: `↓${Math.abs(diff)}`, className: "down", title: `前日${previousRank}位→当日${currentRank}位` };
+  return { label: "→", className: "flat", title: `前日${previousRank}位から変化なし` };
+}
+
+function integratedValueDelta(current, previous) {
+  const cur = Number(current);
+  const prev = Number(previous);
+  if (!Number.isFinite(cur)) return "-";
+  if (!Number.isFinite(prev)) return String(cur);
+  if (cur === prev) return `${cur} (±0)`;
+  const diff = cur - prev;
+  return `${prev}→${cur} (${diff > 0 ? "+" : ""}${diff})`;
+}
+
+function buildIntegratedComparisons(ranking, historyPayload) {
+  const snapshots = historyPayload?.snapshots || {};
+  const dates = integratedSnapshotDates(snapshots);
+  const todayDate = integratedRankingDateKey(ranking?.updatedAt);
+  const effectiveTodayDate = snapshots[todayDate] ? todayDate : dates[dates.length - 1] || todayDate;
+  const priorDates = dates.filter((date) => date < effectiveTodayDate);
+  const yesterdayDate = priorDates[priorDates.length - 1] || null;
+  const dayBeforeDate = priorDates.length >= 2 ? priorDates[priorDates.length - 2] : null;
+  const stocks = Array.isArray(ranking?.stocks) ? ranking.stocks.slice(0, 10) : [];
+
+  const items = stocks.map((stock, index) => {
+    const code = String(stock.code || "").trim();
+    const currentRank = index + 1;
+    const yesterday = yesterdayDate ? snapshots[yesterdayDate]?.stocks?.[code] : null;
+    const dayBefore = dayBeforeDate ? snapshots[dayBeforeDate]?.stocks?.[code] : null;
+    const move = integratedRankMoveLabel(yesterday?.rank, currentRank);
+    const tpChanged = Number.isFinite(Number(yesterday?.tp)) && Number(yesterday.tp) !== Number(stock.tp);
+    const slChanged = Number.isFinite(Number(yesterday?.sl)) && Number(yesterday.sl) !== Number(stock.sl);
+    return {
+      code,
+      rank: currentRank,
+      prevRank: yesterday?.rank ?? null,
+      prev2Rank: dayBefore?.rank ?? null,
+      move,
+      tpChange: integratedValueDelta(stock.tp, yesterday?.tp),
+      slChange: integratedValueDelta(stock.sl, yesterday?.sl),
+      tpChanged,
+      slChanged
+    };
+  });
+
+  return {
+    todayDate: effectiveTodayDate,
+    yesterdayDate,
+    dayBeforeDate,
+    items,
+    counts: {
+      added: items.filter((item) => item.move.className === "new").length,
+      rankUps: items.filter((item) => item.move.className === "up").length,
+      rankDowns: items.filter((item) => item.move.className === "down").length,
+      tpChanged: items.filter((item) => item.tpChanged).length,
+      slChanged: items.filter((item) => item.slChanged).length
+    }
+  };
+}
+
+async function fetchIntegratedRankingHistoryPayload() {
+  const cacheBust = `?t=${Date.now()}`;
+  const publicHistory = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/integrated-ranking-history.json${cacheBust}`;
+  const endpoints = isLocalDevHost()
+    ? [`data/integrated-ranking-history.json${cacheBust}`, publicHistory]
+    : [publicHistory, `data/integrated-ranking-history.json${cacheBust}`];
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${endpoint}`);
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("統合ランキング履歴を取得できませんでした。");
+}
+
+function renderIntegratedRanking() {
+  const container = document.querySelector("#integratedRankingList");
+  const status = document.querySelector("#integratedRankingStatus");
+  const summary = document.querySelector("#integratedRankingComparison");
+  if (!container) return;
+
+  const payload = state.integratedRanking;
+  const stocks = Array.isArray(payload?.stocks) ? payload.stocks.slice(0, 10) : [];
+  const comparisons = state.integratedRankingComparisons;
+  const comparisonByCode = Object.fromEntries((comparisons?.items || []).map((item) => [item.code, item]));
+
+  if (!stocks.length) {
+    container.innerHTML = '<p class="empty">統合ランキングデータがまだありません。</p>';
+    if (status) status.textContent = state.integratedRankingMessage || "未取得";
+    if (summary) summary.innerHTML = "";
+    return;
+  }
+
+  if (summary && comparisons) {
+    summary.innerHTML = `
+      <div class="integrated-comparison-summary">
+        <span>当日 ${comparisons.todayDate || "-"}</span>
+        <span>前日 ${comparisons.yesterdayDate || "記録なし"}</span>
+        <span>前々日 ${comparisons.dayBeforeDate || "記録なし"}</span>
+        <span>新規 ${comparisons.counts.added}件</span>
+        <span>↑${comparisons.counts.rankUps} / ↓${comparisons.counts.rankDowns}</span>
+        <span>利確変化 ${comparisons.counts.tpChanged}件</span>
+        <span>損切変化 ${comparisons.counts.slChanged}件</span>
+      </div>
+    `;
+  } else if (summary) {
+    summary.innerHTML = "";
+  }
+
+  container.innerHTML = stocks.map((stock, index) => {
+    const technical = stock.technical || {};
+    const changes = stock.changes || {};
+    const checks = stock.checks || {};
+    const actual = checks.earnings?.actual || stock.financial?.latestStatement || null;
+    const comparison = comparisonByCode[String(stock.code)] || null;
+    const move = comparison?.move;
+    return `
+      <article class="integrated-stock-card">
+        <div class="integrated-rank-block">
+          <div class="integrated-rank">${index + 1}</div>
+          ${move ? `<small class="rank-move ${move.className}" title="${move.title}">${move.label}</small>` : ""}
+        </div>
+        <div class="integrated-stock-main">
+          <div class="integrated-stock-title">
+            <strong>${stock.code || "-"}</strong>
+            <span>${stock.name || "-"}</span>
+          </div>
+          <div class="integrated-stock-meta">
+            <span>${stock.type || "-"}</span>
+            <span>${stock.theme || "テーマ横断"}</span>
+            <span>${stock.quality || "品質確認中"}</span>
+            <span>${stock.newsRisk || "材料確認中"}</span>
+          </div>
+          <div class="integrated-trade-row">
+            <span>現在 ${formatNumber(stock.price, 1)}</span>
+            <span>買い ${formatNumber(stock.buy)}</span>
+            <span>利確 ${formatNumber(stock.tp)}${comparison?.tpChanged ? ` <em class="value-change">${comparison.tpChange}</em>` : ""}</span>
+            <span>損切 ${formatNumber(stock.sl)}${comparison?.slChanged ? ` <em class="value-change">${comparison.slChange}</em>` : ""}</span>
+          </div>
+          ${comparison ? `
+          <div class="integrated-compare-row">
+            <span>前日順位 ${comparison.prevRank ?? "-"}</span>
+            <span>前々日順位 ${comparison.prev2Rank ?? "-"}</span>
+          </div>` : ""}
+        </div>
+        <div class="integrated-score-block">
+          <strong>${formatNumber(stock.score)}</strong>
+          <span class="integrated-signal ${signalClass(stock.signal)}">${stock.signal || "-"}</span>
+        </div>
+        <div class="integrated-metrics">
+          <span>資金 ${formatNumber(stock.flowScore)}</span>
+          <span>お宝 ${formatNumber(stock.treasureScore)}</span>
+          <span>Kabu ${formatNumber(stock.kabuScore)}</span>
+          <span>確認 ${formatNumber(stock.confirmationScore)}</span>
+          ${stock.themeFlowBonus ? `<span>テーマ+${formatNumber(stock.themeFlowBonus)}</span>` : ""}
+          ${stock.overheatPenalty ? `<span>過熱-${formatNumber(stock.overheatPenalty)}</span>` : ""}
+          <span>決算 ${checks.earnings?.label || "-"}</span>
+          <span>材料 ${checks.material?.label || "-"}</span>
+          <span>出来高 ${checks.volume?.label || "-"}</span>
+          <span>チャート ${checks.chart?.label || "-"}</span>
+          ${actual ? `<span>実決算 ${actual.disclosedDate || "-"}</span>` : ""}
+          ${actual ? `<span>EPS ${actual.eps != null ? Number(actual.eps).toFixed(2) : "-"}</span>` : ""}
+          ${actual ? `<span>進捗 ${actual.progressBasis != null ? `${Number(actual.progressBasis).toFixed(1)}%` : "-"}</span>` : ""}
+          ${actual ? `<span>期待比 ${actual.progressVsExpectedPct != null ? `${Number(actual.progressVsExpectedPct).toFixed(1)}pt` : "-"}</span>` : ""}
+          <span>勝率 ${formatNumber(stock.winRate)}%</span>
+          <span>RR ${formatNumber(stock.rr, 2)}</span>
+          <span>7日 ${formatSignedPercent(changes["7d"])}</span>
+          <span>30日 ${formatSignedPercent(changes["30d"])}</span>
+          <span>25日乖離 ${formatSignedPercent(technical.deviation)}</span>
+          <span>RSI ${formatNumber(technical.rsi, 1)}</span>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  if (status) {
+    const updated = payload.updatedAt ? formatStatusTime(payload.updatedAt) : "時刻不明";
+    status.textContent = `${stocks.length}件表示 / 全${payload.stocks.length}件 / ${updated}`;
+  }
+}
+
+async function loadIntegratedRanking() {
   if (typeof window === "undefined" || window.location.protocol === "file:") {
-    renderStockRanking();
+    renderIntegratedRanking();
     return false;
   }
 
   try {
-    const response = await fetch(`data/treasure-stocks.json?t=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    state.stockRanking = await response.json();
-    renderStockRanking();
+    const [payload, historyPayload] = await Promise.all([
+      fetchIntegratedRankingPayload(),
+      fetchIntegratedRankingHistoryPayload().catch(() => null)
+    ]);
+    state.integratedRanking = payload;
+    state.integratedRankingHistory = historyPayload;
+    state.integratedRankingComparisons = historyPayload
+      ? buildIntegratedComparisons(payload, historyPayload)
+      : null;
+    state.integratedRankingMessage = "";
+    renderIntegratedRanking();
     return true;
   } catch (error) {
-    state.stockRanking = null;
-    const status = document.querySelector("#stockRankingStatus");
-    const list = document.querySelector("#stockRankingList");
-    if (status) status.textContent = `統合銘柄ランキングを取得できませんでした: ${error.message}`;
-    if (list) list.innerHTML = "";
+    state.integratedRanking = null;
+    state.integratedRankingHistory = null;
+    state.integratedRankingComparisons = null;
+    state.integratedRankingMessage = error.message;
+    renderIntegratedRanking();
     return false;
   }
 }
@@ -2236,8 +2573,8 @@ async function init() {
     setUpdatedAt();
   }
   await loadMarketData();
-  await loadStockRanking();
   await loadAiResearch();
+  await loadIntegratedRanking();
   await loadPublicRankHistory();
   renderList();
 }

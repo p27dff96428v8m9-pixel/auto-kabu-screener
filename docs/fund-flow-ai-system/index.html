@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>日本版 資金フローAI v2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260604-01" />
+  <link rel="stylesheet" href="./styles.css?v=20260607-localflow-05" />
 </head>
 <body>
   <header class="app-header">
@@ -17,6 +17,7 @@
       <span>更新</span>
       <strong id="updatedAt">-</strong>
       <small>J-Quants・ニュース・金利・為替 接続対応</small>
+      <button id="refreshData" class="icon-button secondary refresh-button" type="button">データ更新</button>
     </div>
   </header>
 
@@ -44,7 +45,7 @@
           <button type="button" data-scroll-target="sectionCandidates"><b>2</b> 次に見るテーマを見る</button>
           <button type="button" data-scroll-target="sectionMap"><b>3</b> 市場のお金の移動マップを見る</button>
           <button type="button" data-scroll-target="sectionPeriodFlow"><b>4</b> 90日 → 30日 → 7日のつながりを見る</button>
-          <button type="button" data-scroll-target="sectionDetail"><b>5</b> 右側の詳細でテーマを確認する</button>
+          <button type="button" data-scroll-target="sectionDetail"><b>5</b> 右側の詳細で関連銘柄を確認する</button>
         </div>
       </section>
 
@@ -64,10 +65,21 @@
             <h2><span class="step-badge">2</span>次に見るテーマ</h2>
             <p>Geminiが90日・30日・7日の資金量、加速度、広がり、過熱度、ニュース、金利、為替を比べて自動で調べます。</p>
           </div>
-          <button id="runAiResearch" class="text-button compact" type="button">Gemini再読込</button>
         </div>
         <p id="aiResearchStatus" class="ai-research-status">Gemini調査を読み込み中...</p>
         <div id="researchCandidates" class="candidate-list"></div>
+      </section>
+
+      <section id="sectionIntegratedRanking" class="panel integrated-ranking-panel">
+        <div class="panel-head">
+          <div>
+            <h2><span class="step-badge">R</span>統合銘柄ランキング</h2>
+            <p>資金フローAIのお宝候補ロジックとkabukazidou型のテクニカル判定を統合した上位銘柄です。</p>
+          </div>
+          <span id="integratedRankingStatus" class="ranking-status">読み込み中...</span>
+        </div>
+        <div id="integratedRankingComparison" class="integrated-comparison-panel"></div>
+        <div id="integratedRankingList" class="integrated-ranking-list"></div>
       </section>
 
       <section id="sectionMap" class="panel flow-panel main-map-panel">
@@ -93,7 +105,6 @@
                 <button id="mapFullscreen" class="icon-button secondary" type="button" title="画面いっぱいに表示">⛶</button>
               </div>
             </div>
-            <button id="refreshButton" class="icon-button" type="button" title="データを更新">↻</button>
           </div>
         </div>
         <div class="map-legend" aria-label="マップの見方">
@@ -146,17 +157,6 @@
         </div>
         <div id="themeList" class="theme-list"></div>
       </section>
-
-      <section class="panel stock-ranking-panel">
-        <div class="panel-head">
-          <div>
-            <h2>統合銘柄ランキング</h2>
-            <p>価格、出来高、短期と中期の資金流入から個別銘柄を順位付けします。</p>
-          </div>
-        </div>
-        <div id="stockRankingStatus" class="stock-ranking-status">読み込み中...</div>
-        <div id="stockRankingList" class="stock-ranking-list"></div>
-      </section>
     </section>
 
     <aside id="sectionDetail" class="detail" aria-label="テーマ詳細">
@@ -204,6 +204,12 @@
         <p class="detail-help">実際の資金ではなく、Geminiの調査メモです。</p>
         <div id="aiCharacters" class="ai-characters"></div>
 
+        <h3>関連銘柄の使い方</h3>
+        <p class="detail-help">上がりすぎ・混雑・値動き注意・悪材料確認を除外し、業績良好でまだ調査余地があるお宝候補だけを表示します。</p>
+
+        <h3>お宝候補銘柄</h3>
+        <div id="instrumentList" class="instrument-list"></div>
+
         <h3>データ点</h3>
         <dl id="dataPoints" class="data-points"></dl>
 
@@ -243,6 +249,6 @@
     </p>
   </footer>
 
-  <script src="./app.js?v=20260604-01"></script>
+  <script src="./app.js?v=20260607-localflow-05"></script>
 </body>
 </html>
