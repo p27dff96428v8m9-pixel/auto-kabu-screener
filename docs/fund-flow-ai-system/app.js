@@ -2401,6 +2401,276 @@ async function fetchIntegratedRankingHistoryPayload() {
   throw lastError || new Error("統合ランキング履歴を取得できませんでした。");
 }
 
+// === 統合ランキング 買い目標到達 観測 / 利確損切カウント機能 ===
+// 標準モードとゆるめモードで別管理。到達時点のシグナル(統合買い候補/監視継続/確認候補/見送り)で分類。
+// localStorage 永続化（ブラウザ検証用）。データ更新のたびフルリストから新規ヒット検知 + 既存のTP/SL解決をチェック。
+const OBS_STORAGE_KEY = 'integratedBuyTargetObs_v1';
+
+function makeEmptyCounts() {
+  return {
+    "統合買い候補": { tp: 0, sl: 0 },
+    "監視継続": { tp: 0, sl: 0 },
+    "確認候補": { tp: 0, sl: 0 },
+    "見送り": { tp: 0, sl: 0 }
+  };
+}
+
+function normalizeObs(obs) {
+  if (!obs || typeof obs !== 'object') {
+    obs = {};
+  }
+  for (const key of ['standard', 'relax']) {
+    if (!obs[key] || typeof obs[key] !== 'object') {
+      obs[key] = { active: [], counts: makeEmptyCounts() };
+    }
+    const d = obs[key];
+    if (!Array.isArray(d.active)) d.active = [];
+    if (!d.counts || typeof d.counts !== 'object') d.counts = makeEmptyCounts();
+    for (const cat of Object.keys(makeEmptyCounts())) {
+      if (!d.counts[cat] || typeof d.counts[cat] !== 'object') d.counts[cat] = { tp: 0, sl: 0 };
+    }
+  }
+  return obs;
+}
+
+function loadObservations() {
+  try {
+    const raw = localStorage.getItem(OBS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return normalizeObs(parsed);
+    }
+  } catch (_) {}
+  return normalizeObs({});
+}
+
+function saveObservations(obs) {
+  try {
+    localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify(normalizeObs(obs)));
+  } catch (_) {}
+}
+
+function getCategoryLabel(sig) {
+  const s = String(sig || '');
+  if (/統合.*買|buy.*cand/i.test(s)) return "統合買い候補";
+  if (/監視|watch|継続/i.test(s)) return "監視継続";
+  if (/確認|cand/i.test(s)) return "確認候補";
+  if (/見送|skip|pass/i.test(s)) return "見送り";
+  return s || "見送り";
+}
+
+function processBuyTargetObservations() {
+  const payload = state.integratedRanking;
+  if (!payload || !Array.isArray(payload.stocks) || payload.stocks.length === 0) {
+    // データなしでも既存obsのレンダーは可能にするためstateにロードだけ
+    if (!state.buyTargetObservations) state.buyTargetObservations = loadObservations();
+    return state.buyTargetObservations;
+  }
+  const allStocks = payload.stocks;
+  const stockMap = {};
+  for (const s of allStocks) {
+    const c = String(s && s.code || '').trim();
+    if (c) stockMap[c] = s;
+  }
+
+  let obs = loadObservations();
+
+  const modeDefs = [
+    { key: 'standard', factor: 1.0 },
+    { key: 'relax', factor: 1.02 }
+  ];
+
+  for (const def of modeDefs) {
+    const data = obs[def.key];
+    // 1) 既存アクティブを最新価格で解決チェック（利確/損切到達したらカウントして除去）
+    const stillActive = [];
+    for (const item of data.active) {
+      const latest = stockMap[item.code];
+      const curPrice = latest ? Number(latest.price) : null;
+      let resolved = null;
+      if (curPrice != null && Number.isFinite(curPrice)) {
+        if (item.tp != null && curPrice >= Number(item.tp)) resolved = 'tp';
+        else if (item.sl != null && curPrice <= Number(item.sl)) resolved = 'sl';
+      }
+      if (resolved) {
+        const cat = getCategoryLabel(item.signal);
+        if (!data.counts[cat]) data.counts[cat] = { tp: 0, sl: 0 };
+        data.counts[cat][resolved] = (data.counts[cat][resolved] || 0) + 1;
+      } else {
+        stillActive.push(item);
+      }
+    }
+    data.active = stillActive;
+
+    // 2) 現在のフルリストから「まだアクティブでない」買い目標到達を新規追加（到達時点シグナルをスナップショット）
+    const activeCodes = new Set(data.active.map((it) => it.code));
+    for (const stock of allStocks) {
+      const code = String(stock && stock.code || '').trim();
+      if (!code || activeCodes.has(code)) continue;
+      const priceNum = Number(stock.price) || 0;
+      const buyNum = Number(stock.buy) || 0;
+      if (!buyNum || !priceNum) continue;
+      const threshold = buyNum * def.factor;
+      if (priceNum <= threshold) {
+        const snapSignal = stock.signal || '見送り';
+        const newItem = {
+          code,
+          name: stock.name || code,
+          buy: buyNum,
+          tp: Number(stock.tp) || null,
+          sl: Number(stock.sl) || null,
+          signal: snapSignal,
+          hitAt: new Date().toISOString(),
+          hitPrice: priceNum
+        };
+        data.active.push(newItem);
+        activeCodes.add(code);
+      }
+    }
+  }
+
+  saveObservations(obs);
+  state.buyTargetObservations = normalizeObs(obs);
+  return state.buyTargetObservations;
+}
+
+function renderBuyTargetObservations() {
+  const listStd = document.getElementById('standardObsList');
+  const listRel = document.getElementById('relaxObsList');
+  const sumStd = document.getElementById('standardObsSummary');
+  const sumRel = document.getElementById('relaxObsSummary');
+  if (!listStd || !listRel || !sumStd || !sumRel) return;
+
+  let obs = state.buyTargetObservations;
+  if (!obs) {
+    obs = loadObservations();
+    state.buyTargetObservations = obs;
+  }
+  obs = normalizeObs(obs);
+
+  const payload = state.integratedRanking;
+  const stockMap = (payload && Array.isArray(payload.stocks))
+    ? Object.fromEntries(payload.stocks.map((s) => [String(s.code || '').trim(), s]))
+    : {};
+
+  function renderPanel(modeKey, listEl, sumEl) {
+    const data = obs[modeKey] || { active: [], counts: makeEmptyCounts() };
+    const cats = ["統合買い候補", "監視継続", "確認候補", "見送り"];
+    let totalTp = 0;
+    let totalSl = 0;
+    const countLines = cats.map((cat) => {
+      const c = data.counts[cat] || { tp: 0, sl: 0 };
+      totalTp += c.tp || 0;
+      totalSl += c.sl || 0;
+      const short = cat === "統合買い候補" ? "買候" : (cat === "監視継続" ? "監視" : (cat === "確認候補" ? "確認" : "見送"));
+      return `${short}利確${c.tp || 0}回 損切${c.sl || 0}回`;
+    }).join(' ');
+
+    // Compact: total prominent + detailed breakdown in title (hover)
+    sumEl.innerHTML = `
+      <span class="obs-total" title="${countLines}">合計 利確${totalTp}回 / 損切${totalSl}回</span>
+      <button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>
+    `;
+
+    if (!data.active || data.active.length === 0) {
+      listEl.innerHTML = '<p class="obs-empty">現在このモードで観測中の銘柄はありません。統合ランキング上位で買い目標到達が出現すると自動でここに追加され、利確/損切まで価格を追跡します。</p>';
+      return;
+    }
+
+    listEl.innerHTML = data.active.map((item) => {
+      const latest = stockMap[item.code];
+      const curP = latest ? Number(latest.price) : null;
+      const dispCur = (curP != null && Number.isFinite(curP)) ? formatNumber(curP, 1) : (item.hitPrice != null ? formatNumber(item.hitPrice, 1) : '-');
+      const hitD = item.hitAt ? new Date(item.hitAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '-';
+      const cat = getCategoryLabel(item.signal);
+      let prog = null;
+      if (curP != null && item.buy && item.tp && (item.tp > item.buy)) {
+        prog = Math.max(0, Math.min(100, ((curP - item.buy) / (item.tp - item.buy)) * 100));
+      }
+      const sigCls = signalClass(item.signal);
+      return `
+        <div class="obs-card" data-code="${item.code}">
+          <div class="obs-card-head">
+            <strong>${item.code}</strong>
+            <span class="obs-name">${item.name || ''}</span>
+            <span class="obs-signal ${sigCls}">${cat}</span>
+          </div>
+          <div class="obs-trade-row">
+            <span>現在 <b>${dispCur}</b></span>
+            <span>買い ${formatNumber(item.buy)}</span>
+            <span>利確 ${formatNumber(item.tp)}</span>
+            <span>損切 ${formatNumber(item.sl)}</span>
+          </div>
+          <div class="obs-meta-row">
+            <span>到達 ${hitD} @${formatNumber(item.hitPrice, 1)}</span>
+            ${prog != null ? `<span class="obs-prog">進捗 ${prog.toFixed(0)}%</span>` : ''}
+            <span class="obs-mode-mini">${modeKey === 'relax' ? 'ゆるめ' : '標準'}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderPanel('standard', listStd, sumStd);
+  renderPanel('relax', listRel, sumRel);
+
+  // Top-level visible counts for standard / ゆるめ modes (so the realized 利確/損切 counts are clearly displayed)
+  const g = document.getElementById('obsGlobalCounts');
+  if (g) {
+    const stdData = obs.standard || { counts: makeEmptyCounts() };
+    const relData = obs.relax || { counts: makeEmptyCounts() };
+    let sTp = 0, sSl = 0, rTp = 0, rSl = 0;
+    for (const cat of Object.keys(makeEmptyCounts())) {
+      const sc = stdData.counts[cat] || { tp: 0, sl: 0 };
+      const rc = relData.counts[cat] || { tp: 0, sl: 0 };
+      sTp += sc.tp || 0; sSl += sc.sl || 0;
+      rTp += rc.tp || 0; rSl += rc.sl || 0;
+    }
+    g.innerHTML = `
+      <span class="mode-stat standard"><strong>標準モード</strong> 利確 ${sTp}回 / 損切 ${sSl}回</span>
+      <span class="mode-stat relax"><strong>ゆるめモード</strong> 利確 ${rTp}回 / 損切 ${rSl}回</span>
+    `;
+  }
+
+  // reset buttons (per panel)
+  sumStd.querySelectorAll('.obs-reset-btn').forEach((btn) => {
+    if (btn._obsBound) return;
+    btn._obsBound = true;
+    btn.addEventListener('click', handleObsReset);
+  });
+  sumRel.querySelectorAll('.obs-reset-btn').forEach((btn) => {
+    if (btn._obsBound) return;
+    btn._obsBound = true;
+    btn.addEventListener('click', handleObsReset);
+  });
+}
+
+function handleObsReset(e) {
+  const btn = e.currentTarget || e.target;
+  const mode = btn ? btn.dataset.mode : null;
+  if (!mode) return;
+  const label = mode === 'standard' ? '標準モード' : 'ゆるめモード';
+  if (!confirm(`${label} の観測中銘柄と累計カウントをすべてリセットしますか？\n（新しい検証期間の開始に便利）`)) return;
+  let obs = loadObservations();
+  obs[mode] = { active: [], counts: makeEmptyCounts() };
+  saveObservations(obs);
+  state.buyTargetObservations = normalizeObs(obs);
+  renderBuyTargetObservations();
+}
+
+function setupGlobalObsReset() {
+  const btn = document.getElementById('obsResetAllBtn');
+  if (!btn || btn._obsBound) return;
+  btn._obsBound = true;
+  btn.addEventListener('click', () => {
+    if (!confirm('標準とゆるめ両方の観測統計・アクティブ銘柄をすべてリセットします。よろしいですか？')) return;
+    const fresh = normalizeObs({});
+    saveObservations(fresh);
+    state.buyTargetObservations = fresh;
+    renderBuyTargetObservations();
+  });
+}
+
 function renderIntegratedRanking() {
   const container = document.querySelector("#integratedRankingList");
   const status = document.querySelector("#integratedRankingStatus");
@@ -2431,6 +2701,10 @@ function renderIntegratedRanking() {
     container.innerHTML = '<p class="empty">統合ランキングデータがまだありません。</p>';
     if (status) status.textContent = state.integratedRankingMessage || "未取得";
     if (summary) summary.innerHTML = "";
+    // 観測スペースは過去データで表示するため処理・描画を実行
+    processBuyTargetObservations();
+    renderBuyTargetObservations();
+    setupGlobalObsReset();
     return;
   }
 
@@ -2525,6 +2799,12 @@ function renderIntegratedRanking() {
     const totalIntegrated = Array.isArray(payload?.stocks) ? payload.stocks.filter((s) => !isIndexLinkedStock(s)).length : stocks.length;
     status.textContent = `${stocks.length}件表示 / 統合${totalIntegrated}件 / 全${payload.stocks ? payload.stocks.length : 0}件 / ${updated}`;
   }
+
+  // 買い目標観測の処理（フルリストからヒット検知＋解決）とUI描画
+  // トグル変更時やデータ更新時にも呼ばれるので、常に最新価格で利確/損切を評価
+  processBuyTargetObservations();
+  renderBuyTargetObservations();
+  setupGlobalObsReset();
 }
 
 async function loadIntegratedRanking() {

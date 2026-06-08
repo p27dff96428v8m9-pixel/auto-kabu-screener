@@ -2272,3 +2272,240 @@ footer p {
     font-size: 26px;
   }
 }
+
+/* === 統合銘柄ランキング下 買い目標到達観測スペース (標準/ゆるめ別) === */
+.integrated-obs-section {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.integrated-obs-section .obs-head {
+  margin-bottom: 8px;
+}
+
+.integrated-obs-section .obs-head h3 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.integrated-obs-section .obs-note {
+  font-size: 11px;
+  color: #475569;
+  display: block;
+  line-height: 1.35;
+}
+
+.obs-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 860px) {
+  .obs-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.obs-panel {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.obs-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 12px;
+}
+
+.obs-mode-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.obs-mode-badge.standard {
+  background: #166534;
+  color: #fff;
+}
+
+.obs-mode-badge.relax {
+  background: #0369a1;
+  color: #fff;
+}
+
+.obs-summary {
+  font-size: 10px;
+  color: #334155;
+  text-align: right;
+  flex: 1;
+  min-width: 0;
+}
+
+.obs-count-text {
+  display: block;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.obs-total {
+  font-size: 10px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-left: 4px;
+}
+
+.obs-reset-btn,
+.obs-reset-all {
+  font-size: 9px;
+  padding: 1px 5px;
+  border: 1px solid #94a3b8;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.obs-reset-all {
+  margin-top: 8px;
+  font-size: 10px;
+}
+
+.obs-list {
+  padding: 6px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.obs-empty {
+  margin: 4px 0;
+  font-size: 11px;
+  color: #64748b;
+  padding: 4px 6px;
+}
+
+.obs-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+  background: #f8fafc;
+}
+
+.obs-card-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.obs-card-head strong {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.obs-name {
+  color: #1e2937;
+  font-size: 11px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obs-signal {
+  font-size: 9px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.obs-signal.buy {
+  background: #e5f7f1;
+  color: #0f766e;
+}
+
+.obs-signal.watch,
+.obs-signal.early,
+.obs-signal.neutral {
+  background: #fff4e6;
+  color: #b45309;
+}
+
+.obs-trade-row,
+.obs-meta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: #475569;
+  margin-top: 2px;
+}
+
+.obs-trade-row b {
+  color: #0f172a;
+}
+
+.obs-meta-row .obs-prog {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.obs-mode-mini {
+  margin-left: auto;
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.obs-global-actions {
+  text-align: right;
+  margin-top: 4px;
+}
+
+.obs-global-counts {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #334155;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.obs-global-counts .mode-stat {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.obs-global-counts .mode-stat.standard {
+  border-color: #166534;
+}
+
+.obs-global-counts .mode-stat.relax {
+  border-color: #0369a1;
+}
+
+.obs-global-counts strong {
+  font-weight: 700;
+  color: #0f172a;
+}

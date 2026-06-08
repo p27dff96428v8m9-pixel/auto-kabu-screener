@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>日本版 資金フローAI v2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260607-localflow-05" />
+  <link rel="stylesheet" href="./styles.css?v=20260608-obs-counts-01" />
 </head>
 <body>
   <header class="app-header">
@@ -83,6 +83,34 @@
         </div>
         <div id="integratedRankingComparison" class="integrated-comparison-panel"></div>
         <div id="integratedRankingList" class="integrated-ranking-list"></div>
+
+        <!-- 買い目標到達観測スペース: 標準/ゆるめモード別に、到達銘柄を移動して利確/損切までトラッキング・カウント -->
+        <div class="integrated-obs-section">
+          <div class="obs-head">
+            <h3>📈 買い目標到達 観測スペース（標準 / ゆるめ 別トラッキング）</h3>
+            <span class="obs-note">統合銘柄ランキング銘柄が買い目標到達 → 各モードのスペースに自動記録。到達時点のシグナル（統合買い候補 / 監視継続 / 確認候補 / 見送り）で分類し、最新価格で利確 or 損切到達を検知してカウント。検証用。</span>
+            <div id="obsGlobalCounts" class="obs-global-counts" aria-live="polite"></div>
+          </div>
+          <div class="obs-panels">
+            <div class="obs-panel" data-mode="standard">
+              <div class="obs-panel-head">
+                <span class="obs-mode-badge standard">標準モード（到達: 買い目標）</span>
+                <span id="standardObsSummary" class="obs-summary"></span>
+              </div>
+              <div id="standardObsList" class="obs-list"></div>
+            </div>
+            <div class="obs-panel" data-mode="relax">
+              <div class="obs-panel-head">
+                <span class="obs-mode-badge relax">ゆるめモード（到達: 買い目標×1.02）</span>
+                <span id="relaxObsSummary" class="obs-summary"></span>
+              </div>
+              <div id="relaxObsList" class="obs-list"></div>
+            </div>
+          </div>
+          <div class="obs-global-actions">
+            <button id="obsResetAllBtn" type="button" class="obs-reset-all">全観測統計をリセット（検証期間リセット）</button>
+          </div>
+        </div>
       </section>
 
       <section id="sectionMap" class="panel flow-panel main-map-panel">
@@ -252,6 +280,6 @@
     </p>
   </footer>
 
-  <script src="./app.js?v=20260607-localflow-05"></script>
+  <script src="./app.js?v=20260608-obs-counts-01"></script>
 </body>
 </html>
