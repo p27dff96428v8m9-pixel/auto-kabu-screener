@@ -2262,8 +2262,26 @@ function signalClass(signal = "") {
 }
 
 function isIndexLinkedStock(stock = {}) {
-  const text = `${stock.type || ""} ${stock.name || ""}`;
-  return /ETF|投信|連動|REIT|リート/i.test(text);
+  return /ETF|投信|連動|REIT|リート/i.test(`${stock.type || ""} ${stock.name || ""}`);
+}
+
+// === 統合ランキング選択ロジック（scripts/lib/integrated-ranking-compare.js の selectSheetStocks と完全に一致させる） ===
+// これにより、公開ページのデフォルト表示（10件）とスプレッドシートの「統合ランキング」シートが
+// 同じ treasure-stocks.json に対して全く同じ銘柄・同じ順位になる。
+function selectIntegratedRankingStocks(stocks, limit = 10, includeEtf = false) {
+  const picked = [];
+  for (const stock of stocks || []) {
+    if (picked.length >= limit) break;
+    if (!includeEtf && isIndexLinkedStock(stock)) continue;
+    picked.push(stock);
+  }
+  if (picked.length < limit) {
+    for (const stock of stocks || []) {
+      if (picked.length >= limit) break;
+      if (!picked.some((item) => item.code === stock.code)) picked.push(stock);
+    }
+  }
+  return picked;
 }
 
 function formatNumber(value, digits = 0) {
@@ -2323,7 +2341,8 @@ function buildIntegratedComparisons(ranking, historyPayload) {
   const yesterdayDate = priorDates[priorDates.length - 1] || null;
   const dayBeforeDate = priorDates.length >= 2 ? priorDates[priorDates.length - 2] : null;
   const allStocks = Array.isArray(ranking?.stocks) ? ranking.stocks : [];
-  const stocks = allStocks.filter((s) => !isIndexLinkedStock(s)).slice(0, 10);
+  // シート送信用の comparisons と同じトップN選択（limit=10, includeEtf=false）
+  const stocks = selectIntegratedRankingStocks(allStocks, 10, false);
 
   const items = stocks.map((stock, index) => {
     const code = String(stock.code || "").trim();
@@ -2403,7 +2422,8 @@ function renderIntegratedRanking() {
   }
   const maxItems = isRelax ? 15 : 10;
   const allStocks = Array.isArray(payload?.stocks) ? payload.stocks : [];
-  const stocks = allStocks.filter((s) => !isIndexLinkedStock(s)).slice(0, maxItems);
+  // スプレッドシートと同じ select ロジックを使って順位を完全一致させる
+  const stocks = selectIntegratedRankingStocks(allStocks, maxItems, false);
   const comparisons = state.integratedRankingComparisons;
   const comparisonByCode = Object.fromEntries((comparisons?.items || []).map((item) => [item.code, item]));
 
