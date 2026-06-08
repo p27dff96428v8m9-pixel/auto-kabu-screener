@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history so that rebase before push works reliably when other jobs push concurrently
 
       - uses: actions/setup-node@v4
         with:
@@ -84,5 +86,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json docs/fund-flow-ai-system/data/ranking-history.json docs/fund-flow-ai-system/data/treasure-stocks.json docs/fund-flow-ai-system/data/integrated-ranking-history.json
-          git diff --cached --quiet || git commit -m "Update market data"
-          git push
+          
+          if git diff --cached --quiet; then
+            echo "No data changes to commit"
+          else
+            git commit -m "Update market data"
+            # Handle concurrent pushes from other workflows or manual updates
+            # by rebasing our commit on top of the latest remote before pushing.
+            git fetch origin
+            git pull --rebase origin main || echo "Rebase had issues or not needed, will attempt push anyway"
+            git push
+          fi
