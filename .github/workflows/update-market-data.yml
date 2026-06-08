@@ -65,6 +65,20 @@ jobs:
           INTEGRATED_RANKING_INCLUDE_ETF: "0"
         run: node scripts/update-integrated-ranking-history.js
 
+      - name: Sync integrated ranking to Google Sheet
+        # Keep public page (committed treasure-stocks.json) and spreadsheet in sync by using the exact same
+        # just-generated ranking + history for the sheet update. Run frequently so sheet is not stale.
+        continue-on-error: true
+        env:
+          INTEGRATED_RANKING_WEBHOOK_URL: ${{ secrets.INTEGRATED_RANKING_WEBHOOK_URL }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          TREASURE_STOCKS_INPUT_PATH: docs/fund-flow-ai-system/data/treasure-stocks.json
+          INTEGRATED_RANKING_HISTORY_PATH: docs/fund-flow-ai-system/data/integrated-ranking-history.json
+          INTEGRATED_RANKING_LIMIT: "10"
+          INTEGRATED_RANKING_REPLACE: "1"
+          INTEGRATED_RANKING_INCLUDE_ETF: "0"
+        run: node scripts/sync-integrated-ranking-sheet.js
+
       - name: Commit market data
         run: |
           git config user.name "github-actions[bot]"

@@ -2163,7 +2163,7 @@ function marketDataSourceLabel(refreshed = false) {
 async function fetchMarketDataPayload(force) {
   const cacheBust = `?t=${Date.now()}`;
   const suffix = force ? "?refresh=1" : "";
-  const publicMarketData = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/market-data.json${cacheBust}`;
+  const publicMarketData = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/market-data.json${cacheBust}`;
   const isGitHubPages = window.location.hostname.endsWith("github.io");
   const isLocal = isLocalDevHost();
   const localEndpoints = [`data/market-data.json${cacheBust}`, `/api/market-data${suffix}`, `api/market-data${suffix}`];
@@ -2195,7 +2195,7 @@ async function fetchMarketDataPayload(force) {
 
 async function fetchAiResearchPayload(force) {
   const cacheBust = `?t=${Date.now()}`;
-  const publicAiResearch = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/ai-research.json${cacheBust}`;
+  const publicAiResearch = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/ai-research.json${cacheBust}`;
   const endpoints = isLocalDevHost()
     ? [`data/ai-research.json${cacheBust}`, publicAiResearch]
     : [publicAiResearch, `data/ai-research.json${cacheBust}`];
@@ -2235,7 +2235,7 @@ async function loadAiResearch({ force = false } = {}) {
 
 async function fetchIntegratedRankingPayload() {
   const cacheBust = `?t=${Date.now()}`;
-  const publicRanking = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/treasure-stocks.json${cacheBust}`;
+  const publicRanking = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/treasure-stocks.json${cacheBust}`;
   const endpoints = isLocalDevHost()
     ? [`data/treasure-stocks.json${cacheBust}`, publicRanking]
     : [publicRanking, `data/treasure-stocks.json${cacheBust}`];
@@ -2363,7 +2363,7 @@ function buildIntegratedComparisons(ranking, historyPayload) {
 
 async function fetchIntegratedRankingHistoryPayload() {
   const cacheBust = `?t=${Date.now()}`;
-  const publicHistory = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/integrated-ranking-history.json${cacheBust}`;
+  const publicHistory = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/integrated-ranking-history.json${cacheBust}`;
   const endpoints = isLocalDevHost()
     ? [`data/integrated-ranking-history.json${cacheBust}`, publicHistory]
     : [publicHistory, `data/integrated-ranking-history.json${cacheBust}`];
