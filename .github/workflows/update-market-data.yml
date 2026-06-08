@@ -89,11 +89,27 @@ jobs:
           
           if git diff --cached --quiet; then
             echo "No data changes to commit"
-          else
-            git commit -m "Update market data"
-            # Handle concurrent pushes from other workflows or manual updates
-            # by rebasing our commit on top of the latest remote before pushing.
-            git fetch origin
-            git pull --rebase origin main || echo "Rebase had issues or not needed, will attempt push anyway"
-            git push
+            exit 0
           fi
+
+          git commit -m "Update market data"
+
+          echo "Pushing with retry + rebase (to handle concurrent updates from schedules or manual pushes)..."
+          for attempt in 1 2 3; do
+            echo "Push attempt $attempt..."
+            if git push origin main; then
+              echo "✅ Push succeeded on attempt $attempt"
+              exit 0
+            fi
+
+            echo "Push rejected (likely another job pushed). Fetching and rebasing..."
+            git fetch origin
+            if ! git pull --rebase origin main; then
+              echo "Rebase encountered issues, aborting rebase..."
+              git rebase --abort || true
+            fi
+            sleep 8
+          done
+
+          echo "❌ All 3 push attempts failed. Giving up for this run."
+          exit 1
