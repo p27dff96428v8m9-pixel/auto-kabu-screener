@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>日本版 資金フローAI v2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260608-obs-counts-01" />
+  <link rel="stylesheet" href="./styles.css?v=20260609-cors-fix-02" />
 </head>
 <body>
   <header class="app-header">
@@ -88,7 +88,7 @@
         <div class="integrated-obs-section">
           <div class="obs-head">
             <h3>📈 買い目標到達 観測スペース（標準 / ゆるめ 別トラッキング）</h3>
-            <span class="obs-note">統合銘柄ランキング銘柄が買い目標到達 → 各モードのスペースに自動記録。到達時点のシグナル（統合買い候補 / 監視継続 / 確認候補 / 見送り）で分類し、最新価格で利確 or 損切到達を検知してカウント。検証用。</span>
+            <span class="obs-note">統合銘柄ランキング銘柄が買い目標到達 → 各モードのスペースに自動記録。到達時点のシグナルで分類し、最新価格で利確 or 損切到達を検知してカウント。下の「決済済み銘柄リスト」スペースで、実際に利確/損切された銘柄コード・日付・価格を後から確認できます。</span>
             <div id="obsGlobalCounts" class="obs-global-counts" aria-live="polite"></div>
           </div>
           <div class="obs-panels">
@@ -107,8 +107,33 @@
               <div id="relaxObsList" class="obs-list"></div>
             </div>
           </div>
+
+          <!-- 別スペース: 利確と損切された銘柄の確認用（activeから外れた後も銘柄を追えるように） -->
+          <div class="obs-closed-section">
+            <div class="obs-closed-head">
+              <span>📜 利確・損切 決済済み銘柄リスト（標準 / ゆるめ 別トラッキング）</span>
+              <span class="obs-note-small">観測スペースで利確 or 損切に到達して外れた銘柄がここに自動記録されます。どの銘柄がいつ利確/損切されたかの確認用。</span>
+            </div>
+            <div class="obs-closed-panels">
+              <div class="obs-closed-panel" data-mode="standard">
+                <div class="obs-panel-head">
+                  <span class="obs-mode-badge standard">標準 決済済み</span>
+                  <span id="standardClosedSummary" class="obs-summary"></span>
+                </div>
+                <div id="standardClosedList" class="obs-closed-list obs-list"></div>
+              </div>
+              <div class="obs-closed-panel" data-mode="relax">
+                <div class="obs-panel-head">
+                  <span class="obs-mode-badge relax">ゆるめ 決済済み</span>
+                  <span id="relaxClosedSummary" class="obs-summary"></span>
+                </div>
+                <div id="relaxClosedList" class="obs-closed-list obs-list"></div>
+              </div>
+            </div>
+          </div>
+
           <div class="obs-global-actions">
-            <button id="obsResetAllBtn" type="button" class="obs-reset-all">全観測統計をリセット（検証期間リセット）</button>
+            <button id="obsResetAllBtn" type="button" class="obs-reset-all">全観測データ（アクティブ＋履歴＋カウント）をリセット</button>
           </div>
         </div>
       </section>
@@ -280,6 +305,6 @@
     </p>
   </footer>
 
-  <script src="./app.js?v=20260608-obs-counts-01"></script>
+  <script src="./app.js?v=20260609-cors-fix-02"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@ const path = require('path');
 const marketDataHandler = require('./api/market-data');
 const { rebuildAllThemeMetrics } = require('./api/market-data');
 const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 
 const root = __dirname;
 const host = '127.0.0.1';
@@ -63,7 +65,47 @@ async function handleRequest(req, res) {
   }
 
   if (pathname === '/api/recompute-themes' && req.method === 'POST') {
-    return handleRecomputeThemes(res);
+    return handleRecomputeThemes(res);  // async function なので Promise を返す
+  }
+
+  if (pathname === '/api/integrated-obs') {
+    const obsPath = path.join(root, 'data', 'integrated-obs.json');
+    if (req.method === 'GET') {
+      try {
+        const raw = fs.readFileSync(obsPath, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(raw);
+      } catch (_) {
+        // 空の正規化済み構造を返す（クライアントの normalizeObs と互換）
+        const empty = {
+          standard: { active: [], closed: [], counts: { "統合買い候補": {tp:0,sl:0}, "監視継続": {tp:0,sl:0}, "確認候補": {tp:0,sl:0}, "見送り": {tp:0,sl:0} } },
+          relax: { active: [], closed: [], counts: { "統合買い候補": {tp:0,sl:0}, "監視継続": {tp:0,sl:0}, "確認候補": {tp:0,sl:0}, "見送り": {tp:0,sl:0} } }
+        };
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify(empty));
+      }
+      return;
+    }
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          fs.mkdirSync(path.dirname(obsPath), { recursive: true });
+          fs.writeFileSync(obsPath, JSON.stringify(parsed, null, 2) + '\n', 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+      });
+      return;
+    }
+    res.writeHead(405);
+    res.end('Method not allowed');
+    return;
   }
 
   if (pathname === '/' || pathname === '/index.html') {
@@ -110,7 +152,7 @@ function makeRequest(req, url) {
   };
 }
 
-function handleRecomputeThemes(res) {
+async function handleRecomputeThemes(res) {
   try {
     const dataPath = path.join(root, 'data', 'market-data.json');
     const payload = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
@@ -122,11 +164,16 @@ function handleRecomputeThemes(res) {
 
     const treasureScript = path.join(root, 'scripts', 'update-treasure-stocks.js');
     if (fs.existsSync(treasureScript)) {
-      execFile(process.execPath, [treasureScript], { cwd: root }, () => {});
+      try {
+        // 完了を待ってからレスポンスを返す（クライアントがすぐに loadIntegratedRanking するので重要）
+        await execFileAsync(process.execPath, [treasureScript], { cwd: root });
+      } catch (e) {
+        console.warn('[recompute] update-treasure-stocks.js failed or had warnings:', e.message || e);
+      }
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ ok: true, themes: themes.length, updatedAt: payload.updatedAt }));
+    res.end(JSON.stringify({ ok: true, themes: themes.length, updatedAt: payload.updatedAt, treasureUpdated: true }));
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ ok: false, error: error.message }));

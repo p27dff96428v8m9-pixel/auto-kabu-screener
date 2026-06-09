@@ -2163,7 +2163,7 @@ function marketDataSourceLabel(refreshed = false) {
 async function fetchMarketDataPayload(force) {
   const cacheBust = `?t=${Date.now()}`;
   const suffix = force ? "?refresh=1" : "";
-  const publicMarketData = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/market-data.json${cacheBust}`;
+  const publicMarketData = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/market-data.json${cacheBust}`;
   const isGitHubPages = window.location.hostname.endsWith("github.io");
   const isLocal = isLocalDevHost();
   const localEndpoints = [`data/market-data.json${cacheBust}`, `/api/market-data${suffix}`, `api/market-data${suffix}`];
@@ -2195,10 +2195,13 @@ async function fetchMarketDataPayload(force) {
 
 async function fetchAiResearchPayload(force) {
   const cacheBust = `?t=${Date.now()}`;
-  const publicAiResearch = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/ai-research.json${cacheBust}`;
+  const publicAiResearch = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/ai-research.json${cacheBust}`;
+  const isGitHubPages = window.location.hostname.endsWith("github.io");
   const endpoints = isLocalDevHost()
     ? [`data/ai-research.json${cacheBust}`, publicAiResearch]
-    : [publicAiResearch, `data/ai-research.json${cacheBust}`];
+    : isGitHubPages
+      ? [`data/ai-research.json${cacheBust}`, publicAiResearch]
+      : [publicAiResearch, `data/ai-research.json${cacheBust}`];
   let lastError = null;
 
   for (const endpoint of endpoints) {
@@ -2235,23 +2238,42 @@ async function loadAiResearch({ force = false } = {}) {
 
 async function fetchIntegratedRankingPayload() {
   const cacheBust = `?t=${Date.now()}`;
-  const publicRanking = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/treasure-stocks.json${cacheBust}`;
-  const endpoints = isLocalDevHost()
-    ? [`data/treasure-stocks.json${cacheBust}`, publicRanking]
-    : [publicRanking, `data/treasure-stocks.json${cacheBust}`];
-  let lastError = null;
+  const publicUrl = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/treasure-stocks.json${cacheBust}`;
+  const localUrl = `data/treasure-stocks.json${cacheBust}`;
 
-  for (const endpoint of endpoints) {
+  // ローカル開発時 (127.0.0.1:8790 など) は「公開CI版」と「ローカル生成ファイル」の
+  // 両方を並行取得し、updatedAt が新しい方を自動採用する。
+  // GitHub Pages 上では相対パスを優先して同一オリジンで取得（CORS回避）。
+  // ローカルで recompute してより新しいデータを作った場合はそちらを優先し、
+  // そうでなければ常に最新の公開データを表示する。
+  const isGitHubPages = window.location.hostname.endsWith("github.io");
+  const tryUrls = isLocalDevHost()
+    ? [localUrl, publicUrl]
+    : isGitHubPages
+      ? [localUrl, publicUrl]
+      : [publicUrl, localUrl];
+
+  const fetched = [];
+  for (const url of tryUrls) {
     try {
-      const response = await fetch(endpoint, { cache: "no-store" });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${endpoint}`);
-      return await response.json();
-    } catch (error) {
-      lastError = error;
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        const ts = json && (json.updatedAt || json.marketUpdatedAt || json.date || "");
+        fetched.push({ json, ts: String(ts) });
+      }
+    } catch (_) {
+      // 片方が失敗してももう片方を使えるようにする
     }
   }
 
-  throw lastError || new Error("統合ランキングデータを取得できませんでした。");
+  if (fetched.length === 0) {
+    throw new Error("統合ランキングデータを取得できませんでした。");
+  }
+
+  // updatedAt (または同等フィールド) が辞書順で最新のものを選ぶ
+  fetched.sort((a, b) => b.ts.localeCompare(a.ts));
+  return fetched[0].json;
 }
 
 function signalClass(signal = "") {
@@ -2382,10 +2404,13 @@ function buildIntegratedComparisons(ranking, historyPayload) {
 
 async function fetchIntegratedRankingHistoryPayload() {
   const cacheBust = `?t=${Date.now()}`;
-  const publicHistory = `https://p27df96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/integrated-ranking-history.json${cacheBust}`;
+  const publicHistory = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/integrated-ranking-history.json${cacheBust}`;
+  const isGitHubPages = window.location.hostname.endsWith("github.io");
   const endpoints = isLocalDevHost()
     ? [`data/integrated-ranking-history.json${cacheBust}`, publicHistory]
-    : [publicHistory, `data/integrated-ranking-history.json${cacheBust}`];
+    : isGitHubPages
+      ? [`data/integrated-ranking-history.json${cacheBust}`, publicHistory]
+      : [publicHistory, `data/integrated-ranking-history.json${cacheBust}`];
   let lastError = null;
 
   for (const endpoint of endpoints) {
@@ -2421,10 +2446,11 @@ function normalizeObs(obs) {
   }
   for (const key of ['standard', 'relax']) {
     if (!obs[key] || typeof obs[key] !== 'object') {
-      obs[key] = { active: [], counts: makeEmptyCounts() };
+      obs[key] = { active: [], closed: [], counts: makeEmptyCounts() };
     }
     const d = obs[key];
     if (!Array.isArray(d.active)) d.active = [];
+    if (!Array.isArray(d.closed)) d.closed = [];
     if (!d.counts || typeof d.counts !== 'object') d.counts = makeEmptyCounts();
     for (const cat of Object.keys(makeEmptyCounts())) {
       if (!d.counts[cat] || typeof d.counts[cat] !== 'object') d.counts[cat] = { tp: 0, sl: 0 };
@@ -2445,9 +2471,40 @@ function loadObservations() {
 }
 
 function saveObservations(obs) {
+  const normalized = normalizeObs(obs);
   try {
-    localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify(normalizeObs(obs)));
+    localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify(normalized));
   } catch (_) {}
+
+  // ローカルサーバー (127.0.0.1:8790 など) の場合、ファイルにも永続化
+  // これによりローカル環境でも利確/損切カウントがサーバー再起動後も残り、
+  // 公開用と同じように標準/ゆるめモード別のカウントを管理できる。
+  if (isLocalDevHost()) {
+    fetch('/api/integrated-obs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(normalized)
+    }).catch(() => {});
+  }
+}
+
+// ローカルサーバー利用時は、初回ロードでファイルから obs データ（カウント含む）を
+// localStorage に取り込んでおく（バックグラウンド）。パネルが表示中なら再描画。
+if (isLocalDevHost()) {
+  fetch('/api/integrated-obs', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(fileData => {
+      if (fileData) {
+        try {
+          localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify(normalizeObs(fileData)));
+          // すでにパネルが描画済みなら更新
+          if (document.getElementById('standardObsList') || document.getElementById('relaxObsList')) {
+            renderBuyTargetObservations();
+          }
+        } catch (_) {}
+      }
+    })
+    .catch(() => {});
 }
 
 function getCategoryLabel(sig) {
@@ -2482,7 +2539,7 @@ function processBuyTargetObservations() {
 
   for (const def of modeDefs) {
     const data = obs[def.key];
-    // 1) 既存アクティブを最新価格で解決チェック（利確/損切到達したらカウントして除去）
+    // 1) 既存アクティブを最新価格で解決チェック（利確/損切到達したらカウントして除去 + 決済履歴へ記録）
     const stillActive = [];
     for (const item of data.active) {
       const latest = stockMap[item.code];
@@ -2496,6 +2553,17 @@ function processBuyTargetObservations() {
         const cat = getCategoryLabel(item.signal);
         if (!data.counts[cat]) data.counts[cat] = { tp: 0, sl: 0 };
         data.counts[cat][resolved] = (data.counts[cat][resolved] || 0) + 1;
+
+        // 決済済みとして履歴に記録（後からどの銘柄が利確/損切されたか確認できるように）
+        const closedItem = {
+          ...item,
+          exitType: resolved,
+          exitPrice: curPrice,
+          exitAt: new Date().toISOString()
+        };
+        data.closed.unshift(closedItem); // 最新を先頭に
+        // 無制限成長防止（最近の80件程度を保持）
+        if (data.closed.length > 80) data.closed.length = 80;
       } else {
         stillActive.push(item);
       }
@@ -2554,7 +2622,7 @@ function renderBuyTargetObservations() {
     : {};
 
   function renderPanel(modeKey, listEl, sumEl) {
-    const data = obs[modeKey] || { active: [], counts: makeEmptyCounts() };
+    const data = obs[modeKey] || { active: [], closed: [], counts: makeEmptyCounts() };
     const cats = ["統合買い候補", "監視継続", "確認候補", "見送り"];
     let totalTp = 0;
     let totalSl = 0;
@@ -2614,6 +2682,9 @@ function renderBuyTargetObservations() {
   renderPanel('standard', listStd, sumStd);
   renderPanel('relax', listRel, sumRel);
 
+  // === 別スペース: 利確・損切 決済済み銘柄の表示 ===
+  renderClosedBuyTargetHistory(obs);
+
   // Top-level visible counts for standard / ゆるめ modes (so the realized 利確/損切 counts are clearly displayed)
   const g = document.getElementById('obsGlobalCounts');
   if (g) {
@@ -2643,6 +2714,103 @@ function renderBuyTargetObservations() {
     btn._obsBound = true;
     btn.addEventListener('click', handleObsReset);
   });
+
+  // 決済履歴パネル用のリセットボタンもバインド（存在する場合）
+  const cSumStd = document.getElementById('standardClosedSummary');
+  const cSumRel = document.getElementById('relaxClosedSummary');
+  if (cSumStd) cSumStd.querySelectorAll('.obs-reset-btn').forEach((btn) => {
+    if (btn._obsBound) return;
+    btn._obsBound = true;
+    btn.addEventListener('click', handleObsReset);
+  });
+  if (cSumRel) cSumRel.querySelectorAll('.obs-reset-btn').forEach((btn) => {
+    if (btn._obsBound) return;
+    btn._obsBound = true;
+    btn.addEventListener('click', handleObsReset);
+  });
+}
+
+function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapshotted at exit) */) {
+  const listStd = document.getElementById('standardClosedList');
+  const listRel = document.getElementById('relaxClosedList');
+  const sumStd = document.getElementById('standardClosedSummary');
+  const sumRel = document.getElementById('relaxClosedSummary');
+  // 要素がまだHTMLに追加されていない場合は何もしない（後方互換）
+  if (!listStd && !listRel) return;
+
+  function renderClosedPanel(modeKey, listEl, sumEl) {
+    if (!listEl) return;
+    const data = obs[modeKey] || { active: [], closed: [], counts: makeEmptyCounts() };
+    const closed = Array.isArray(data.closed) ? data.closed : [];
+
+    // サマリー：利確/損切件数 + 履歴総数 + リセットボタン
+    let cTp = 0, cSl = 0;
+    for (const it of closed) {
+      if (it.exitType === 'tp') cTp++;
+      else if (it.exitType === 'sl') cSl++;
+    }
+    const totalClosed = closed.length;
+    if (sumEl) {
+      sumEl.innerHTML = `
+        <span class="obs-total" title="利確${cTp}件 / 損切${cSl}件">利確${cTp} / 損切${cSl}（履歴${totalClosed}件）</span>
+        <button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>
+      `;
+    }
+
+    if (!closed.length) {
+      if (listEl) listEl.innerHTML = '<p class="obs-empty">このモードで利確・損切到達した銘柄はまだありません。観測中の銘柄がTP/SLに達するとここに自動で記録されます。</p>';
+      return;
+    }
+
+    // 最新順（すでにunshiftされているが念のため）
+    const sorted = [...closed].sort((a, b) => {
+      const ta = a.exitAt ? Date.parse(a.exitAt) : 0;
+      const tb = b.exitAt ? Date.parse(b.exitAt) : 0;
+      return tb - ta;
+    });
+
+    listEl.innerHTML = sorted.map((item) => {
+      const isTp = item.exitType === 'tp';
+      const exitLabel = isTp ? '利確' : '損切';
+      const exitCls = isTp ? 'tp' : 'sl';
+      const exitD = item.exitAt ? new Date(item.exitAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '-';
+      const hitD = item.hitAt ? new Date(item.hitAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '-';
+      const cat = getCategoryLabel(item.signal);
+      const sigCls = signalClass(item.signal);
+
+      // 参考：buy→exit の簡易リターン表示（任意）
+      let ret = null;
+      if (item.buy != null && item.exitPrice != null && Number(item.buy) > 0) {
+        const r = ((Number(item.exitPrice) - Number(item.buy)) / Number(item.buy)) * 100;
+        ret = (r >= 0 ? '+' : '') + r.toFixed(1) + '%';
+      }
+
+      return `
+        <div class="obs-card obs-closed-card ${isTp ? 'closed-tp' : 'closed-sl'}" data-code="${item.code}">
+          <div class="obs-card-head">
+            <strong>${item.code}</strong>
+            <span class="obs-name">${item.name || ''}</span>
+            <span class="obs-signal ${sigCls}">${cat}</span>
+            <span class="obs-exit-badge ${exitCls}">${exitLabel}</span>
+          </div>
+          <div class="obs-trade-row">
+            <span>買い ${formatNumber(item.buy)}</span>
+            <span>利確 ${formatNumber(item.tp)}</span>
+            <span>損切 ${formatNumber(item.sl)}</span>
+          </div>
+          <div class="obs-meta-row">
+            <span>到達 ${hitD} @${formatNumber(item.hitPrice, 1)}</span>
+            <span class="${isTp ? 'obs-tp' : 'obs-sl'}"><b>${exitLabel} ${formatNumber(item.exitPrice, 1)}</b> @${exitD}</span>
+            ${ret != null ? `<span class="obs-ret ${isTp ? 'pos' : 'neg'}">${ret}</span>` : ''}
+            <span class="obs-mode-mini">${modeKey === 'relax' ? 'ゆるめ' : '標準'}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (listStd || sumStd) renderClosedPanel('standard', listStd, sumStd);
+  if (listRel || sumRel) renderClosedPanel('relax', listRel, sumRel);
 }
 
 function handleObsReset(e) {
@@ -2650,9 +2818,9 @@ function handleObsReset(e) {
   const mode = btn ? btn.dataset.mode : null;
   if (!mode) return;
   const label = mode === 'standard' ? '標準モード' : 'ゆるめモード';
-  if (!confirm(`${label} の観測中銘柄と累計カウントをすべてリセットしますか？\n（新しい検証期間の開始に便利）`)) return;
+  if (!confirm(`${label} の観測中銘柄・累計カウント・決済履歴をすべてリセットしますか？\n（新しい検証期間の開始に便利）`)) return;
   let obs = loadObservations();
-  obs[mode] = { active: [], counts: makeEmptyCounts() };
+  obs[mode] = { active: [], closed: [], counts: makeEmptyCounts() };
   saveObservations(obs);
   state.buyTargetObservations = normalizeObs(obs);
   renderBuyTargetObservations();
@@ -2663,7 +2831,7 @@ function setupGlobalObsReset() {
   if (!btn || btn._obsBound) return;
   btn._obsBound = true;
   btn.addEventListener('click', () => {
-    if (!confirm('標準とゆるめ両方の観測統計・アクティブ銘柄をすべてリセットします。よろしいですか？')) return;
+    if (!confirm('標準とゆるめ両方の観測統計・アクティブ銘柄・決済履歴をすべてリセットします。よろしいですか？')) return;
     const fresh = normalizeObs({});
     saveObservations(fresh);
     state.buyTargetObservations = fresh;
