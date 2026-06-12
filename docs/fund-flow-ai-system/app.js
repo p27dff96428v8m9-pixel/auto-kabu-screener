@@ -2557,33 +2557,58 @@ function makeEmptyPortfolioClient() {
   };
 }
 
+function getPortfolioVariants(obs, modeKey) {
+  let m = obs.portfolio && obs.portfolio[modeKey];
+  // 旧形式（フラット構造）は fixed として扱う
+  if (m && typeof m === 'object' && Number.isFinite(Number(m.cash))) m = { fixed: m };
+  return (m && typeof m === 'object') ? m : null;
+}
+
 function renderPortfolioPanel(modeKey, obs) {
   const el = document.getElementById(modeKey === 'relax' ? 'relaxPortfolio' : 'standardPortfolio');
   if (!el) return;
-  const pf = obs.portfolio && obs.portfolio[modeKey];
-  if (!pf || !Number.isFinite(Number(pf.cash))) {
-    el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（1,000万円・1銘柄100万円）は次回のサーバー更新から開始されます。</span>';
+  const variants = getPortfolioVariants(obs, modeKey);
+  const defs = [
+    { key: 'fixed', label: '100万円固定', hint: '1銘柄ちょうど100万円分購入（端株可・S株想定）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る' },
+    { key: 'unit', label: '1単元(100株)', hint: '実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる。資金不足の単元はスキップ' }
+  ];
+  if (!variants || !defs.some((d) => variants[d.key] && Number.isFinite(Number(variants[d.key].cash)))) {
+    el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（各1,000万円 / 100万円固定・1単元購入の2方式）は次回のサーバー更新から開始されます。</span>';
     return;
   }
-  const initial = Number(pf.initialCapital) || PF_INITIAL_CAPITAL;
-  const equity = Number.isFinite(Number(pf.equity)) ? Number(pf.equity) : Number(pf.cash);
-  const totalPnl = equity - initial;
-  const totalPct = ((totalPnl / initial) * 100).toFixed(2);
-  const cls = totalPnl > 0 ? 'pos' : (totalPnl < 0 ? 'neg' : '');
-  const posCount = Object.keys(pf.positions || {}).length;
-  const unreal = Number(pf.unrealizedPnl || 0);
-  const realized = Number(pf.realizedPnl || 0);
-  const skippedCount = (pf.skipped || []).length;
+  const rows = defs.map((def) => {
+    const pf = variants[def.key];
+    if (!pf || !Number.isFinite(Number(pf.cash))) {
+      return `<div class="obs-pf-variant"><span class="obs-pf-label" title="${def.hint}">${def.label}</span><span class="obs-pf-note">次回サーバー更新から開始</span></div>`;
+    }
+    const initial = Number(pf.initialCapital) || PF_INITIAL_CAPITAL;
+    const equity = Number.isFinite(Number(pf.equity)) ? Number(pf.equity) : Number(pf.cash);
+    const totalPnl = equity - initial;
+    const totalPct = ((totalPnl / initial) * 100).toFixed(2);
+    const cls = totalPnl > 0 ? 'pos' : (totalPnl < 0 ? 'neg' : '');
+    const posCount = Object.keys(pf.positions || {}).length;
+    const unreal = Number(pf.unrealizedPnl || 0);
+    const realized = Number(pf.realizedPnl || 0);
+    const skippedCount = (pf.skipped || []).length;
+    return `
+      <div class="obs-pf-variant">
+        <div class="obs-pf-main">
+          <span class="obs-pf-label" title="${def.hint}">${def.label}</span>
+          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（見送りシグナルは購入対象外）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
+        </div>
+        <div class="obs-pf-detail">
+          <span>現金 ${formatYen(pf.cash)}円</span>
+          <span>保有 ${posCount}銘柄（評価 ${formatYen(pf.positionValue || 0)}円 / 含み ${unreal >= 0 ? '+' : ''}${formatYen(unreal)}円）</span>
+          <span>実現損益 ${realized >= 0 ? '+' : ''}${formatYen(realized)}円</span>
+          ${skippedCount ? `<span title="資金不足で購入できなかったシグナル">スキップ ${skippedCount}件</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
   el.innerHTML = `
-    <div class="obs-pf-main">
-      <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円 / 1銘柄100万円固定（端株可・見送りは購入対象外）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
+    ${rows}
+    <div class="obs-pf-actions">
       <button type="button" class="obs-reset-btn obs-pf-reset-btn" data-mode="${modeKey}">資金リセット</button>
-    </div>
-    <div class="obs-pf-detail">
-      <span>現金 ${formatYen(pf.cash)}円</span>
-      <span>保有 ${posCount}銘柄（評価 ${formatYen(pf.positionValue || 0)}円 / 含み ${unreal >= 0 ? '+' : ''}${formatYen(unreal)}円）</span>
-      <span>実現損益 ${realized >= 0 ? '+' : ''}${formatYen(realized)}円</span>
-      ${skippedCount ? `<span title="資金不足で購入できなかったシグナル">スキップ ${skippedCount}件</span>` : ''}
     </div>
   `;
   const btn = el.querySelector('.obs-pf-reset-btn');
@@ -2596,10 +2621,10 @@ function handlePortfolioReset(e) {
   if (!mode) return;
   const label = mode === 'standard' ? '標準モード' : 'ゆるめモード';
   if (isLocalDevHost()) {
-    if (!confirm(`${label} の仮想資金を1,000万円に初期化します（観測カウント・決済履歴はそのまま）。よろしいですか？`)) return;
+    if (!confirm(`${label} の仮想資金（100万円固定・1単元購入の両方）を1,000万円に初期化します（観測カウント・決済履歴はそのまま）。よろしいですか？`)) return;
     const obs = normalizeObs(state.buyTargetObservations || loadObservations());
     if (!obs.portfolio || typeof obs.portfolio !== 'object') obs.portfolio = {};
-    obs.portfolio[mode] = makeEmptyPortfolioClient();
+    obs.portfolio[mode] = { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient() };
     saveObservations(obs);
     state.buyTargetObservations = obs;
     renderBuyTargetObservations();
@@ -2680,12 +2705,19 @@ function renderBuyTargetObservations() {
         prog = Math.max(0, Math.min(100, ((curP - item.buy) / (item.tp - item.buy)) * 100));
       }
       const sigCls = signalClass(item.signal);
-      const pos = obs.portfolio && obs.portfolio[modeKey] && obs.portfolio[modeKey].positions
-        ? obs.portfolio[modeKey].positions[item.code]
-        : null;
-      const heldHtml = pos
-        ? `<span class="obs-held" title="仮想資金で100万円分保有中（取得 ${formatNumber(pos.entryPrice, 1)} / ${Number(pos.shares).toFixed(1)}株相当）">💰保有中</span>`
-        : (cat === '見送り' ? `<span class="obs-held none" title="見送りシグナルは仮想資金の購入対象外（対照群として観測のみ）">観測のみ</span>` : '');
+      const pfVariants = getPortfolioVariants(obs, modeKey);
+      const posF = pfVariants && pfVariants.fixed && pfVariants.fixed.positions ? pfVariants.fixed.positions[item.code] : null;
+      const posU = pfVariants && pfVariants.unit && pfVariants.unit.positions ? pfVariants.unit.positions[item.code] : null;
+      let heldHtml = '';
+      if (posF && posU) {
+        heldHtml = `<span class="obs-held" title="100万円固定: ${Number(posF.shares).toFixed(1)}株相当 / 1単元: 100株（${formatYen(posU.investedAmount)}円）を保有中">💰保有中</span>`;
+      } else if (posF) {
+        heldHtml = `<span class="obs-held" title="100万円固定のみ保有（1単元 ${formatYen(Number(item.hitPrice) * 100)}円 は資金不足でスキップ）">💰保有(100万のみ)</span>`;
+      } else if (posU) {
+        heldHtml = `<span class="obs-held" title="1単元（100株 ${formatYen(posU.investedAmount)}円）のみ保有">💰保有(1単元のみ)</span>`;
+      } else if (cat === '見送り') {
+        heldHtml = `<span class="obs-held none" title="見送りシグナルは仮想資金の購入対象外（対照群として観測のみ）">観測のみ</span>`;
+      }
       return `
         <div class="obs-card" data-code="${item.code}">
           <div class="obs-card-head">
@@ -2774,11 +2806,15 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     const data = obs[modeKey] || { active: [], closed: [], counts: makeEmptyCounts() };
     const closed = Array.isArray(data.closed) ? data.closed : [];
 
-    // 仮想資金の決済履歴（code + exitAt で照合し、実際の損益円を表示）
-    const pfHist = {};
-    const pfm = obs.portfolio && obs.portfolio[modeKey];
-    for (const h of (pfm && Array.isArray(pfm.history) ? pfm.history : [])) {
-      pfHist[`${h.code}|${h.exitAt}`] = h;
+    // 仮想資金の決済履歴（code + exitAt で照合し、両方式の実損益円を表示）
+    const pfHistFixed = {};
+    const pfHistUnit = {};
+    const pfVariants = getPortfolioVariants(obs, modeKey);
+    for (const h of (pfVariants && pfVariants.fixed && Array.isArray(pfVariants.fixed.history) ? pfVariants.fixed.history : [])) {
+      pfHistFixed[`${h.code}|${h.exitAt}`] = h;
+    }
+    for (const h of (pfVariants && pfVariants.unit && Array.isArray(pfVariants.unit.history) ? pfVariants.unit.history : [])) {
+      pfHistUnit[`${h.code}|${h.exitAt}`] = h;
     }
 
     // サマリー：利確/損切件数 + 履歴総数 + リセットボタン
@@ -2843,7 +2879,15 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
             <span>到達 ${hitD} @${formatNumber(item.hitPrice, 1)}</span>
             <span class="${isTp ? 'obs-tp' : 'obs-sl'}"><b>${exitLabel} ${formatNumber(item.exitPrice, 1)}</b> @${exitD}</span>
             ${ret != null ? `<span class="obs-ret ${isTp ? 'pos' : 'neg'}">${ret}</span>` : ''}
-            ${(() => { const ph = pfHist[`${item.code}|${item.exitAt}`]; return ph ? `<span class="obs-ret ${Number(ph.pnl) >= 0 ? 'pos' : 'neg'}" title="仮想資金の実現損益（100万円投入）">資金 ${Number(ph.pnl) >= 0 ? '+' : ''}${formatYen(ph.pnl)}円</span>` : ''; })()}
+            ${(() => {
+              const key = `${item.code}|${item.exitAt}`;
+              const phF = pfHistFixed[key];
+              const phU = pfHistUnit[key];
+              let html = '';
+              if (phF) html += `<span class="obs-ret ${Number(phF.pnl) >= 0 ? 'pos' : 'neg'}" title="100万円固定の実現損益">100万 ${Number(phF.pnl) >= 0 ? '+' : ''}${formatYen(phF.pnl)}円</span>`;
+              if (phU) html += `<span class="obs-ret ${Number(phU.pnl) >= 0 ? 'pos' : 'neg'}" title="1単元（100株 ${formatYen(phU.investedAmount)}円投入）の実現損益">1単元 ${Number(phU.pnl) >= 0 ? '+' : ''}${formatYen(phU.pnl)}円</span>`;
+              return html;
+            })()}
             <span class="obs-mode-mini">${modeKey === 'relax' ? 'ゆるめ' : '標準'}</span>
           </div>
         </div>
@@ -2865,7 +2909,7 @@ function handleObsReset(e) {
   obs[mode] = { active: [], closed: [], counts: makeEmptyCounts() };
   // 観測中銘柄を消すと保有ポジションが決済不能になるため、仮想資金も一緒に初期化する
   if (!obs.portfolio || typeof obs.portfolio !== 'object') obs.portfolio = {};
-  obs.portfolio[mode] = makeEmptyPortfolioClient();
+  obs.portfolio[mode] = { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient() };
   saveObservations(obs);
   state.buyTargetObservations = normalizeObs(obs);
   renderBuyTargetObservations();
@@ -2887,7 +2931,10 @@ function setupGlobalObsReset() {
       fresh.targets = state.buyTargetObservations.targets;
     }
     // 仮想資金も初期化（観測中銘柄が消えると保有ポジションが決済不能になるため）
-    fresh.portfolio = { standard: makeEmptyPortfolioClient(), relax: makeEmptyPortfolioClient() };
+    fresh.portfolio = {
+      standard: { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient() },
+      relax: { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient() }
+    };
     saveObservations(fresh);
     state.buyTargetObservations = fresh;
     renderBuyTargetObservations();
