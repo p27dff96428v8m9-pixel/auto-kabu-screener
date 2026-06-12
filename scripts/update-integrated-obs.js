@@ -18,6 +18,15 @@ const RELAX_FACTOR = 1.02;
 const TARGET_LIMIT = 15; // 標準表示10件 + ゆるめ表示15件をカバー
 const CLOSED_LIMIT = 80;
 
+// 仮想資金シミュレーション: 観測スペースへの追加を「購入」とみなし、利確/損切で資金を増減させる。
+// 1銘柄100万円固定（端株可・S株/ミニ株想定）。全銘柄が同じ重みになり統計が歪まない。
+// シグナル「見送り」は実運用で買わないため購入対象外（観測・カウントには従来通り残る＝対照群）。
+// 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
+const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 10000000);
+const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
+const PF_HISTORY_LIMIT = 200;
+const PF_SKIPPED_LIMIT = 40;
+
 function resolvePath(envName, fallback) {
   const value = process.env[envName];
   if (value) return path.resolve(process.cwd(), value);
@@ -62,6 +71,18 @@ function getCategoryLabel(signal) {
   return "見送り";
 }
 
+function makeEmptyPortfolio() {
+  return {
+    initialCapital: INITIAL_CAPITAL,
+    cash: INITIAL_CAPITAL,
+    positions: {},
+    history: [],
+    skipped: [],
+    realizedPnl: 0,
+    startedAt: null
+  };
+}
+
 function normalizeObs(obs) {
   if (!obs || typeof obs !== "object") obs = {};
   for (const key of ["standard", "relax"]) {
@@ -77,6 +98,19 @@ function normalizeObs(obs) {
     }
   }
   if (!obs.targets || typeof obs.targets !== "object") obs.targets = {};
+  if (!obs.portfolio || typeof obs.portfolio !== "object") obs.portfolio = {};
+  for (const key of ["standard", "relax"]) {
+    if (!obs.portfolio[key] || typeof obs.portfolio[key] !== "object") {
+      obs.portfolio[key] = makeEmptyPortfolio();
+    }
+    const p = obs.portfolio[key];
+    if (!Number.isFinite(Number(p.initialCapital)) || Number(p.initialCapital) <= 0) p.initialCapital = INITIAL_CAPITAL;
+    if (!Number.isFinite(Number(p.cash))) p.cash = p.initialCapital;
+    if (!p.positions || typeof p.positions !== "object") p.positions = {};
+    if (!Array.isArray(p.history)) p.history = [];
+    if (!Array.isArray(p.skipped)) p.skipped = [];
+    if (!Number.isFinite(Number(p.realizedPnl))) p.realizedPnl = 0;
+  }
   return obs;
 }
 
@@ -114,6 +148,13 @@ function main() {
   const nowIso = new Date().toISOString();
   const summary = { settled: 0, hits: { standard: 0, relax: 0 } };
 
+  // workflow_dispatch の reset_portfolio 入力で仮想資金を初期化（観測カウント・履歴はそのまま）
+  if (process.env.RESET_PORTFOLIO === "1" || process.env.RESET_PORTFOLIO === "true") {
+    obs.portfolio.standard = makeEmptyPortfolio();
+    obs.portfolio.relax = makeEmptyPortfolio();
+    console.log(`RESET_PORTFOLIO: 仮想資金を${INITIAL_CAPITAL.toLocaleString()}円に初期化しました（標準/ゆるめ両方）`);
+  }
+
   const modeDefs = [
     { key: "standard", factor: 1.0 },
     { key: "relax", factor: RELAX_FACTOR }
@@ -136,6 +177,33 @@ function main() {
         data.closed.unshift({ ...item, exitType: resolved, exitPrice: curPrice, exitAt: nowIso });
         if (data.closed.length > CLOSED_LIMIT) data.closed.length = CLOSED_LIMIT;
         summary.settled += 1;
+
+        // 仮想資金: 保有していれば決済価格で売却し現金に戻す
+        const pf = obs.portfolio[def.key];
+        const pos = pf.positions[item.code];
+        if (pos) {
+          const proceeds = Math.round(Number(pos.shares) * curPrice);
+          const pnl = proceeds - Number(pos.investedAmount);
+          pf.cash = Math.round(Number(pf.cash) + proceeds);
+          pf.realizedPnl = Math.round(Number(pf.realizedPnl) + pnl);
+          pf.history.unshift({
+            code: item.code,
+            name: item.name || item.code,
+            signal: item.signal,
+            exitType: resolved,
+            shares: pos.shares,
+            investedAmount: pos.investedAmount,
+            entryPrice: pos.entryPrice,
+            exitPrice: curPrice,
+            proceeds,
+            pnl,
+            pnlPct: Number(((pnl / Number(pos.investedAmount)) * 100).toFixed(2)),
+            entryAt: pos.entryAt,
+            exitAt: nowIso
+          });
+          if (pf.history.length > PF_HISTORY_LIMIT) pf.history.length = PF_HISTORY_LIMIT;
+          delete pf.positions[item.code];
+        }
       } else {
         stillActive.push(item);
       }
@@ -170,6 +238,34 @@ function main() {
         });
         activeCodes.add(code);
         summary.hits[def.key] += 1;
+
+        // 仮想資金: 到達＝購入とみなして100万円分を取得（見送りシグナルは購入対象外、資金不足はスキップ記録）
+        const pf = obs.portfolio[def.key];
+        if (!pf.startedAt) pf.startedAt = nowIso;
+        if (getCategoryLabel(target.signal) !== "見送り") {
+          if (Number(pf.cash) >= TRADE_BUDGET) {
+            const shares = Number((TRADE_BUDGET / curPrice).toFixed(4));
+            pf.cash = Math.round(Number(pf.cash) - TRADE_BUDGET);
+            pf.positions[code] = {
+              name: target.name || code,
+              shares,
+              entryPrice: curPrice,
+              investedAmount: TRADE_BUDGET,
+              signal: target.signal || "見送り",
+              entryAt: nowIso
+            };
+          } else {
+            pf.skipped.unshift({
+              code,
+              name: target.name || code,
+              signal: target.signal || "見送り",
+              price: curPrice,
+              at: nowIso,
+              reason: "資金不足"
+            });
+            if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+          }
+        }
       }
     }
   }
@@ -197,6 +293,22 @@ function main() {
     };
   }
 
+  // 4) 仮想資金の評価額を最新価格で算出（価格が取れない保有銘柄は取得額で据え置き評価）
+  for (const key of ["standard", "relax"]) {
+    const pf = obs.portfolio[key];
+    let positionValue = 0;
+    let invested = 0;
+    for (const [code, pos] of Object.entries(pf.positions)) {
+      const cur = priceMap[code];
+      positionValue += Number.isFinite(cur) ? Number(pos.shares) * cur : Number(pos.investedAmount);
+      invested += Number(pos.investedAmount);
+    }
+    pf.positionValue = Math.round(positionValue);
+    pf.unrealizedPnl = Math.round(positionValue - invested);
+    pf.equity = Math.round(Number(pf.cash) + positionValue);
+    pf.updatedAt = nowIso;
+  }
+
   obs.source = "github-actions-integrated-obs";
   obs.updatedAt = nowIso;
   obs.marketUpdatedAt = treasure.marketUpdatedAt || treasure.updatedAt || null;
@@ -207,6 +319,10 @@ function main() {
     targets: Object.keys(obs.targets).length,
     standardActive: obs.standard.active.length,
     relaxActive: obs.relax.active.length,
+    portfolio: {
+      standard: { equity: obs.portfolio.standard.equity, cash: obs.portfolio.standard.cash, positions: Object.keys(obs.portfolio.standard.positions).length },
+      relax: { equity: obs.portfolio.relax.equity, cash: obs.portfolio.relax.cash, positions: Object.keys(obs.portfolio.relax.positions).length }
+    },
     updatedAt: nowIso
   }));
 }

@@ -2534,6 +2534,83 @@ function getCategoryLabel(sig) {
   return s || "見送り";
 }
 
+// === 仮想資金シミュレーション表示（サーバー側 update-integrated-obs.js が計算） ===
+// 観測スペースへの追加＝1銘柄100万円購入（見送りシグナルは対象外）、利確/損切で資金が増減する。
+const PF_INITIAL_CAPITAL = 10000000;
+
+function formatYen(value) {
+  return Math.round(Number(value) || 0).toLocaleString('ja-JP');
+}
+
+function makeEmptyPortfolioClient() {
+  return {
+    initialCapital: PF_INITIAL_CAPITAL,
+    cash: PF_INITIAL_CAPITAL,
+    positions: {},
+    history: [],
+    skipped: [],
+    realizedPnl: 0,
+    startedAt: null,
+    positionValue: 0,
+    unrealizedPnl: 0,
+    equity: PF_INITIAL_CAPITAL
+  };
+}
+
+function renderPortfolioPanel(modeKey, obs) {
+  const el = document.getElementById(modeKey === 'relax' ? 'relaxPortfolio' : 'standardPortfolio');
+  if (!el) return;
+  const pf = obs.portfolio && obs.portfolio[modeKey];
+  if (!pf || !Number.isFinite(Number(pf.cash))) {
+    el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（1,000万円・1銘柄100万円）は次回のサーバー更新から開始されます。</span>';
+    return;
+  }
+  const initial = Number(pf.initialCapital) || PF_INITIAL_CAPITAL;
+  const equity = Number.isFinite(Number(pf.equity)) ? Number(pf.equity) : Number(pf.cash);
+  const totalPnl = equity - initial;
+  const totalPct = ((totalPnl / initial) * 100).toFixed(2);
+  const cls = totalPnl > 0 ? 'pos' : (totalPnl < 0 ? 'neg' : '');
+  const posCount = Object.keys(pf.positions || {}).length;
+  const unreal = Number(pf.unrealizedPnl || 0);
+  const realized = Number(pf.realizedPnl || 0);
+  const skippedCount = (pf.skipped || []).length;
+  el.innerHTML = `
+    <div class="obs-pf-main">
+      <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円 / 1銘柄100万円固定（端株可・見送りは購入対象外）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
+      <button type="button" class="obs-reset-btn obs-pf-reset-btn" data-mode="${modeKey}">資金リセット</button>
+    </div>
+    <div class="obs-pf-detail">
+      <span>現金 ${formatYen(pf.cash)}円</span>
+      <span>保有 ${posCount}銘柄（評価 ${formatYen(pf.positionValue || 0)}円 / 含み ${unreal >= 0 ? '+' : ''}${formatYen(unreal)}円）</span>
+      <span>実現損益 ${realized >= 0 ? '+' : ''}${formatYen(realized)}円</span>
+      ${skippedCount ? `<span title="資金不足で購入できなかったシグナル">スキップ ${skippedCount}件</span>` : ''}
+    </div>
+  `;
+  const btn = el.querySelector('.obs-pf-reset-btn');
+  if (btn) btn.addEventListener('click', handlePortfolioReset);
+}
+
+function handlePortfolioReset(e) {
+  const btn = e.currentTarget || e.target;
+  const mode = btn ? btn.dataset.mode : null;
+  if (!mode) return;
+  const label = mode === 'standard' ? '標準モード' : 'ゆるめモード';
+  if (isLocalDevHost()) {
+    if (!confirm(`${label} の仮想資金を1,000万円に初期化します（観測カウント・決済履歴はそのまま）。よろしいですか？`)) return;
+    const obs = normalizeObs(state.buyTargetObservations || loadObservations());
+    if (!obs.portfolio || typeof obs.portfolio !== 'object') obs.portfolio = {};
+    obs.portfolio[mode] = makeEmptyPortfolioClient();
+    saveObservations(obs);
+    state.buyTargetObservations = obs;
+    renderBuyTargetObservations();
+  } else {
+    // 公開ページの仮想資金は GitHub Actions 管理の共有データ（全端末共通）のため、
+    // Actions の手動実行（reset_portfolio にチェック）でリセットする。
+    if (!confirm('仮想資金は全端末で共有しているため、GitHub Actions からリセットします。\n\nこれから開くページで「Run workflow」→「仮想資金…を初期化する」にチェック → 緑の「Run workflow」を押してください（標準/ゆるめ両方が1,000万円に戻り、数分で反映されます）。')) return;
+    window.open('https://github.com/p27dff96428v8m9-pixel/auto-kabu-screener/actions/workflows/update-market-data.yml', '_blank', 'noopener');
+  }
+}
+
 function processBuyTargetObservations() {
   // 到達検知・決済判定はサーバー側（update-integrated-obs.js）に移行済み。
   // ここでは表示用に localStorage キャッシュを state に載せ、共有データの取得をトリガーするだけ。
@@ -2584,6 +2661,9 @@ function renderBuyTargetObservations() {
       ${resetBtnHtml}
     `;
 
+    // 仮想資金（評価額・現金・含み損益 + 資金リセットボタン）
+    renderPortfolioPanel(modeKey, obs);
+
     if (!data.active || data.active.length === 0) {
       listEl.innerHTML = '<p class="obs-empty">現在このモードで観測中の銘柄はありません。統合ランキング上位銘柄が日次固定の買い目標に到達するとサーバー側で自動記録され、利確/損切まで価格を追跡します（約20分ごとに判定・全端末共有）。</p>';
       return;
@@ -2600,12 +2680,19 @@ function renderBuyTargetObservations() {
         prog = Math.max(0, Math.min(100, ((curP - item.buy) / (item.tp - item.buy)) * 100));
       }
       const sigCls = signalClass(item.signal);
+      const pos = obs.portfolio && obs.portfolio[modeKey] && obs.portfolio[modeKey].positions
+        ? obs.portfolio[modeKey].positions[item.code]
+        : null;
+      const heldHtml = pos
+        ? `<span class="obs-held" title="仮想資金で100万円分保有中（取得 ${formatNumber(pos.entryPrice, 1)} / ${Number(pos.shares).toFixed(1)}株相当）">💰保有中</span>`
+        : (cat === '見送り' ? `<span class="obs-held none" title="見送りシグナルは仮想資金の購入対象外（対照群として観測のみ）">観測のみ</span>` : '');
       return `
         <div class="obs-card" data-code="${item.code}">
           <div class="obs-card-head">
             <strong>${item.code}</strong>
             <span class="obs-name">${item.name || ''}</span>
             <span class="obs-signal ${sigCls}">${cat}</span>
+            ${heldHtml}
           </div>
           <div class="obs-trade-row">
             <span>現在 <b>${dispCur}</b></span>
@@ -2687,6 +2774,13 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     const data = obs[modeKey] || { active: [], closed: [], counts: makeEmptyCounts() };
     const closed = Array.isArray(data.closed) ? data.closed : [];
 
+    // 仮想資金の決済履歴（code + exitAt で照合し、実際の損益円を表示）
+    const pfHist = {};
+    const pfm = obs.portfolio && obs.portfolio[modeKey];
+    for (const h of (pfm && Array.isArray(pfm.history) ? pfm.history : [])) {
+      pfHist[`${h.code}|${h.exitAt}`] = h;
+    }
+
     // サマリー：利確/損切件数 + 履歴総数 + リセットボタン
     let cTp = 0, cSl = 0;
     for (const it of closed) {
@@ -2749,6 +2843,7 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
             <span>到達 ${hitD} @${formatNumber(item.hitPrice, 1)}</span>
             <span class="${isTp ? 'obs-tp' : 'obs-sl'}"><b>${exitLabel} ${formatNumber(item.exitPrice, 1)}</b> @${exitD}</span>
             ${ret != null ? `<span class="obs-ret ${isTp ? 'pos' : 'neg'}">${ret}</span>` : ''}
+            ${(() => { const ph = pfHist[`${item.code}|${item.exitAt}`]; return ph ? `<span class="obs-ret ${Number(ph.pnl) >= 0 ? 'pos' : 'neg'}" title="仮想資金の実現損益（100万円投入）">資金 ${Number(ph.pnl) >= 0 ? '+' : ''}${formatYen(ph.pnl)}円</span>` : ''; })()}
             <span class="obs-mode-mini">${modeKey === 'relax' ? 'ゆるめ' : '標準'}</span>
           </div>
         </div>
@@ -2765,9 +2860,12 @@ function handleObsReset(e) {
   const mode = btn ? btn.dataset.mode : null;
   if (!mode) return;
   const label = mode === 'standard' ? '標準モード' : 'ゆるめモード';
-  if (!confirm(`${label} の観測中銘柄・累計カウント・決済履歴をすべてリセットしますか？\n（新しい検証期間の開始に便利）`)) return;
+  if (!confirm(`${label} の観測中銘柄・累計カウント・決済履歴・仮想資金をすべてリセットしますか？\n（新しい検証期間の開始に便利）`)) return;
   let obs = loadObservations();
   obs[mode] = { active: [], closed: [], counts: makeEmptyCounts() };
+  // 観測中銘柄を消すと保有ポジションが決済不能になるため、仮想資金も一緒に初期化する
+  if (!obs.portfolio || typeof obs.portfolio !== 'object') obs.portfolio = {};
+  obs.portfolio[mode] = makeEmptyPortfolioClient();
   saveObservations(obs);
   state.buyTargetObservations = normalizeObs(obs);
   renderBuyTargetObservations();
@@ -2788,6 +2886,8 @@ function setupGlobalObsReset() {
     if (state.buyTargetObservations && typeof state.buyTargetObservations.targets === 'object') {
       fresh.targets = state.buyTargetObservations.targets;
     }
+    // 仮想資金も初期化（観測中銘柄が消えると保有ポジションが決済不能になるため）
+    fresh.portfolio = { standard: makeEmptyPortfolioClient(), relax: makeEmptyPortfolioClient() };
     saveObservations(fresh);
     state.buyTargetObservations = fresh;
     renderBuyTargetObservations();
