@@ -13,6 +13,7 @@ async function main() {
   console.log(JSON.stringify({
     source: data.source,
     themes: data.themes.length,
+    priorityRankingRefresh: data.priorityRankingRefresh || false,
     macro: {
       fx: Object.keys(data.macro?.alpha?.fx || {}).length,
       commodities: Object.keys(data.macro?.alpha?.commodities || {}).length,

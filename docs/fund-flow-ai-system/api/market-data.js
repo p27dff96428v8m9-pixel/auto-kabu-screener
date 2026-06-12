@@ -41,8 +41,10 @@ const JQUANTS_REQUEST_DELAY_MS = Math.max(0, Number(process.env.JQUANTS_REQUEST_
 const JQUANTS_THEME_REQUEST_LIMIT = Math.max(1, Number(process.env.JQUANTS_THEME_REQUEST_LIMIT || 9) || 9);
 const JQUANTS_QUOTE_REQUEST_LIMIT = Math.max(0, Number(process.env.JQUANTS_QUOTE_REQUEST_LIMIT || 32) || 32);
 const MARKET_REFRESH_WINDOWS = [
-  { id: "morning", start: 8 * 60 + 45, end: 9 * 60 + 15 },
-  { id: "close", start: 14 * 60 + 45, end: 15 * 60 + 15 }
+  // 午前取引終了頃（ユーザーリクエストに合わせて優先フル更新）
+  { id: "morning-end", start: 11 * 60 + 20, end: 12 * 60 + 10 },
+  // 午後取引終了（引け）頃（優先的にランキング全銘柄の株価を更新）
+  { id: "close", start: 14 * 60 + 50, end: 15 * 60 + 40 }
 ];
 
 function jquantsPlan() {
@@ -666,12 +668,15 @@ async function buildMarketData({ force = false } = {}) {
   const windowKey = refreshWindowKey();
   if (!force) {
     if (previousMarketData && (!windowKey || previousMarketData.refreshWindowKey === windowKey)) {
+      // 同じ windowKey（同日・同ウィンドウ）内はキャッシュを返すことで重複APIコールとレート制限を避ける。
+      // ただし「次の日の更新で元に戻る」ように感じる場合は、ウィンドウ内で ?refresh=1 を付けるか
+      // /api/recompute-themes を呼ぶと強制で最新化（優先的に全ランキング銘柄）される。
       return previousMarketData;
     }
     if (!windowKey) {
       return previousMarketData || {
         source: "sample",
-        message: "Outside the scheduled market refresh windows.",
+        message: "Outside the scheduled market refresh windows (午前/引けウィンドウ外). ランキング全銘柄の優先更新はウィンドウ内で行われます。",
         macro: null,
         instrumentQuotes: {},
         themes: []
@@ -733,10 +738,26 @@ async function buildMarketData({ force = false } = {}) {
   const treasureTickers = Array.from(new Set(TREASURE_TICKERS));
   const remainingQuoteBudget = Math.max(0, Math.min(requestLimit - requestCount, JQUANTS_QUOTE_REQUEST_LIMIT));
   const quoteOffsetSeed = Array.from(`${windowKey || "cache"}:quotes`).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  const treasureBatch = rotateItems(treasureTickers, quoteOffsetSeed);
-  const themeQuoteBudget = Math.max(0, remainingQuoteBudget - treasureBatch.length);
-  const themeQuoteBatch = rotateItems(themeInstrumentTickers, quoteOffsetSeed).slice(0, themeQuoteBudget);
-  const quoteBatch = [...treasureBatch, ...themeQuoteBatch];
+
+  let quoteBatch;
+  let priorityFullRanking = false;
+
+  if (windowKey) {
+    // ローカルサーバー (127.0.0.1:8790) 用:
+    // MARKET_REFRESH_WINDOWS (午前/引けウィンドウ) のときは、ほかの更新より優先的に
+    // ランキング全銘柄 (TREASURE_TICKERS) の株価をフルで更新する。
+    // これにより「更新された後に次の日の更新で元に戻る」問題を解消し、
+    // 取引時間の午前終了・午後終了時にランキング銘柄の最新株価を確実に取りに行く。
+    priorityFullRanking = true;
+    // 全 treasure を先頭に置き、残り予算でテーマ銘柄を追加（ローテーションは優先度を崩さない範囲で）
+    const rotatedThemes = rotateItems(themeInstrumentTickers, quoteOffsetSeed);
+    quoteBatch = [...treasureTickers, ...rotatedThemes];
+  } else {
+    const treasureBatch = rotateItems(treasureTickers, quoteOffsetSeed);
+    const themeQuoteBudget = Math.max(0, remainingQuoteBudget - treasureBatch.length);
+    const themeQuoteBatch = rotateItems(themeInstrumentTickers, quoteOffsetSeed).slice(0, themeQuoteBudget);
+    quoteBatch = [...treasureBatch, ...themeQuoteBatch];
+  }
 
   for (const ticker of quoteBatch) {
     if (requestCount >= requestLimit) break;
@@ -760,6 +781,7 @@ async function buildMarketData({ force = false } = {}) {
     jquantsHistoryDays: jquantsHistoryDays(),
     refreshWindowKey: windowKey,
     updatedAt: new Date().toISOString(),
+    priorityFullRanking: !!priorityFullRanking,
     message: themes.length ? "" : errors.slice(0, 3).join(" / "),
     macro,
     instrumentQuotes,
@@ -767,7 +789,11 @@ async function buildMarketData({ force = false } = {}) {
       count: quoteBatch.length,
       tickers: quoteBatch,
       treasureTickers,
-      rotatedTickers: themeQuoteBatch
+      rotatedTickers: priorityFullRanking ? [] : (themeQuoteBatch || []),
+      priorityFullRanking: !!priorityFullRanking,
+      note: priorityFullRanking
+        ? "LOCAL PRIORITY: full ranking (all treasure) stocks refreshed first during MARKET_REFRESH_WINDOW (morning/close). Other updates deprioritized."
+        : "Rotated batch with treasure priority."
     },
     themes
   };

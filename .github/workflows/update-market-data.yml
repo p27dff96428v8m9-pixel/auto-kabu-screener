@@ -3,7 +3,9 @@ name: Update market data
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/20 * * * *"
+    - cron: "*/20 * * * *"           # Regular frequent refresh (with rotation + treasure priority)
+    - cron: "30 2 * * 1-5"           # ~11:30 JST - end of morning trading session: PRIORITY full refresh of all ranking stocks
+    - cron: "0 6 * * 1-5"            # ~15:00 JST - end of afternoon trading session (close): PRIORITY full refresh of all ranking stocks
 
 permissions:
   contents: write
@@ -26,6 +28,8 @@ jobs:
           JQUANTS_PLAN: light
           JQUANTS_HISTORY_DAYS: "1825"
           JQUANTS_MAX_REQUESTS_PER_RUN: "18"
+          # Used by api/market-data.js to rotate a limited subset of tickers per run (prevents quota exhaustion
+          # and ensures previously-stale prices like some treasure/integrated-ranking stocks get refreshed regularly).
           JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN: "36"
           JQUANTS_ENABLE_FINANCIALS: "1"
           JQUANTS_FINANCIALS_PER_RUN: "12"
@@ -37,6 +41,9 @@ jobs:
           FX_API_URL: ${{ secrets.FX_API_URL }}
           RATES_API_URL: ${{ secrets.RATES_API_URL }}
           BOJ_STAT_API_URL: ${{ secrets.BOJ_STAT_API_URL }}
+          # When set to 1, forces a full refresh of *all* ranking/treasure tickers (bypasses rotation).
+          # Also automatically triggered by time windows inside the JS around morning/afternoon session ends.
+          PRIORITY_RANKING_REFRESH: "0"
         run: node scripts/update-market-data.js
 
       - name: Run Gemini theme research
@@ -67,6 +74,14 @@ jobs:
           INTEGRATED_RANKING_INCLUDE_ETF: "0"
         run: node scripts/update-integrated-ranking-history.js
 
+      - name: Update buy-target observations
+        # 買い目標到達 観測スペースをサーバー側で更新（標準/ゆるめ別の到達検知 + 利確/損切判定）。
+        # 結果は integrated-obs.json として公開され、全端末で同じ観測状態が共有される。
+        env:
+          TREASURE_STOCKS_INPUT_PATH: docs/fund-flow-ai-system/data/treasure-stocks.json
+          INTEGRATED_OBS_PATH: docs/fund-flow-ai-system/data/integrated-obs.json
+        run: node scripts/update-integrated-obs.js
+
       - name: Sync integrated ranking to Google Sheet
         # Keep public page (committed treasure-stocks.json) and spreadsheet in sync by using the exact same
         # just-generated ranking + history for the sheet update. Run frequently so sheet is not stale.
@@ -85,7 +100,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json docs/fund-flow-ai-system/data/ranking-history.json docs/fund-flow-ai-system/data/treasure-stocks.json docs/fund-flow-ai-system/data/integrated-ranking-history.json
+          git add docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json docs/fund-flow-ai-system/data/ranking-history.json docs/fund-flow-ai-system/data/treasure-stocks.json docs/fund-flow-ai-system/data/integrated-ranking-history.json docs/fund-flow-ai-system/data/integrated-obs.json
           
           if git diff --cached --quiet; then
             echo "No data changes to commit"

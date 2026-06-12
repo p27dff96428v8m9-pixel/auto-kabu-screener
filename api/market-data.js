@@ -459,6 +459,69 @@ function selectedFinancialTickerBatch(tickers) {
   return Array.from({ length: limit }, (_, index) => unique[(start + index) % unique.length]);
 }
 
+function selectedInstrumentQuoteBatch(tickers, explicitLimit) {
+  const limit = Number.isFinite(explicitLimit) && explicitLimit > 0
+    ? explicitLimit
+    : Number(process.env.JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN || 36);
+  // Preserve caller-provided order (treasure tickers are prepended by caller for priority).
+  // This ensures the 統合銘柄ランキング tickers are attempted more often within the budget.
+  const seen = new Set();
+  const unique = [];
+  for (const t of tickers.map(String)) {
+    if (!seen.has(t)) {
+      seen.add(t);
+      unique.push(t);
+    }
+  }
+  if (unique.length <= limit) return unique;
+  const runNumber = Number(process.env.GITHUB_RUN_NUMBER);
+  const rawIndex = Number.isFinite(runNumber) ? runNumber - 1 : Math.floor(Date.now() / (20 * 60 * 1000));
+  const start = ((Math.trunc(rawIndex) * limit) % unique.length + unique.length) % unique.length;
+  return Array.from({ length: limit }, (_, index) => unique[(start + index) % unique.length]);
+}
+
+/**
+ * Returns true if we are currently near the end of morning or afternoon trading session (JST, weekdays).
+ * Used to give full priority to refreshing prices for all ranking (treasure) stocks.
+ */
+function isPriorityRankingPriceTime() {
+  try {
+    const now = new Date();
+    // Work entirely in JST for both time and weekday
+    const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo", hour12: false }));
+    const hour = jst.getHours();
+    const minute = jst.getMinutes();
+    const dayOfWeek = jst.getDay(); // 0=Sun ... 6=Sat in JST
+    if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+
+    // Morning session end window: ~11:20 - 12:10 JST
+    if (hour === 11 && minute >= 20) return true;
+    if (hour === 12 && minute <= 10) return true;
+
+    // Afternoon session end / close window: ~14:50 - 15:40 JST
+    if (hour === 14 && minute >= 50) return true;
+    if (hour === 15 && minute <= 40) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function getRankingInstrumentTickers() {
+  const themeTickers = THEME_UNIVERSE.flatMap(t => t.tickers);
+  const all = [...TREASURE_TICKERS, ...themeTickers];
+  const seen = new Set();
+  const ordered = [];
+  for (const t of all.map(String)) {
+    if (!seen.has(t)) {
+      seen.add(t);
+      ordered.push(t);
+    }
+  }
+  return ordered;
+}
+
 function periodChange(rows, days) {
   if (rows.length < 2) return { price: 0, volume: 0 };
   const end = rows[rows.length - 1];
@@ -711,9 +774,26 @@ async function buildMarketData() {
 
   const themeInstrumentTickers = Array.from(new Set(THEME_UNIVERSE.flatMap((theme) => theme.tickers)));
   const treasureTickers = Array.from(new Set(TREASURE_TICKERS));
-  const allInstrumentTickers = Array.from(new Set([...themeInstrumentTickers, ...treasureTickers]));
-  const quoteRequestLimit = allInstrumentTickers.length;
-  const quoteBatch = allInstrumentTickers;
+  // Prioritize treasure tickers (the ones powering 統合銘柄ランキング / "今日の株価" in the UI)
+  // so they get refreshed more reliably within the per-run quote budget.
+  const allInstrumentTickers = Array.from(new Set([...treasureTickers, ...themeInstrumentTickers]));
+
+  const instrumentQuoteLimit = Number(process.env.JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN || 36);
+  const envPriority = process.env.PRIORITY_RANKING_REFRESH === "1" || process.env.PRIORITY_RANKING_REFRESH === "true";
+  const timePriority = isPriorityRankingPriceTime();
+
+  let quoteBatch;
+  let priorityRankingRefresh = false;
+
+  if (envPriority || timePriority) {
+    // PRIORITY MODE: ほかの更新より優先的に、ランキング全銘柄の株価を取引時間の午前・午後の終わりに更新
+    priorityRankingRefresh = true;
+    quoteBatch = getRankingInstrumentTickers(); // full set, treasure first, no artificial rotation limit
+    console.log(`PRIORITY_RANKING_REFRESH: forcing FULL refresh for all ${quoteBatch.length} ranking tickers (env=${envPriority}, time=${timePriority})`);
+  } else {
+    // Normal mode: rotating limited batch with treasure priority
+    quoteBatch = selectedInstrumentQuoteBatch(allInstrumentTickers, instrumentQuoteLimit);
+  }
 
   for (const ticker of quoteBatch) {
     try {
@@ -725,9 +805,18 @@ async function buildMarketData() {
     }
   }
 
-  const financialBatch = jquantsFinancialsEnabled(auth)
-    ? selectedFinancialTickerBatch(allInstrumentTickers)
-    : [];
+  // In priority ranking price refresh mode, deprioritize financial statements (quota consumer)
+  // so we have more headroom for the full set of ranking stock price (daily quote) fetches.
+  let financialBatch = [];
+  if (jquantsFinancialsEnabled(auth)) {
+    if (priorityRankingRefresh) {
+      // Only a very small number (or none) during priority price updates
+      const finLimit = Math.min(3, jquantsFinancialsPerRun());
+      financialBatch = finLimit > 0 ? selectedFinancialTickerBatch(allInstrumentTickers).slice(0, finLimit) : [];
+    } else {
+      financialBatch = selectedFinancialTickerBatch(allInstrumentTickers);
+    }
+  }
   for (const ticker of financialBatch) {
     try {
       const rows = await fetchFinancialStatements(ticker, auth);
@@ -743,15 +832,21 @@ async function buildMarketData() {
     jquantsPlan: auth.mode === "v2" ? jquantsPlan() : "v1",
     jquantsHistoryDays: jquantsHistoryDays(),
     updatedAt: new Date().toISOString(),
+    priorityRankingRefresh,
     message: themes.length ? "" : errors.slice(0, 3).join(" / "),
     macro,
     instrumentQuotes,
     financials,
     instrumentQuoteBatch: {
-      count: quoteRequestLimit,
+      count: quoteBatch.length,
+      limit: priorityRankingRefresh ? quoteBatch.length : instrumentQuoteLimit,
       tickers: quoteBatch,
       treasureTickers,
-      rotatedTickers: themeInstrumentTickers.filter((ticker) => !treasureTickers.includes(ticker))
+      rotatedTickers: themeInstrumentTickers.filter((ticker) => !treasureTickers.includes(ticker)),
+      priorityRankingRefresh,
+      note: priorityRankingRefresh
+        ? "PRIORITY: full refresh of all ranking/treasure tickers (morning or afternoon session end). Other updates deprioritized where possible."
+        : "Rotating batch to respect JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN. Other tickers carried over from previous run."
     },
     financialBatch: {
       count: financialBatch.length,

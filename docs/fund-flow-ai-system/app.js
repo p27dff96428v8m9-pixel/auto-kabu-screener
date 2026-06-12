@@ -2488,23 +2488,37 @@ function saveObservations(obs) {
   }
 }
 
-// ローカルサーバー利用時は、初回ロードでファイルから obs データ（カウント含む）を
-// localStorage に取り込んでおく（バックグラウンド）。パネルが表示中なら再描画。
-if (isLocalDevHost()) {
-  fetch('/api/integrated-obs', { cache: 'no-store' })
-    .then(r => r.ok ? r.json() : null)
-    .then(fileData => {
-      if (fileData) {
-        try {
-          localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify(normalizeObs(fileData)));
-          // すでにパネルが描画済みなら更新
-          if (document.getElementById('standardObsList') || document.getElementById('relaxObsList')) {
-            renderBuyTargetObservations();
-          }
-        } catch (_) {}
+// 観測スペースの到達検知・利確/損切判定は GitHub Actions (scripts/update-integrated-obs.js) が
+// サーバー側で実行し、data/integrated-obs.json として公開される。ブラウザは表示専用で、
+// localStorage は最後に取得した共有データのキャッシュとしてのみ使う。
+// （従来のブラウザ側検知は、buyが現在価格から毎回再計算されるため標準モードで到達が
+//   構造的に発生しない欠陥があった。買い目標の日次固定はサーバー側で行う。）
+let lastObsFetchAt = 0;
+
+async function refreshSharedObservations() {
+  if (Date.now() - lastObsFetchAt < 60000) return state.buyTargetObservations;
+  lastObsFetchAt = Date.now();
+  const cacheBust = `?t=${Date.now()}`;
+  const publicObs = `https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/data/integrated-obs.json${cacheBust}`;
+  const endpoints = isLocalDevHost()
+    ? ['/api/integrated-obs', `data/integrated-obs.json${cacheBust}`]
+    : [`data/integrated-obs.json${cacheBust}`, publicObs];
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) continue;
+      const fileData = await res.json();
+      if (!fileData || typeof fileData !== 'object') continue;
+      const normalized = normalizeObs(fileData);
+      state.buyTargetObservations = normalized;
+      try { localStorage.setItem(OBS_STORAGE_KEY, JSON.stringify(normalized)); } catch (_) {}
+      if (document.getElementById('standardObsList') || document.getElementById('relaxObsList')) {
+        renderBuyTargetObservations();
       }
-    })
-    .catch(() => {});
+      return normalized;
+    } catch (_) {}
+  }
+  return null;
 }
 
 function getCategoryLabel(sig) {
@@ -2517,88 +2531,10 @@ function getCategoryLabel(sig) {
 }
 
 function processBuyTargetObservations() {
-  const payload = state.integratedRanking;
-  if (!payload || !Array.isArray(payload.stocks) || payload.stocks.length === 0) {
-    // データなしでも既存obsのレンダーは可能にするためstateにロードだけ
-    if (!state.buyTargetObservations) state.buyTargetObservations = loadObservations();
-    return state.buyTargetObservations;
-  }
-  const allStocks = payload.stocks;
-  const stockMap = {};
-  for (const s of allStocks) {
-    const c = String(s && s.code || '').trim();
-    if (c) stockMap[c] = s;
-  }
-
-  let obs = loadObservations();
-
-  const modeDefs = [
-    { key: 'standard', factor: 1.0 },
-    { key: 'relax', factor: 1.02 }
-  ];
-
-  for (const def of modeDefs) {
-    const data = obs[def.key];
-    // 1) 既存アクティブを最新価格で解決チェック（利確/損切到達したらカウントして除去 + 決済履歴へ記録）
-    const stillActive = [];
-    for (const item of data.active) {
-      const latest = stockMap[item.code];
-      const curPrice = latest ? Number(latest.price) : null;
-      let resolved = null;
-      if (curPrice != null && Number.isFinite(curPrice)) {
-        if (item.tp != null && curPrice >= Number(item.tp)) resolved = 'tp';
-        else if (item.sl != null && curPrice <= Number(item.sl)) resolved = 'sl';
-      }
-      if (resolved) {
-        const cat = getCategoryLabel(item.signal);
-        if (!data.counts[cat]) data.counts[cat] = { tp: 0, sl: 0 };
-        data.counts[cat][resolved] = (data.counts[cat][resolved] || 0) + 1;
-
-        // 決済済みとして履歴に記録（後からどの銘柄が利確/損切されたか確認できるように）
-        const closedItem = {
-          ...item,
-          exitType: resolved,
-          exitPrice: curPrice,
-          exitAt: new Date().toISOString()
-        };
-        data.closed.unshift(closedItem); // 最新を先頭に
-        // 無制限成長防止（最近の80件程度を保持）
-        if (data.closed.length > 80) data.closed.length = 80;
-      } else {
-        stillActive.push(item);
-      }
-    }
-    data.active = stillActive;
-
-    // 2) 現在のフルリストから「まだアクティブでない」買い目標到達を新規追加（到達時点シグナルをスナップショット）
-    const activeCodes = new Set(data.active.map((it) => it.code));
-    for (const stock of allStocks) {
-      const code = String(stock && stock.code || '').trim();
-      if (!code || activeCodes.has(code)) continue;
-      const priceNum = Number(stock.price) || 0;
-      const buyNum = Number(stock.buy) || 0;
-      if (!buyNum || !priceNum) continue;
-      const threshold = buyNum * def.factor;
-      if (priceNum <= threshold) {
-        const snapSignal = stock.signal || '見送り';
-        const newItem = {
-          code,
-          name: stock.name || code,
-          buy: buyNum,
-          tp: Number(stock.tp) || null,
-          sl: Number(stock.sl) || null,
-          signal: snapSignal,
-          hitAt: new Date().toISOString(),
-          hitPrice: priceNum
-        };
-        data.active.push(newItem);
-        activeCodes.add(code);
-      }
-    }
-  }
-
-  saveObservations(obs);
-  state.buyTargetObservations = normalizeObs(obs);
+  // 到達検知・決済判定はサーバー側（update-integrated-obs.js）に移行済み。
+  // ここでは表示用に localStorage キャッシュを state に載せ、共有データの取得をトリガーするだけ。
+  if (!state.buyTargetObservations) state.buyTargetObservations = loadObservations();
+  refreshSharedObservations().catch(() => {});
   return state.buyTargetObservations;
 }
 
@@ -2635,13 +2571,17 @@ function renderBuyTargetObservations() {
     }).join(' ');
 
     // Compact: total prominent + detailed breakdown in title (hover)
+    // リセットはローカル開発時のみ（公開ページの統計は GitHub Actions 管理の共有データのため）
+    const resetBtnHtml = isLocalDevHost()
+      ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
+      : '';
     sumEl.innerHTML = `
       <span class="obs-total" title="${countLines}">合計 利確${totalTp}回 / 損切${totalSl}回</span>
-      <button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>
+      ${resetBtnHtml}
     `;
 
     if (!data.active || data.active.length === 0) {
-      listEl.innerHTML = '<p class="obs-empty">現在このモードで観測中の銘柄はありません。統合ランキング上位で買い目標到達が出現すると自動でここに追加され、利確/損切まで価格を追跡します。</p>';
+      listEl.innerHTML = '<p class="obs-empty">現在このモードで観測中の銘柄はありません。統合ランキング上位銘柄が日次固定の買い目標に到達するとサーバー側で自動記録され、利確/損切まで価格を追跡します（約20分ごとに判定・全端末共有）。</p>';
       return;
     }
 
@@ -2751,9 +2691,12 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     }
     const totalClosed = closed.length;
     if (sumEl) {
+      const closedResetHtml = isLocalDevHost()
+        ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
+        : '';
       sumEl.innerHTML = `
         <span class="obs-total" title="利確${cTp}件 / 損切${cSl}件">利確${cTp} / 損切${cSl}（履歴${totalClosed}件）</span>
-        <button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>
+        ${closedResetHtml}
       `;
     }
 
@@ -2829,6 +2772,10 @@ function handleObsReset(e) {
 function setupGlobalObsReset() {
   const btn = document.getElementById('obsResetAllBtn');
   if (!btn || btn._obsBound) return;
+  if (!isLocalDevHost()) {
+    btn.style.display = 'none';
+    return;
+  }
   btn._obsBound = true;
   btn.addEventListener('click', () => {
     if (!confirm('標準とゆるめ両方の観測統計・アクティブ銘柄・決済履歴をすべてリセットします。よろしいですか？')) return;
