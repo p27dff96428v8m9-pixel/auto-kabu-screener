@@ -2515,6 +2515,10 @@ async function refreshSharedObservations() {
       if (document.getElementById('standardObsList') || document.getElementById('relaxObsList')) {
         renderBuyTargetObservations();
       }
+      // 固定目標(targets)が更新されたらランキングの🎯バッジにも反映する。
+      // renderIntegratedRanking → processBuyTargetObservations → 本関数の再帰は
+      // 冒頭の60秒スロットルで止まる。
+      if (document.querySelector('#integratedRankingList')) renderIntegratedRanking();
       return normalized;
     } catch (_) {}
   }
@@ -2780,6 +2784,10 @@ function setupGlobalObsReset() {
   btn.addEventListener('click', () => {
     if (!confirm('標準とゆるめ両方の観測統計・アクティブ銘柄・決済履歴をすべてリセットします。よろしいですか？')) return;
     const fresh = normalizeObs({});
+    // 日次固定の買い目標はカウントではなく判定基準なのでリセット対象外（🎯バッジ判定にも使用）
+    if (state.buyTargetObservations && typeof state.buyTargetObservations.targets === 'object') {
+      fresh.targets = state.buyTargetObservations.targets;
+    }
     saveObservations(fresh);
     state.buyTargetObservations = fresh;
     renderBuyTargetObservations();
@@ -2811,6 +2819,14 @@ function renderIntegratedRanking() {
   const stocks = selectIntegratedRankingStocks(allStocks, maxItems, false);
   const comparisons = state.integratedRankingComparisons;
   const comparisonByCode = Object.fromEntries((comparisons?.items || []).map((item) => [item.code, item]));
+
+  // 🎯バッジは観測スペースと同じ「日次固定の買い目標」(integrated-obs.json の targets) で判定する。
+  // リアルタイム再計算の buy（現在価格×(1-0.5〜3%)）を使うと、ゆるめモードでは ×1.02 で
+  // 閾値が現在価格より上になり、ほぼ全銘柄が常時「到達」表示になってしまうため。
+  if (!state.buyTargetObservations) state.buyTargetObservations = loadObservations();
+  const fixedTargets = (state.buyTargetObservations && typeof state.buyTargetObservations.targets === 'object')
+    ? state.buyTargetObservations.targets
+    : null;
 
   if (!stocks.length) {
     container.innerHTML = '<p class="empty">統合ランキングデータがまだありません。</p>';
@@ -2847,8 +2863,10 @@ function renderIntegratedRanking() {
     const comparison = comparisonByCode[String(stock.code)] || null;
     const move = comparison?.move;
     const priceNum = Number(stock.price) || 0;
-    const buyNum = Number(stock.buy) || 0;
-    const isAtTarget = buyNum > 0 && priceNum > 0 && priceNum <= (isRelax ? buyNum * 1.02 : buyNum);
+    const fixedTarget = fixedTargets ? fixedTargets[String(stock.code || '').trim()] : null;
+    const fixedBuy = fixedTarget ? Number(fixedTarget.buy) : NaN;
+    const isAtTarget = Number.isFinite(fixedBuy) && fixedBuy > 0 && priceNum > 0
+      && priceNum <= fixedBuy * (isRelax ? 1.02 : 1.0);
     return `
       <article class="integrated-stock-card ${isAtTarget ? 'at-buy-target' : ''} ${isRelax ? 'relax-mode' : ''}">
         <div class="integrated-rank-block">
@@ -2859,7 +2877,7 @@ function renderIntegratedRanking() {
           <div class="integrated-stock-title">
             <strong>${stock.code || "-"}</strong>
             <span>${stock.name || "-"}</span>
-            ${isAtTarget ? `<span class="buy-target-badge">🎯 目標到達</span>` : ""}
+            ${isAtTarget ? `<span class="buy-target-badge" title="日次固定の買い目標 ${formatNumber(fixedBuy)}${isRelax ? '×1.02' : ''} に到達">🎯 目標到達</span>` : ""}
           </div>
           <div class="integrated-stock-meta">
             <span>${stock.type || "-"}</span>
