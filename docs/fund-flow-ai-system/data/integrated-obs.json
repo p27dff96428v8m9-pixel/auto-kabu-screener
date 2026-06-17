@@ -1,16 +1,8 @@
 {
   "source": "github-actions-integrated-obs",
-  "updatedAt": "2026-06-17T01:45:59.340Z",
-  "marketUpdatedAt": "2026-06-17T01:45:09.069Z",
+  "updatedAt": "2026-06-17T07:12:30.946Z",
+  "marketUpdatedAt": "2026-06-17T07:11:32.667Z",
   "targets": {
-    "1802": {
-      "name": "大林組",
-      "buy": 3130,
-      "tp": 3358,
-      "sl": 3009,
-      "signal": "統合買い候補",
-      "setDate": "2026-06-17"
-    },
     "2768": {
       "name": "双日",
       "buy": 5212,
@@ -59,6 +51,14 @@
       "signal": "監視継続",
       "setDate": "2026-06-17"
     },
+    "6902": {
+      "name": "デンソー",
+      "buy": 1888,
+      "tp": 2020,
+      "sl": 1822,
+      "signal": "監視継続",
+      "setDate": "2026-06-17"
+    },
     "6954": {
       "name": "ファナック",
       "buy": 7289,
@@ -72,6 +72,14 @@
       "buy": 1392,
       "tp": 1489,
       "sl": 1343,
+      "signal": "統合買い候補",
+      "setDate": "2026-06-17"
+    },
+    "7182": {
+      "name": "ゆうちょ銀行",
+      "buy": 3122,
+      "tp": 3464,
+      "sl": 2941,
       "signal": "統合買い候補",
       "setDate": "2026-06-17"
     },
@@ -105,14 +113,6 @@
       "tp": 2861,
       "sl": 2580,
       "signal": "監視継続",
-      "setDate": "2026-06-17"
-    },
-    "9434": {
-      "name": "ソフトバンク",
-      "buy": 208,
-      "tp": 223,
-      "sl": 201,
-      "signal": "確認候補",
       "setDate": "2026-06-17"
     },
     "9502": {
@@ -149,6 +149,19 @@
         "hitPrice": 2718
       },
       {
+        "code": "7267",
+        "name": "ホンダ",
+        "buy": 1417,
+        "tp": 1529,
+        "sl": 1358,
+        "signal": "確認候補",
+        "targetSetAt": "2026-06-17",
+        "hitAt": "2026-06-17T07:12:30.946Z",
+        "hitPrice": 1415.5
+      }
+    ],
+    "closed": [
+      {
         "code": "9501",
         "name": "東京電力ホールディングス",
         "buy": 529,
@@ -157,10 +170,12 @@
         "signal": "監視継続",
         "targetSetAt": "2026-06-16",
         "hitAt": "2026-06-16T07:47:32.842Z",
-        "hitPrice": 513.5
+        "hitPrice": 513.5,
+        "exitType": "sl",
+        "exitPrice": 508.1,
+        "exitAt": "2026-06-17T07:12:30.946Z"
       }
     ],
-    "closed": [],
     "counts": {
       "統合買い候補": {
         "tp": 0,
@@ -168,7 +183,7 @@
       },
       "監視継続": {
         "tp": 0,
-        "sl": 0
+        "sl": 1
       },
       "確認候補": {
         "tp": 0,
@@ -392,17 +407,6 @@
         "hitPrice": 146.6
       },
       {
-        "code": "9501",
-        "name": "東京電力ホールディングス",
-        "buy": 529,
-        "tp": 566,
-        "sl": 510,
-        "signal": "監視継続",
-        "targetSetAt": "2026-06-15",
-        "hitAt": "2026-06-15T12:31:14.418Z",
-        "hitPrice": 531.3
-      },
-      {
         "code": "8015",
         "name": "豊田通商",
         "buy": 6407,
@@ -460,6 +464,20 @@
     ],
     "closed": [
       {
+        "code": "9501",
+        "name": "東京電力ホールディングス",
+        "buy": 529,
+        "tp": 566,
+        "sl": 510,
+        "signal": "監視継続",
+        "targetSetAt": "2026-06-15",
+        "hitAt": "2026-06-15T12:31:14.418Z",
+        "hitPrice": 531.3,
+        "exitType": "sl",
+        "exitPrice": 508.1,
+        "exitAt": "2026-06-17T07:12:30.946Z"
+      },
+      {
         "code": "9201",
         "name": "日本航空",
         "buy": 2587,
@@ -509,7 +527,7 @@
       },
       "監視継続": {
         "tp": 0,
-        "sl": 0
+        "sl": 1
       },
       "確認候補": {
         "tp": 2,
@@ -525,8 +543,16 @@
     "standard": {
       "fixed": {
         "initialCapital": 10000000,
-        "cash": 7000000,
+        "cash": 6989484,
         "positions": {
+          "7267": {
+            "name": "ホンダ",
+            "shares": 706.4641,
+            "entryPrice": 1415.5,
+            "investedAmount": 1000000,
+            "signal": "確認候補",
+            "entryAt": "2026-06-17T07:12:30.946Z"
+          },
           "9020": {
             "name": "東日本旅客鉄道",
             "shares": 293.772,
@@ -542,29 +568,45 @@
             "investedAmount": 1000000,
             "signal": "統合買い候補",
             "entryAt": "2026-06-15T08:39:17.727Z"
-          },
-          "9501": {
-            "name": "東京電力ホールディングス",
-            "shares": 1947.4197,
-            "entryPrice": 513.5,
-            "investedAmount": 1000000,
-            "signal": "監視継続",
-            "entryAt": "2026-06-16T07:47:32.842Z"
           }
         },
-        "history": [],
+        "history": [
+          {
+            "code": "9501",
+            "name": "東京電力ホールディングス",
+            "signal": "監視継続",
+            "exitType": "sl",
+            "shares": 1947.4197,
+            "investedAmount": 1000000,
+            "entryPrice": 513.5,
+            "exitPrice": 508.1,
+            "proceeds": 989484,
+            "pnl": -10516,
+            "pnlPct": -1.05,
+            "entryAt": "2026-06-16T07:47:32.842Z",
+            "exitAt": "2026-06-17T07:12:30.946Z"
+          }
+        ],
         "skipped": [],
-        "realizedPnl": 0,
+        "realizedPnl": -10516,
         "startedAt": "2026-06-12T10:24:31.161Z",
-        "positionValue": 2996950,
-        "unrealizedPnl": -3050,
-        "equity": 9996950,
-        "updatedAt": "2026-06-17T01:45:59.340Z"
+        "positionValue": 2986346,
+        "unrealizedPnl": -13654,
+        "equity": 9975830,
+        "updatedAt": "2026-06-17T07:12:30.946Z"
       },
       "unit": {
         "initialCapital": 10000000,
-        "cash": 9336450,
+        "cash": 9245710,
         "positions": {
+          "7267": {
+            "name": "ホンダ",
+            "shares": 100,
+            "entryPrice": 1415.5,
+            "investedAmount": 141550,
+            "signal": "確認候補",
+            "entryAt": "2026-06-17T07:12:30.946Z"
+          },
           "9020": {
             "name": "東日本旅客鉄道",
             "shares": 100,
@@ -580,24 +622,32 @@
             "investedAmount": 271800,
             "signal": "統合買い候補",
             "entryAt": "2026-06-15T08:39:17.727Z"
-          },
-          "9501": {
-            "name": "東京電力ホールディングス",
-            "shares": 100,
-            "entryPrice": 513.5,
-            "investedAmount": 51350,
-            "signal": "監視継続",
-            "entryAt": "2026-06-16T07:47:32.842Z"
           }
         },
-        "history": [],
+        "history": [
+          {
+            "code": "9501",
+            "name": "東京電力ホールディングス",
+            "signal": "監視継続",
+            "exitType": "sl",
+            "shares": 100,
+            "investedAmount": 51350,
+            "entryPrice": 513.5,
+            "exitPrice": 508.1,
+            "proceeds": 50810,
+            "pnl": -540,
+            "pnlPct": -1.05,
+            "entryAt": "2026-06-16T07:47:32.842Z",
+            "exitAt": "2026-06-17T07:12:30.946Z"
+          }
+        ],
         "skipped": [],
-        "realizedPnl": 0,
+        "realizedPnl": -540,
         "startedAt": "2026-06-12T10:24:31.161Z",
-        "positionValue": 662600,
-        "unrealizedPnl": -950,
-        "equity": 9999050,
-        "updatedAt": "2026-06-17T01:45:59.340Z"
+        "positionValue": 748850,
+        "unrealizedPnl": -4900,
+        "equity": 9994560,
+        "updatedAt": "2026-06-17T07:12:30.946Z"
       }
     },
     "relax": {
@@ -843,14 +893,14 @@
         ],
         "realizedPnl": 89286,
         "startedAt": "2026-06-12T10:24:31.161Z",
-        "positionValue": 10144211,
-        "unrealizedPnl": 144211,
-        "equity": 10233497,
-        "updatedAt": "2026-06-17T01:45:59.340Z"
+        "positionValue": 10123159,
+        "unrealizedPnl": 123159,
+        "equity": 10212445,
+        "updatedAt": "2026-06-17T07:12:30.946Z"
       },
       "unit": {
         "initialCapital": 10000000,
-        "cash": 796100,
+        "cash": 846910,
         "positions": {
           "1802": {
             "name": "大林組",
@@ -1028,14 +1078,6 @@
             "signal": "確認候補",
             "entryAt": "2026-06-15T08:39:17.727Z"
           },
-          "9501": {
-            "name": "東京電力ホールディングス",
-            "shares": 100,
-            "entryPrice": 531.3,
-            "investedAmount": 53130,
-            "signal": "監視継続",
-            "entryAt": "2026-06-15T12:31:14.418Z"
-          },
           "9502": {
             "name": "中部電力",
             "shares": 100,
@@ -1054,6 +1096,21 @@
           }
         },
         "history": [
+          {
+            "code": "9501",
+            "name": "東京電力ホールディングス",
+            "signal": "監視継続",
+            "exitType": "sl",
+            "shares": 100,
+            "investedAmount": 53130,
+            "entryPrice": 531.3,
+            "exitPrice": 508.1,
+            "proceeds": 50810,
+            "pnl": -2320,
+            "pnlPct": -4.37,
+            "entryAt": "2026-06-15T12:31:14.418Z",
+            "exitAt": "2026-06-17T07:12:30.946Z"
+          },
           {
             "code": "9201",
             "name": "日本航空",
@@ -1101,12 +1158,12 @@
           }
         ],
         "skipped": [],
-        "realizedPnl": 238500,
+        "realizedPnl": 236180,
         "startedAt": "2026-06-12T10:24:31.161Z",
-        "positionValue": 9622590,
-        "unrealizedPnl": 180190,
-        "equity": 10418690,
-        "updatedAt": "2026-06-17T01:45:59.340Z"
+        "positionValue": 9619940,
+        "unrealizedPnl": 230670,
+        "equity": 10466850,
+        "updatedAt": "2026-06-17T07:12:30.946Z"
       }
     }
   }
