@@ -2771,9 +2771,21 @@ function renderBuyTargetObservations() {
       sTp += sc.tp || 0; sSl += sc.sl || 0;
       rTp += rc.tp || 0; rSl += rc.sl || 0;
     }
+    // 利確/損切回数は 100万固定 と 1単元 で別集計して表示（観測ベースの両方式合算はツールチップに残す）。
+    const vc = (modeKey) => {
+      const pfm = (obs.portfolio && obs.portfolio[modeKey]) || {};
+      const fx = pfm.fixed || {};
+      const un = pfm.unit || {};
+      return {
+        fxTp: Number(fx.tpCount) || 0, fxSl: Number(fx.slCount) || 0,
+        unTp: Number(un.tpCount) || 0, unSl: Number(un.slCount) || 0
+      };
+    };
+    const s = vc('standard');
+    const r = vc('relax');
     g.innerHTML = `
-      <span class="mode-stat standard"><strong>標準モード</strong> 利確 ${sTp}回 / 損切 ${sSl}回</span>
-      <span class="mode-stat relax"><strong>ゆるめモード</strong> 利確 ${rTp}回 / 損切 ${rSl}回</span>
+      <span class="mode-stat standard" title="観測ベース(両方式合算) 利確${sTp}回/損切${sSl}回"><strong>標準モード</strong> 100万固定 利確${s.fxTp}/損切${s.fxSl} ｜ 1単元 利確${s.unTp}/損切${s.unSl}</span>
+      <span class="mode-stat relax" title="観測ベース(両方式合算) 利確${rTp}回/損切${rSl}回"><strong>ゆるめモード</strong> 100万固定 利確${r.fxTp}/損切${r.fxSl} ｜ 1単元 利確${r.unTp}/損切${r.unSl}</span>
     `;
   }
 
@@ -2829,6 +2841,8 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     }
 
     // サマリー：利確/損切件数 + 履歴総数 + リセットボタン
+    // 観測ベースの件数（fixed/unit合算）はツールチップに残しつつ、表示は方式別に分ける
+    // （同じ到達でも資金不足で1単元だけトレード不成立になり得るため）。
     let cTp = 0, cSl = 0;
     for (const it of closed) {
       if (it.exitType === 'tp') cTp++;
@@ -2836,11 +2850,17 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     }
     const totalClosed = closed.length;
     if (sumEl) {
+      const fx = (pfVariants && pfVariants.fixed) || {};
+      const un = (pfVariants && pfVariants.unit) || {};
+      const fxTp = Number(fx.tpCount) || 0;
+      const fxSl = Number(fx.slCount) || 0;
+      const unTp = Number(un.tpCount) || 0;
+      const unSl = Number(un.slCount) || 0;
       const closedResetHtml = isLocalDevHost()
         ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
         : '';
       sumEl.innerHTML = `
-        <span class="obs-total" title="利確${cTp}件 / 損切${cSl}件">利確${cTp} / 損切${cSl}（履歴${totalClosed}件）</span>
+        <span class="obs-total" title="観測ベース(両方式合算) 利確${cTp}件 / 損切${cSl}件">100万固定 利確${fxTp}/損切${fxSl} ｜ 1単元 利確${unTp}/損切${unSl}（履歴${totalClosed}件）</span>
         ${closedResetHtml}
       `;
     }
