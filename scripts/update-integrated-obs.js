@@ -24,7 +24,7 @@ const CLOSED_LIMIT = 80;
 //   unit : 1単元（100株）購入。実際の発注（単元株取引）の再現。銘柄ごとに投入額が変わる
 // シグナル「見送り」は実運用で買わないため購入対象外（観測・カウントには従来通り残る＝対照群）。
 // 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
-const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 10000000);
+const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
 const UNIT_SHARES = 100;
 const PF_VARIANTS = ["fixed", "unit"];
@@ -115,7 +115,11 @@ function normalizeObs(obs) {
     if (m && typeof m === "object" && Number.isFinite(Number(m.cash))) m = { fixed: m };
     if (!m || typeof m !== "object") m = {};
     for (const variant of PF_VARIANTS) {
-      if (!m[variant] || typeof m[variant] !== "object") m[variant] = makeEmptyPortfolio();
+      // 初期資金の設定が変わったら（増額など）そのバケットを作り直して全端末で公平に再スタートする。
+      // 取りこぼし（資金不足スキップ）を避けるための資金変更は、過去の偏った成績を引き継がず仕切り直す。
+      if (!m[variant] || typeof m[variant] !== "object" || Number(m[variant].initialCapital) !== INITIAL_CAPITAL) {
+        m[variant] = makeEmptyPortfolio();
+      }
       const p = m[variant];
       if (!Number.isFinite(Number(p.initialCapital)) || Number(p.initialCapital) <= 0) p.initialCapital = INITIAL_CAPITAL;
       if (!Number.isFinite(Number(p.cash))) p.cash = p.initialCapital;

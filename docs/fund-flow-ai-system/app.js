@@ -2536,7 +2536,7 @@ function getCategoryLabel(sig) {
 
 // === 仮想資金シミュレーション表示（サーバー側 update-integrated-obs.js が計算） ===
 // 観測スペースへの追加＝1銘柄100万円購入（見送りシグナルは対象外）、利確/損切で資金が増減する。
-const PF_INITIAL_CAPITAL = 10000000;
+const PF_INITIAL_CAPITAL = 50000000;
 
 function formatYen(value) {
   return Math.round(Number(value) || 0).toLocaleString('ja-JP');
@@ -2573,7 +2573,7 @@ function renderPortfolioPanel(modeKey, obs) {
     { key: 'unit', label: '1単元(100株)', hint: '実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる。資金不足の単元はスキップ' }
   ];
   if (!variants || !defs.some((d) => variants[d.key] && Number.isFinite(Number(variants[d.key].cash)))) {
-    el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（各1,000万円 / 100万円固定・1単元購入の2方式）は次回のサーバー更新から開始されます。</span>';
+    el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（各5,000万円 / 100万円固定・1単元購入の2方式）は次回のサーバー更新から開始されます。</span>';
     return;
   }
   const rows = defs.map((def) => {
@@ -2621,7 +2621,7 @@ function handlePortfolioReset(e) {
   if (!mode) return;
   const label = mode === 'standard' ? '標準モード' : 'ゆるめモード';
   if (isLocalDevHost()) {
-    if (!confirm(`${label} の仮想資金（100万円固定・1単元購入の両方）を1,000万円に初期化します（観測カウント・決済履歴はそのまま）。よろしいですか？`)) return;
+    if (!confirm(`${label} の仮想資金（100万円固定・1単元購入の両方）を5,000万円に初期化します（観測カウント・決済履歴はそのまま）。よろしいですか？`)) return;
     const obs = normalizeObs(state.buyTargetObservations || loadObservations());
     if (!obs.portfolio || typeof obs.portfolio !== 'object') obs.portfolio = {};
     obs.portfolio[mode] = { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient() };
@@ -2631,7 +2631,7 @@ function handlePortfolioReset(e) {
   } else {
     // 公開ページの仮想資金は GitHub Actions 管理の共有データ（全端末共通）のため、
     // Actions の手動実行（reset_portfolio にチェック）でリセットする。
-    if (!confirm('仮想資金は全端末で共有しているため、GitHub Actions からリセットします。\n\nこれから開くページで「Run workflow」→「仮想資金…を初期化する」にチェック → 緑の「Run workflow」を押してください（標準/ゆるめ両方が1,000万円に戻り、数分で反映されます）。')) return;
+    if (!confirm('仮想資金は全端末で共有しているため、GitHub Actions からリセットします。\n\nこれから開くページで「Run workflow」→「仮想資金…を初期化する」にチェック → 緑の「Run workflow」を押してください（標準/ゆるめ両方が5,000万円に戻り、数分で反映されます）。')) return;
     window.open('https://github.com/p27dff96428v8m9-pixel/auto-kabu-screener/actions/workflows/update-market-data.yml', '_blank', 'noopener');
   }
 }
