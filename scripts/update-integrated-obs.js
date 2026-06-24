@@ -34,6 +34,8 @@ const PF_SKIPPED_LIMIT = 40;
 // LINE通知（買い目標到達＝仮想購入時）。標準/ゆるめ × 100万固定/1単元 の4バケットの結果を
 // 1銘柄=1通にまとめて送る。LINE_ACCESS_TOKEN / LINE_USER_ID 未設定なら自動スキップ。
 const MODE_LABELS = { standard: "標準", relax: "ゆるめ" };
+// 標準/ゆるめを一目で見分けるための色分け絵文字（LINEはプレーンテキストなので色付き絵文字で代用）。
+const MODE_EMOJI = { standard: "🔵", relax: "🟠" };
 const VARIANT_LABELS = { fixed: "100万固定", unit: "1単元" };
 const PAGE_URL = process.env.OBS_PAGE_URL || "https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/";
 
@@ -89,7 +91,9 @@ function makeEmptyPortfolio() {
     history: [],
     skipped: [],
     realizedPnl: 0,
-    startedAt: null
+    startedAt: null,
+    tpCount: 0,
+    slCount: 0
   };
 }
 
@@ -127,6 +131,8 @@ function normalizeObs(obs) {
       if (!Array.isArray(p.history)) p.history = [];
       if (!Array.isArray(p.skipped)) p.skipped = [];
       if (!Number.isFinite(Number(p.realizedPnl))) p.realizedPnl = 0;
+      if (!Number.isFinite(Number(p.tpCount))) p.tpCount = 0;
+      if (!Number.isFinite(Number(p.slCount))) p.slCount = 0;
     }
     obs.portfolio[key] = m;
   }
@@ -186,9 +192,11 @@ async function sendLine(message) {
 function buildBuyMessage(ev) {
   const yen = (n) => `${Math.round(n).toLocaleString()}円`;
   const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
+  const emoji = MODE_EMOJI[ev.mode] || "🎯";
   const lines = [
-    `🎯【${modeLabel}モード】買い目標到達（仮想売買）`,
+    `${emoji}【${modeLabel}モード】買い目標到達（仮想売買）`,
     `${ev.name} (${ev.code})`,
+    `区分: ${ev.category || "—"}`,
     `現在値 ${yen(ev.price)} ≤ ${modeLabel}基準 ${yen(ev.threshold)}`
   ];
   // ゆるめは 買い目標×1.02 がしきい値なので、根拠を明示（標準は買い目標そのものなので省略）。
@@ -218,6 +226,9 @@ function settlePosition(pf, item, exitType, exitPrice, nowIso) {
   const pnl = proceeds - Number(pos.investedAmount);
   pf.cash = Math.round(Number(pf.cash) + proceeds);
   pf.realizedPnl = Math.round(Number(pf.realizedPnl) + pnl);
+  // 100万固定・1単元それぞれの利確/損切回数を別々に集計する（観測スペースで分けて表示するため）。
+  if (exitType === "tp") pf.tpCount = (Number(pf.tpCount) || 0) + 1;
+  else if (exitType === "sl") pf.slCount = (Number(pf.slCount) || 0) + 1;
   pf.history.unshift({
     code: item.code,
     name: item.name || item.code,
@@ -356,6 +367,7 @@ async function main() {
                 code,
                 name: target.name || code,
                 mode: def.key,
+                category: getCategoryLabel(target.signal),
                 factor: def.factor,
                 threshold: buy * def.factor,
                 price: curPrice,

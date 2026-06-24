@@ -2553,7 +2553,9 @@ function makeEmptyPortfolioClient() {
     startedAt: null,
     positionValue: 0,
     unrealizedPnl: 0,
-    equity: PF_INITIAL_CAPITAL
+    equity: PF_INITIAL_CAPITAL,
+    tpCount: 0,
+    slCount: 0
   };
 }
 
@@ -2681,8 +2683,17 @@ function renderBuyTargetObservations() {
     const resetBtnHtml = isLocalDevHost()
       ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
       : '';
+    // 利確/損切の回数は 100万固定 と 1単元 で別々に集計（同じ到達でも資金不足で1単元だけ
+    // スキップ＝トレード不成立になり得るため、合算せず方式ごとに表示する）。
+    const pfm = (obs.portfolio && obs.portfolio[modeKey]) || {};
+    const fx = pfm.fixed || {};
+    const un = pfm.unit || {};
+    const fxTp = Number(fx.tpCount) || 0;
+    const fxSl = Number(fx.slCount) || 0;
+    const unTp = Number(un.tpCount) || 0;
+    const unSl = Number(un.slCount) || 0;
     sumEl.innerHTML = `
-      <span class="obs-total" title="${countLines}">合計 利確${totalTp}回 / 損切${totalSl}回</span>
+      <span class="obs-total" title="カテゴリ別(観測): ${countLines}　／　観測合計 利確${totalTp}回 損切${totalSl}回">合計 <b>100万固定</b> 利確${fxTp}/損切${fxSl} ｜ <b>1単元</b> 利確${unTp}/損切${unSl}</span>
       ${resetBtnHtml}
     `;
 
