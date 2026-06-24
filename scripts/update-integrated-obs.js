@@ -31,6 +31,12 @@ const PF_VARIANTS = ["fixed", "unit"];
 const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
 
+// LINE通知（買い目標到達＝仮想購入時）。標準/ゆるめ × 100万固定/1単元 の4バケットの結果を
+// 1銘柄=1通にまとめて送る。LINE_ACCESS_TOKEN / LINE_USER_ID 未設定なら自動スキップ。
+const MODE_LABELS = { standard: "標準", relax: "ゆるめ" };
+const VARIANT_LABELS = { fixed: "100万固定", unit: "1単元" };
+const PAGE_URL = process.env.OBS_PAGE_URL || "https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/";
+
 function resolvePath(envName, fallback) {
   const value = process.env[envName];
   if (value) return path.resolve(process.cwd(), value);
@@ -138,17 +144,66 @@ function tryBuy(pf, variant, code, name, signal, price, nowIso) {
   if (Number(pf.cash) >= cost) {
     pf.cash = Math.round(Number(pf.cash) - cost);
     pf.positions[code] = { name, shares, entryPrice: price, investedAmount: cost, signal, entryAt: nowIso };
-  } else {
-    pf.skipped.unshift({
-      code,
-      name,
-      signal,
-      price,
-      at: nowIso,
-      reason: variant === "unit" ? `資金不足（1単元 ${cost.toLocaleString()}円）` : "資金不足"
-    });
-    if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+    return { action: "buy", shares, cost };
   }
+  const reason = variant === "unit" ? `資金不足（1単元 ${cost.toLocaleString()}円）` : "資金不足";
+  pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+  if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+  return { action: "skip", cost, reason };
+}
+
+// LINE Messaging API でテキストを push 送信する（auto_trader.py / gas_code.gs と同じ方式）。
+async function sendLine(message) {
+  const token = process.env.LINE_ACCESS_TOKEN;
+  const userId = process.env.LINE_USER_ID;
+  if (!token || !userId) {
+    console.log("LINE未設定のため通知をスキップ");
+    return false;
+  }
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ to: userId, messages: [{ type: "text", text: message }] })
+    });
+    if (!res.ok) {
+      console.error(`LINE通知エラー: HTTP ${res.status} ${await res.text().catch(() => "")}`);
+      return false;
+    }
+    console.log("LINE通知送信完了");
+    return true;
+  } catch (e) {
+    console.error(`LINE通知エラー: ${e && e.message ? e.message : e}`);
+    return false;
+  }
+}
+
+// 1銘柄×1モードの買い目標到達イベント（100万固定/1単元の両方式の結果込み）をLINE本文に整形する。
+function buildBuyMessage(ev) {
+  const yen = (n) => `${Math.round(n).toLocaleString()}円`;
+  const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
+  const lines = [
+    `🎯【${modeLabel}モード】買い目標到達（仮想売買）`,
+    `${ev.name} (${ev.code})`,
+    `現在値 ${yen(ev.price)} ≤ ${modeLabel}基準 ${yen(ev.threshold)}`
+  ];
+  // ゆるめは 買い目標×1.02 がしきい値なので、根拠を明示（標準は買い目標そのものなので省略）。
+  if (ev.factor !== 1) lines.push(`(買い目標 ${yen(ev.buy)} ×${ev.factor})`);
+  lines.push(`利確 ${ev.tp != null ? yen(ev.tp) : "—"} ／ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`);
+  lines.push("──────────");
+  for (const e of ev.entries) {
+    const variant = VARIANT_LABELS[e.variant] || e.variant;
+    if (e.action === "buy") {
+      const detail = e.variant === "unit"
+        ? `${e.shares}株（${Math.round(e.cost).toLocaleString()}円）`
+        : `${Math.round(e.cost).toLocaleString()}円分`;
+      lines.push(`${variant}: 買い ${detail}`);
+    } else {
+      lines.push(`${variant}: ${e.reason}`);
+    }
+  }
+  lines.push(`詳細: ${PAGE_URL}`);
+  return lines.join("\n");
 }
 
 // 利確/損切＝売却。保有していれば決済価格で現金に戻し、履歴に記録する。
@@ -189,7 +244,7 @@ function selectRankedStocks(stocks, limit) {
   return picked;
 }
 
-function main() {
+async function main() {
   const treasurePath = resolvePath("TREASURE_STOCKS_INPUT_PATH", path.join("docs", "fund-flow-ai-system", "data", "treasure-stocks.json"));
   const obsPath = resolvePath("INTEGRATED_OBS_PATH", path.join("docs", "fund-flow-ai-system", "data", "integrated-obs.json"));
 
@@ -211,6 +266,8 @@ function main() {
   const today = jstDateKey();
   const nowIso = new Date().toISOString();
   const summary = { settled: 0, hits: { standard: 0, relax: 0 } };
+  // この実行で新たに買い目標到達した銘柄を集約（code -> 4バケットの結果）。実行末に1銘柄=1通でLINE通知。
+  const buyEvents = {};
 
   // workflow_dispatch の reset_portfolio 入力で仮想資金を初期化（観測カウント・履歴はそのまま）
   if (process.env.RESET_PORTFOLIO === "1" || process.env.RESET_PORTFOLIO === "true") {
@@ -285,8 +342,26 @@ function main() {
         // 仮想資金: 到達＝購入（fixed=100万円分・unit=1単元100株 の両方式で並行運用）。
         // 見送りシグナルは購入対象外、資金不足はスキップ記録
         if (getCategoryLabel(target.signal) !== "見送り") {
+          // 通知は銘柄×モード単位（標準/ゆるめは達成基準もタイミングも違うため別通知）。
+          // fixed/unit は同基準・同タイミングなので同じイベントにまとめる。
+          const evKey = `${code}__${def.key}`;
           for (const variant of PF_VARIANTS) {
-            tryBuy(obs.portfolio[def.key][variant], variant, code, target.name || code, target.signal || "見送り", curPrice, nowIso);
+            const result = tryBuy(obs.portfolio[def.key][variant], variant, code, target.name || code, target.signal || "見送り", curPrice, nowIso);
+            if (!buyEvents[evKey]) {
+              buyEvents[evKey] = {
+                code,
+                name: target.name || code,
+                mode: def.key,
+                factor: def.factor,
+                threshold: buy * def.factor,
+                price: curPrice,
+                buy,
+                tp: Number.isFinite(Number(target.tp)) ? Number(target.tp) : null,
+                sl: Number.isFinite(sl) ? sl : null,
+                entries: []
+              };
+            }
+            buyEvents[evKey].entries.push({ variant, ...result });
           }
         }
       }
@@ -339,8 +414,17 @@ function main() {
   obs.marketUpdatedAt = treasure.marketUpdatedAt || treasure.updatedAt || null;
 
   writeJson(obsPath, obs);
+
+  // 新規に買い目標到達した銘柄を 1銘柄=1通 でLINE通知（4バケットの買い/資金不足を本文に併記）。
+  const notifyCodes = Object.keys(buyEvents);
+  let notified = 0;
+  for (const code of notifyCodes) {
+    if (await sendLine(buildBuyMessage(buyEvents[code]))) notified += 1;
+  }
+
   console.log(JSON.stringify({
     ...summary,
+    notified,
     targets: Object.keys(obs.targets).length,
     standardActive: obs.standard.active.length,
     relaxActive: obs.relax.active.length,
@@ -354,4 +438,7 @@ function main() {
   }));
 }
 
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exitCode = 1;
+});

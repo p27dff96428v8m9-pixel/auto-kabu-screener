@@ -87,6 +87,9 @@ jobs:
           INTEGRATED_OBS_PATH: docs/fund-flow-ai-system/data/integrated-obs.json
           # Actions の「Run workflow」で reset_portfolio にチェックを入れると仮想資金を1000万円に初期化
           RESET_PORTFOLIO: ${{ (github.event_name == 'workflow_dispatch' && inputs.reset_portfolio) && '1' || '0' }}
+          # 買い目標到達（仮想購入）を 1銘柄=1通 でLINE通知（4バケットの結果込み）。未設定なら自動スキップ。
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: node scripts/update-integrated-obs.js
 
       - name: Sync integrated ranking to Google Sheet
