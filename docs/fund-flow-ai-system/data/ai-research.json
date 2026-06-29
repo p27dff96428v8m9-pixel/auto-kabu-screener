@@ -1,80 +1,80 @@
 {
-  "source": "rule-fallback",
-  "updatedAt": "2026-06-29T07:15:19.336Z",
+  "source": "gemini",
+  "updatedAt": "2026-06-29T11:12:05.953Z",
   "period": "90d",
-  "model": null,
-  "message": "gemini-2.5-flash#1:503 Service Unavailable: {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n / gemini-2.5-flash#2:503 Service Unavailable: {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n / gemini-2.5-flash#3:503 Service Unavailable: {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
-  "summary": "Gemini未接続のため、株価・出来高から計算した暫定候補です。Gemini APIキー登録後はニュース・金利・為替材料を含めてAI調査に切り替わります。",
+  "model": "gemini-2.5-flash",
+  "marketUpdatedAt": "2026-06-29T11:11:38.583Z",
+  "summary": "日本株の資金フロー分析に基づくと、医薬品・ヘルスケア、保険・金利上昇メリット、総合商社・資源、通信・ディフェンシブが注目すべきテーマとして挙げられます。特に保険関連は長期的な過熱度が高いため、追いかけ買いには注意が必要です。円安メリット関連テーマは為替の追い風があるものの、テーマへの資金流入はまだ限定的です。",
   "candidates": [
     {
-      "id": "jp-electric-power",
-      "name": "電力・原子力再稼働",
+      "id": "jp-insurance",
+      "name": "保険・金利上昇メリット",
       "score": 100,
-      "decision": "優先確認",
-      "reason": "90日の資金量0、7日の資金量65、広がり35。価格・出来高だけで見る暫定判定です。",
+      "decision": "追いかけ買い注意",
+      "reason": "90日間で資金量、価格・出来高の勢い、テーマの広がりが極めて高く、非常に注目されています。しかし、長期的な過熱度が84と高水準にあり、短期的な調整リスクも考慮すべきです。",
       "evidence": [
-        "資金量 90日:0 / 30日:1 / 7日:65",
-        "加速度:0",
-        "過熱度:40"
+        "価格・出来高: 90日間資金量100、モメンタム100、広がり95。",
+        "過熱度: 90日間過熱度84。",
+        "金利・為替材料: なし。"
       ],
-      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
-      "risk": "ニュース未確認のため、材料の裏取り前提。"
+      "nextCheck": "過熱度の推移、金利動向。",
+      "risk": "長期的な過熱感による調整リスク。"
     },
     {
       "id": "jp-pharma",
       "name": "医薬品・ヘルスケア",
       "score": 100,
-      "decision": "優先確認",
-      "reason": "90日の資金量30、7日の資金量88、広がり35。価格・出来高だけで見る暫定判定です。",
+      "decision": "注目",
+      "reason": "7日間で資金量が非常に強く、価格・出来高の勢いも高く、テーマの広がりも非常に広いです。中長期でも安定した資金流入が見られます。",
       "evidence": [
-        "資金量 90日:30 / 30日:48 / 7日:88",
-        "加速度:0",
-        "過熱度:40"
+        "価格・出来高: 7日間資金量88、モメンタム70、広がり95。",
+        "ニュース見出し: なし。",
+        "金利・為替材料: なし。"
       ],
-      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
-      "risk": "ニュース未確認のため、材料の裏取り前提。"
-    },
-    {
-      "id": "jp-insurance",
-      "name": "保険・金利上昇メリット",
-      "score": 100,
-      "decision": "優先確認",
-      "reason": "90日の資金量100、7日の資金量85、広がり95。価格・出来高だけで見る暫定判定です。",
-      "evidence": [
-        "資金量 90日:100 / 30日:39 / 7日:85",
-        "加速度:0",
-        "過熱度:84"
-      ],
-      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
-      "risk": "ニュース未確認のため、材料の裏取り前提。"
+      "nextCheck": "資金流入の持続性、過熱度の変化。",
+      "risk": "なし（現時点では過熱感なし）。"
     },
     {
       "id": "jp-trading-houses",
       "name": "総合商社・資源",
       "score": 77,
-      "decision": "優先確認",
-      "reason": "90日の資金量53、7日の資金量70、広がり35。価格・出来高だけで見る暫定判定です。",
+      "decision": "注目",
+      "reason": "7日間で資金流入が強く、テーマの広がりも非常に広いです。銅価格の継続的な上昇など、資源価格の堅調な推移も追い風となる可能性があります。",
       "evidence": [
-        "資金量 90日:53 / 30日:45 / 7日:70",
-        "加速度:0",
-        "過熱度:41"
+        "価格・出来高: 7日間資金量70、モメンタム50、広がり95。",
+        "ニュース見出し: なし。",
+        "金利・為替材料: 銅価格の継続的な上昇。"
       ],
-      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
-      "risk": "ニュース未確認のため、材料の裏取り前提。"
+      "nextCheck": "資源価格の動向、資金流入の持続性。",
+      "risk": "資源価格の変動リスク。"
+    },
+    {
+      "id": "jp-telecom",
+      "name": "通信・ディフェンシブ",
+      "score": 68,
+      "decision": "注目",
+      "reason": "7日間で資金流入が強く、価格・出来高の勢いも高く、テーマの広がりも非常に広いです。中長期でも安定した資金流入とモメンタムが見られます。",
+      "evidence": [
+        "価格・出来高: 7日間資金量69、モメンタム54、広がり95。",
+        "ニュース見出し: なし。",
+        "金利・為替材料: なし。"
+      ],
+      "nextCheck": "資金流入の持続性、広がりと勢いの維持。",
+      "risk": "なし（現時点では過熱感なし）。"
     },
     {
       "id": "jp-small-growth",
       "name": "グロース250・中小型成長",
       "score": 76,
-      "decision": "優先確認",
-      "reason": "90日の資金量29、7日の資金量52、広がり35。価格・出来高だけで見る暫定判定です。",
+      "decision": "継続監視",
+      "reason": "7日間で価格・出来高の勢いとテーマの広がりが見られますが、資金流入と出来高はそれほど強くありません。中長期的な資金流入は限定的です。",
       "evidence": [
-        "資金量 90日:29 / 30日:24 / 7日:52",
-        "加速度:0",
-        "過熱度:40"
+        "価格・出来高: 7日間モメンタム56、広がり95。",
+        "ニュース見出し: なし。",
+        "金利・為替材料: なし。"
       ],
-      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
-      "risk": "ニュース未確認のため、材料の裏取り前提。"
+      "nextCheck": "資金流入と出来高の改善、広がりと勢いの持続性。",
+      "risk": "短期的な動きで終わる可能性。"
     }
   ]
 }
