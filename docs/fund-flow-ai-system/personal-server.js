@@ -8,6 +8,9 @@ const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 
 const root = __dirname;
+// 共有スクリプト(scripts/)はリポジトリ直下にある。cwd もリポジトリ直下にすると
+// 各スクリプトのデフォルトパス(docs/fund-flow-ai-system/data/...)が GitHub Actions と同じに解決される。
+const repoRoot = path.resolve(root, '..', '..');
 const host = '127.0.0.1';
 const preferredPort = Number(process.env.PORT || 8790);
 const portFile = path.join(root, 'personal-server.port');
@@ -162,18 +165,32 @@ async function handleRecomputeThemes(res) {
     payload.updatedAt = new Date().toISOString();
     fs.writeFileSync(dataPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 
-    const treasureScript = path.join(root, 'scripts', 'update-treasure-stocks.js');
+    // 従来は root/scripts/... を参照していたが実体はリポジトリ直下の scripts/ のため
+    // 存在チェックで常にスキップされていた（宝株更新が動いていなかった）。repoRoot に修正。
+    const treasureScript = path.join(repoRoot, 'scripts', 'update-treasure-stocks.js');
     if (fs.existsSync(treasureScript)) {
       try {
         // 完了を待ってからレスポンスを返す（クライアントがすぐに loadIntegratedRanking するので重要）
-        await execFileAsync(process.execPath, [treasureScript], { cwd: root });
+        await execFileAsync(process.execPath, [treasureScript], { cwd: repoRoot });
       } catch (e) {
         console.warn('[recompute] update-treasure-stocks.js failed or had warnings:', e.message || e);
       }
     }
 
+    // 観測スペースも公開側（GitHub Actions）と同一のトラッカーで更新する。
+    // 買い目標の日次固定・市場時間内判定・ゆるめ上限(基準価格×0.999)・監視継続の購入除外・
+    // 実戦候補順位(candidateRanking) までローカルでも同じロジックになる。LINE未設定なら通知は自動スキップ。
+    const obsScript = path.join(repoRoot, 'scripts', 'update-integrated-obs.js');
+    if (fs.existsSync(obsScript)) {
+      try {
+        await execFileAsync(process.execPath, [obsScript], { cwd: repoRoot });
+      } catch (e) {
+        console.warn('[recompute] update-integrated-obs.js failed or had warnings:', e.message || e);
+      }
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ ok: true, themes: themes.length, updatedAt: payload.updatedAt, treasureUpdated: true }));
+    res.end(JSON.stringify({ ok: true, themes: themes.length, updatedAt: payload.updatedAt, treasureUpdated: true, obsUpdated: true }));
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ ok: false, error: error.message }));
