@@ -2708,8 +2708,9 @@ function renderBuyTargetObservations() {
     const fxSl = Number(fx.slCount) || 0;
     const unTp = Number(un.tpCount) || 0;
     const unSl = Number(un.slCount) || 0;
+    // 方式ごとの塊(obs-total-seg)は途中改行させず、狭い幅では塊単位で折り返す
     sumEl.innerHTML = `
-      <span class="obs-total" title="カテゴリ別(観測): ${countLines}　／　観測合計 利確${totalTp}回 損切${totalSl}回">合計 <b>100万固定</b> 利確${fxTp}/損切${fxSl} ｜ <b>1単元</b> 利確${unTp}/損切${unSl}</span>
+      <span class="obs-total" title="カテゴリ別(観測): ${countLines}　／　観測合計 利確${totalTp}回 損切${totalSl}回"><span class="obs-total-seg">合計 <b>100万固定</b> 利確${fxTp}/損切${fxSl}</span> ｜ <span class="obs-total-seg"><b>1単元</b> 利確${unTp}/損切${unSl}</span></span>
       ${resetBtnHtml}
     `;
 
@@ -2804,7 +2805,7 @@ function renderBuyTargetObservations() {
     let rankLine = '';
     if (cr && Array.isArray(cr.items) && cr.items.length) {
       const nm = (c) => `${c.mode === 'relax' ? 'ゆるめ' : '標準'}×${c.variant === 'unit' ? '1単元' : '100万固定'}`;
-      const body = cr.items.map((c) => `<b>第${c.rank}候補</b> ${nm(c)} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct}%)`).join('　');
+      const body = cr.items.map((c) => `<span class="obs-total-seg"><b>第${c.rank}候補</b> ${nm(c)} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct}%)</span>`).join(' ');
       rankLine = `<span class="mode-stat ranking" title="実戦で絞る場合の優先順位。損益率で自動更新${cr.basis === 'structural' ? '（現在は成績差が無いため初期優先度: 標準>ゆるめ・100万固定>1単元）' : ''}。LINE通知にも同じ順位を表示">🏅 実戦候補順位: ${body}</span>`;
     }
     g.innerHTML = `

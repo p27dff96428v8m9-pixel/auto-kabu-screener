@@ -2323,6 +2323,7 @@ footer p {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap; /* バッジ+合計が収まらない幅でも重ならず折り返す */
   gap: 6px;
   padding: 6px 8px;
   background: #f1f5f9;
@@ -2336,6 +2337,10 @@ footer p {
   padding: 1px 6px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+.obs-mode-badge[title] {
+  cursor: help; /* 到達条件の詳細はツールチップで表示 */
 }
 
 .obs-mode-badge.standard {
@@ -2367,6 +2372,11 @@ footer p {
   font-weight: 600;
   color: #0f172a;
   margin-left: 4px;
+}
+
+/* 「合計 100万固定 利確n/損切n」の塊は途中で改行させない（狭い幅では塊単位で折り返す） */
+.obs-total-seg {
+  white-space: nowrap;
 }
 
 .obs-reset-btn,
