@@ -28,7 +28,9 @@ const CLOSED_LIMIT = 80;
 // 2種類の購入ルールを並行運用して比較できるようにする:
 //   fixed: 1銘柄100万円固定（端株可・S株/ミニ株想定）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る
 //   unit : 1単元（100株）購入。実際の発注（単元株取引）の再現。銘柄ごとに投入額が変わる
-// シグナル「見送り」は実運用で買わないため購入対象外（観測・カウントには従来通り残る＝対照群）。
+// 購入するのは BUY_CATEGORIES のシグナル区分のみ。「見送り」は実運用で買わないため対象外。
+// 「監視継続」は観測実績が利確0回/損切11回（2026-07-02時点、標準5+ゆるめ6）と一方的に悪いため対象外。
+// どちらも観測・カウントには従来通り残す（対照群として引き続き検証する）。
 // 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
 const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
@@ -36,6 +38,7 @@ const UNIT_SHARES = 100;
 const PF_VARIANTS = ["fixed", "unit"];
 const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
+const BUY_CATEGORIES = new Set(["統合買い候補", "確認候補"]);
 
 // LINE通知（買い目標到達＝仮想購入時）。標準/ゆるめ × 100万固定/1単元 の4バケットの結果を
 // 1銘柄=1通にまとめて送る。LINE_ACCESS_TOKEN / LINE_USER_ID 未設定なら自動スキップ。
@@ -383,8 +386,8 @@ async function main() {
         summary.hits[def.key] += 1;
 
         // 仮想資金: 到達＝購入（fixed=100万円分・unit=1単元100株 の両方式で並行運用）。
-        // 見送りシグナルは購入対象外、資金不足はスキップ記録
-        if (getCategoryLabel(target.signal) !== "見送り") {
+        // 見送り・監視継続シグナルは購入対象外（対照群）、資金不足はスキップ記録
+        if (BUY_CATEGORIES.has(getCategoryLabel(target.signal))) {
           // 通知は銘柄×モード単位（標準/ゆるめは達成基準もタイミングも違うため別通知）。
           // fixed/unit は同基準・同タイミングなので同じイベントにまとめる。
           const evKey = `${code}__${def.key}`;

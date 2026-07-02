@@ -2535,7 +2535,7 @@ function getCategoryLabel(sig) {
 }
 
 // === 仮想資金シミュレーション表示（サーバー側 update-integrated-obs.js が計算） ===
-// 観測スペースへの追加＝1銘柄100万円購入（見送りシグナルは対象外）、利確/損切で資金が増減する。
+// 観測スペースへの追加＝1銘柄100万円購入（見送り・監視継続シグナルは対象外）、利確/損切で資金が増減する。
 const PF_INITIAL_CAPITAL = 50000000;
 
 function formatYen(value) {
@@ -2596,7 +2596,7 @@ function renderPortfolioPanel(modeKey, obs) {
       <div class="obs-pf-variant">
         <div class="obs-pf-main">
           <span class="obs-pf-label" title="${def.hint}">${def.label}</span>
-          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（見送りシグナルは購入対象外）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
+          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（見送り・監視継続シグナルは購入対象外）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
         </div>
         <div class="obs-pf-detail">
           <span>現金 ${formatYen(pf.cash)}円</span>
@@ -2726,8 +2726,8 @@ function renderBuyTargetObservations() {
         heldHtml = `<span class="obs-held" title="100万円固定のみ保有（1単元 ${formatYen(Number(item.hitPrice) * 100)}円 は資金不足でスキップ）">💰保有(100万のみ)</span>`;
       } else if (posU) {
         heldHtml = `<span class="obs-held" title="1単元（100株 ${formatYen(posU.investedAmount)}円）のみ保有">💰保有(1単元のみ)</span>`;
-      } else if (cat === '見送り') {
-        heldHtml = `<span class="obs-held none" title="見送りシグナルは仮想資金の購入対象外（対照群として観測のみ）">観測のみ</span>`;
+      } else if (cat === '見送り' || cat === '監視継続') {
+        heldHtml = `<span class="obs-held none" title="${cat}シグナルは仮想資金の購入対象外（対照群として観測のみ。監視継続は観測実績が損切に偏ったため2026-07-02から除外）">観測のみ</span>`;
       }
       return `
         <div class="obs-card" data-code="${item.code}">
