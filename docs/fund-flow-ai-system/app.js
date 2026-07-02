@@ -3134,7 +3134,7 @@ function renderIntegratedRanking() {
           ${actual ? `<span>EPS ${actual.eps != null ? Number(actual.eps).toFixed(2) : "-"}</span>` : ""}
           ${actual ? `<span>進捗 ${actual.progressBasis != null ? `${Number(actual.progressBasis).toFixed(1)}%` : "-"}</span>` : ""}
           ${actual ? `<span>期待比 ${actual.progressVsExpectedPct != null ? `${Number(actual.progressVsExpectedPct).toFixed(1)}pt` : "-"}</span>` : ""}
-          <span>勝率 ${formatNumber(stock.winRate)}%</span>
+          <span title="予測勝率(未較正) ${formatNumber(stock.winRate)}%">勝率 ${stock.winRateCalibrated != null ? `${formatNumber(stock.winRateCalibrated)}%(実測較正)` : `${formatNumber(stock.winRate)}%`}</span>
           <span>RR ${formatNumber(stock.rr, 2)}</span>
           <span>7日 ${formatSignedPercent(changes["7d"])}</span>
           <span>30日 ${formatSignedPercent(changes["30d"])}</span>

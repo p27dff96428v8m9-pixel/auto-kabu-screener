@@ -1,0 +1,545 @@
+{
+ "source": "backtest-strategy",
+ "sltpMode": "atr",
+ "ranAt": "2026-07-02T14:43:23.387Z",
+ "note": "価格・出来高ベースの再現。業績/材料ラベルは対象外。同日両触れは損切扱い(保守的)。資金制約なし。",
+ "holdLimitSessions": 90,
+ "universe": [
+  "1306",
+  "1321",
+  "1328",
+  "1343",
+  "1540",
+  "1615",
+  "1801",
+  "1802",
+  "1803",
+  "2516",
+  "2768",
+  "3099",
+  "3283",
+  "3462",
+  "4004",
+  "4063",
+  "4188",
+  "4478",
+  "4483",
+  "4502",
+  "4519",
+  "4568",
+  "4661",
+  "5713",
+  "6146",
+  "6208",
+  "6301",
+  "6501",
+  "6503",
+  "6723",
+  "6857",
+  "6902",
+  "6920",
+  "6954",
+  "6981",
+  "7011",
+  "7012",
+  "7013",
+  "7167",
+  "7182",
+  "7201",
+  "7203",
+  "7267",
+  "7270",
+  "7532",
+  "7735",
+  "8001",
+  "8015",
+  "8031",
+  "8035",
+  "8053",
+  "8058",
+  "8267",
+  "8306",
+  "8308",
+  "8316",
+  "8411",
+  "8630",
+  "8725",
+  "8750",
+  "8766",
+  "8795",
+  "8951",
+  "8952",
+  "8953",
+  "9020",
+  "9201",
+  "9432",
+  "9433",
+  "9434",
+  "9501",
+  "9502",
+  "9503",
+  "9504",
+  "9506",
+  "9508",
+  "9513",
+  "9983"
+ ],
+ "period": {
+  "from": "2021-07-02",
+  "to": "2026-07-02"
+ },
+ "regimeFilterOn": {
+  "overall": {
+   "trades": 3317,
+   "tp": 1367,
+   "sl": 1851,
+   "timeout": 99,
+   "winPct": 42.5,
+   "avgPnlPct": 1.21,
+   "totalPnlPct": 4023.2,
+   "avgHoldSessions": 16.8
+  },
+  "byWinRateBucket": {
+   "75-79": {
+    "trades": 397,
+    "tp": 173,
+    "sl": 221,
+    "timeout": 3,
+    "winPct": 43.9,
+    "avgPnlPct": 1.21,
+    "totalPnlPct": 481.8
+   },
+   "80-84": {
+    "trades": 701,
+    "tp": 305,
+    "sl": 393,
+    "timeout": 3,
+    "winPct": 43.7,
+    "avgPnlPct": 1.31,
+    "totalPnlPct": 914.8
+   },
+   "70-74": {
+    "trades": 281,
+    "tp": 108,
+    "sl": 164,
+    "timeout": 9,
+    "winPct": 39.7,
+    "avgPnlPct": 1.25,
+    "totalPnlPct": 352.3
+   },
+   "60-64": {
+    "trades": 742,
+    "tp": 326,
+    "sl": 390,
+    "timeout": 26,
+    "winPct": 45.5,
+    "avgPnlPct": 1.47,
+    "totalPnlPct": 1092.9
+   },
+   "45-49": {
+    "trades": 79,
+    "tp": 22,
+    "sl": 51,
+    "timeout": 6,
+    "winPct": 30.1,
+    "avgPnlPct": -0.71,
+    "totalPnlPct": -55.8
+   },
+   "65-69": {
+    "trades": 441,
+    "tp": 177,
+    "sl": 246,
+    "timeout": 18,
+    "winPct": 41.8,
+    "avgPnlPct": 0.98,
+    "totalPnlPct": 431.5
+   },
+   "50-54": {
+    "trades": 294,
+    "tp": 115,
+    "sl": 164,
+    "timeout": 15,
+    "winPct": 41.2,
+    "avgPnlPct": 1.32,
+    "totalPnlPct": 388.9
+   },
+   "55-59": {
+    "trades": 261,
+    "tp": 92,
+    "sl": 158,
+    "timeout": 11,
+    "winPct": 36.8,
+    "avgPnlPct": 0.57,
+    "totalPnlPct": 148.2
+   },
+   "40-44": {
+    "trades": 119,
+    "tp": 48,
+    "sl": 63,
+    "timeout": 8,
+    "winPct": 43.2,
+    "avgPnlPct": 2.17,
+    "totalPnlPct": 258.3
+   },
+   "35-39": {
+    "trades": 2,
+    "tp": 1,
+    "sl": 1,
+    "timeout": 0,
+    "winPct": 50,
+    "avgPnlPct": 5.13,
+    "totalPnlPct": 10.3
+   }
+  },
+  "byTier": {
+   "tierC(その他)": {
+    "trades": 1575,
+    "tp": 620,
+    "sl": 902,
+    "timeout": 53,
+    "winPct": 40.7,
+    "avgPnlPct": 1.05,
+    "totalPnlPct": 1657.1
+   },
+   "tierA(買い候補相当)": {
+    "trades": 907,
+    "tp": 402,
+    "sl": 497,
+    "timeout": 8,
+    "winPct": 44.7,
+    "avgPnlPct": 1.31,
+    "totalPnlPct": 1192.3
+   },
+   "tierB(確認候補相当)": {
+    "trades": 835,
+    "tp": 345,
+    "sl": 452,
+    "timeout": 38,
+    "winPct": 43.3,
+    "avgPnlPct": 1.41,
+    "totalPnlPct": 1173.7
+   }
+  },
+  "byYear": {
+   "2021": {
+    "trades": 144,
+    "tp": 42,
+    "sl": 101,
+    "timeout": 1,
+    "winPct": 29.4,
+    "avgPnlPct": -0.75,
+    "totalPnlPct": -107.8
+   },
+   "2022": {
+    "trades": 610,
+    "tp": 212,
+    "sl": 384,
+    "timeout": 14,
+    "winPct": 35.6,
+    "avgPnlPct": 0.21,
+    "totalPnlPct": 126.1
+   },
+   "2023": {
+    "trades": 660,
+    "tp": 306,
+    "sl": 350,
+    "timeout": 4,
+    "winPct": 46.6,
+    "avgPnlPct": 1.64,
+    "totalPnlPct": 1082.4
+   },
+   "2024": {
+    "trades": 681,
+    "tp": 272,
+    "sl": 399,
+    "timeout": 10,
+    "winPct": 40.5,
+    "avgPnlPct": 1.04,
+    "totalPnlPct": 704.9
+   },
+   "2025": {
+    "trades": 746,
+    "tp": 375,
+    "sl": 369,
+    "timeout": 2,
+    "winPct": 50.4,
+    "avgPnlPct": 2.27,
+    "totalPnlPct": 1694.4
+   },
+   "2026": {
+    "trades": 476,
+    "tp": 160,
+    "sl": 248,
+    "timeout": 68,
+    "winPct": 39.2,
+    "avgPnlPct": 1.1,
+    "totalPnlPct": 523.2
+   }
+  }
+ },
+ "regimeFilterOff": {
+  "overall": {
+   "trades": 4288,
+   "tp": 1804,
+   "sl": 2374,
+   "timeout": 110,
+   "winPct": 43.2,
+   "avgPnlPct": 1.63,
+   "totalPnlPct": 7001.2,
+   "avgHoldSessions": 16
+  },
+  "byWinRateBucket": {
+   "75-79": {
+    "trades": 438,
+    "tp": 191,
+    "sl": 245,
+    "timeout": 2,
+    "winPct": 43.8,
+    "avgPnlPct": 1.31,
+    "totalPnlPct": 572.4
+   },
+   "60-64": {
+    "trades": 775,
+    "tp": 345,
+    "sl": 411,
+    "timeout": 19,
+    "winPct": 45.6,
+    "avgPnlPct": 1.36,
+    "totalPnlPct": 1056.4
+   },
+   "65-69": {
+    "trades": 537,
+    "tp": 220,
+    "sl": 298,
+    "timeout": 19,
+    "winPct": 42.5,
+    "avgPnlPct": 1.29,
+    "totalPnlPct": 694.9
+   },
+   "80-84": {
+    "trades": 830,
+    "tp": 358,
+    "sl": 469,
+    "timeout": 3,
+    "winPct": 43.3,
+    "avgPnlPct": 1.07,
+    "totalPnlPct": 889.2
+   },
+   "70-74": {
+    "trades": 363,
+    "tp": 139,
+    "sl": 216,
+    "timeout": 8,
+    "winPct": 39.2,
+    "avgPnlPct": 1.35,
+    "totalPnlPct": 489.9
+   },
+   "50-54": {
+    "trades": 729,
+    "tp": 318,
+    "sl": 383,
+    "timeout": 28,
+    "winPct": 45.4,
+    "avgPnlPct": 3.45,
+    "totalPnlPct": 2511.6
+   },
+   "55-59": {
+    "trades": 387,
+    "tp": 155,
+    "sl": 216,
+    "timeout": 16,
+    "winPct": 41.8,
+    "avgPnlPct": 1.49,
+    "totalPnlPct": 576.9
+   },
+   "40-44": {
+    "trades": 134,
+    "tp": 49,
+    "sl": 75,
+    "timeout": 10,
+    "winPct": 39.5,
+    "avgPnlPct": 1.48,
+    "totalPnlPct": 198.1
+   },
+   "45-49": {
+    "trades": 92,
+    "tp": 27,
+    "sl": 60,
+    "timeout": 5,
+    "winPct": 31,
+    "avgPnlPct": 0.07,
+    "totalPnlPct": 6
+   },
+   "35-39": {
+    "trades": 3,
+    "tp": 2,
+    "sl": 1,
+    "timeout": 0,
+    "winPct": 66.7,
+    "avgPnlPct": 1.9,
+    "totalPnlPct": 5.7
+   }
+  },
+  "byTier": {
+   "tierC(その他)": {
+    "trades": 2298,
+    "tp": 955,
+    "sl": 1272,
+    "timeout": 71,
+    "winPct": 42.9,
+    "avgPnlPct": 1.89,
+    "totalPnlPct": 4332.7
+   },
+   "tierA(買い候補相当)": {
+    "trades": 1026,
+    "tp": 442,
+    "sl": 578,
+    "timeout": 6,
+    "winPct": 43.3,
+    "avgPnlPct": 1.05,
+    "totalPnlPct": 1079.9
+   },
+   "tierB(確認候補相当)": {
+    "trades": 964,
+    "tp": 407,
+    "sl": 524,
+    "timeout": 33,
+    "winPct": 43.7,
+    "avgPnlPct": 1.65,
+    "totalPnlPct": 1588.5
+   }
+  },
+  "byYear": {
+   "2021": {
+    "trades": 210,
+    "tp": 84,
+    "sl": 125,
+    "timeout": 1,
+    "winPct": 40.2,
+    "avgPnlPct": 0.65,
+    "totalPnlPct": 136.4
+   },
+   "2022": {
+    "trades": 933,
+    "tp": 354,
+    "sl": 562,
+    "timeout": 17,
+    "winPct": 38.6,
+    "avgPnlPct": 0.73,
+    "totalPnlPct": 684
+   },
+   "2023": {
+    "trades": 840,
+    "tp": 425,
+    "sl": 411,
+    "timeout": 4,
+    "winPct": 50.8,
+    "avgPnlPct": 2.31,
+    "totalPnlPct": 1941.5
+   },
+   "2024": {
+    "trades": 854,
+    "tp": 330,
+    "sl": 508,
+    "timeout": 16,
+    "winPct": 39.4,
+    "avgPnlPct": 1.51,
+    "totalPnlPct": 1288.2
+   },
+   "2025": {
+    "trades": 921,
+    "tp": 442,
+    "sl": 474,
+    "timeout": 5,
+    "winPct": 48.3,
+    "avgPnlPct": 2.77,
+    "totalPnlPct": 2547.4
+   },
+   "2026": {
+    "trades": 530,
+    "tp": 169,
+    "sl": 294,
+    "timeout": 67,
+    "winPct": 36.5,
+    "avgPnlPct": 0.76,
+    "totalPnlPct": 403.8
+   }
+  }
+ },
+ "calibration": {
+  "basis": "backtest atr / 地合いフィルタON / 3317件",
+  "overallWinPct": 42.5,
+  "buckets": [
+   {
+    "minWinRate": 35,
+    "maxWinRate": 39,
+    "samples": 2,
+    "observedWinPct": 50,
+    "calibratedWinPct": 42.8
+   },
+   {
+    "minWinRate": 40,
+    "maxWinRate": 44,
+    "samples": 111,
+    "observedWinPct": 43.2,
+    "calibratedWinPct": 43
+   },
+   {
+    "minWinRate": 45,
+    "maxWinRate": 49,
+    "samples": 73,
+    "observedWinPct": 30.1,
+    "calibratedWinPct": 35.1
+   },
+   {
+    "minWinRate": 50,
+    "maxWinRate": 54,
+    "samples": 279,
+    "observedWinPct": 41.2,
+    "calibratedWinPct": 41.4
+   },
+   {
+    "minWinRate": 55,
+    "maxWinRate": 59,
+    "samples": 250,
+    "observedWinPct": 36.8,
+    "calibratedWinPct": 37.8
+   },
+   {
+    "minWinRate": 60,
+    "maxWinRate": 64,
+    "samples": 716,
+    "observedWinPct": 45.5,
+    "calibratedWinPct": 45.3
+   },
+   {
+    "minWinRate": 65,
+    "maxWinRate": 69,
+    "samples": 423,
+    "observedWinPct": 41.8,
+    "calibratedWinPct": 41.9
+   },
+   {
+    "minWinRate": 70,
+    "maxWinRate": 74,
+    "samples": 272,
+    "observedWinPct": 39.7,
+    "calibratedWinPct": 40.1
+   },
+   {
+    "minWinRate": 75,
+    "maxWinRate": 79,
+    "samples": 394,
+    "observedWinPct": 43.9,
+    "calibratedWinPct": 43.7
+   },
+   {
+    "minWinRate": 80,
+    "maxWinRate": 84,
+    "samples": 698,
+    "observedWinPct": 43.7,
+    "calibratedWinPct": 43.6
+   }
+  ]
+ }
+}

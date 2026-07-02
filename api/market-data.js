@@ -303,11 +303,18 @@ async function getJQuantsAuth() {
 }
 
 function mapDailyQuoteRows(data) {
-  return (data.data || data.daily_quotes || data.dailyQuotes || []).map((row) => ({
-    date: row.Date || row.date,
-    close: Number(row.AdjC ?? row.C ?? row.AdjustmentClose ?? row.Close ?? row.close),
-    volume: Number(row.AdjVo ?? row.Vo ?? row.Volume ?? row.volume)
-  })).filter((row) => Number.isFinite(row.close) && Number.isFinite(row.volume));
+  return (data.data || data.daily_quotes || data.dailyQuotes || []).map((row) => {
+    const high = Number(row.AdjH ?? row.H ?? row.AdjustmentHigh ?? row.High ?? row.high);
+    const low = Number(row.AdjL ?? row.L ?? row.AdjustmentLow ?? row.Low ?? row.low);
+    return {
+      date: row.Date || row.date,
+      close: Number(row.AdjC ?? row.C ?? row.AdjustmentClose ?? row.Close ?? row.close),
+      volume: Number(row.AdjVo ?? row.Vo ?? row.Volume ?? row.volume),
+      // ATR(実測ボラティリティ)計算用。取得できない行は省略し、利用側で終値差分にフォールバックする。
+      ...(Number.isFinite(high) ? { high } : {}),
+      ...(Number.isFinite(low) ? { low } : {})
+    };
+  }).filter((row) => Number.isFinite(row.close) && Number.isFinite(row.volume));
 }
 
 function normalizeJQuantsCode(code) {
@@ -336,6 +343,36 @@ async function fetchDailyQuotes(code, auth) {
     headers: { Authorization: `Bearer ${auth.idToken}` }
   });
   return mapDailyQuoteRows(data);
+}
+
+// 投資部門別売買状況（TSEプライム・週次）。海外投資家(FrgnBal)の買越/売越は市場全体の
+// 代表的な資金フロー指標。Lightプランで取得できる唯一の本物の需給データ
+// （信用残 margin-interest / 空売り比率 short-ratio は Standard 以上のため 403）。
+async function fetchInvestorFlows(auth) {
+  if (auth?.mode !== "v2") return null;
+  const url = `${JQUANTS_V2_BASE_URL}/equities/investor-types?from=${dateDaysAgo(120)}&to=${dateDaysAgo(0)}`;
+  const data = await fetchJson(url, { headers: { "x-api-key": auth.apiKey } });
+  const weeks = (data.data || [])
+    .filter((row) => row.Section === "TSEPrime")
+    .map((row) => ({
+      stDate: row.StDate || null,
+      enDate: row.EnDate || null,
+      pubDate: row.PubDate || null,
+      foreignersNet: Number.isFinite(Number(row.FrgnBal)) ? Number(row.FrgnBal) : null,
+      individualsNet: Number.isFinite(Number(row.IndBal)) ? Number(row.IndBal) : null,
+      trustBanksNet: Number.isFinite(Number(row.TrstBnkBal)) ? Number(row.TrstBnkBal) : null,
+      investmentTrustsNet: Number.isFinite(Number(row.InvTrBal)) ? Number(row.InvTrBal) : null
+    }))
+    .sort((a, b) => String(a.enDate).localeCompare(String(b.enDate)));
+  if (!weeks.length) return null;
+  const recent = weeks.slice(-4).map((w) => w.foreignersNet).filter((v) => v != null);
+  return {
+    section: "TSEPrime",
+    updatedAt: new Date().toISOString(),
+    weeks: weeks.slice(-12),
+    foreignersNet4w: recent.length ? recent.reduce((a, b) => a + b, 0) : null,
+    foreignersPositiveWeeks4w: recent.filter((v) => v > 0).length
+  };
 }
 
 function financialAccessHeaders(auth) {
@@ -599,7 +636,9 @@ function summarizeInstrumentQuote(ticker, rows) {
     history: ordered.slice(-60).map((row) => ({
       date: row.date,
       close: row.close,
-      volume: row.volume
+      volume: row.volume,
+      ...(Number.isFinite(row.high) ? { high: row.high } : {}),
+      ...(Number.isFinite(row.low) ? { low: row.low } : {})
     }))
   };
 }
@@ -740,6 +779,13 @@ async function buildMarketData() {
   }
 
   const newsScores = await fetchNewsScores();
+  let investorFlows = previousMarketData?.investorFlows || null;
+  try {
+    investorFlows = (await fetchInvestorFlows(auth)) || investorFlows;
+  } catch (error) {
+    // 週次データなので失敗時は前回値を維持（致命的でない）
+    console.warn(`investor-types: ${error.message}`);
+  }
   const themes = [];
   const errors = [];
   const planConfig = jquantsPlanConfig();
@@ -835,6 +881,7 @@ async function buildMarketData() {
     priorityRankingRefresh,
     message: themes.length ? "" : errors.slice(0, 3).join(" / "),
     macro,
+    investorFlows,
     instrumentQuotes,
     financials,
     instrumentQuoteBatch: {

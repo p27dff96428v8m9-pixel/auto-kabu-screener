@@ -190,6 +190,28 @@ function resolveTreasureOutputDefaultPath() {
   return path.resolve(process.cwd(), "docs", "fund-flow-ai-system", "data", "treasure-stocks.json");
 }
 
+// backtest-strategy.js が出力する較正表（予測winRate帯→バックテスト実勝率）。無ければ null。
+function loadWinRateCalibration() {
+  const candidate = resolveMarketDataDefaultPath().replace(/market-data\.json$/, "backtest.json");
+  try {
+    const backtest = JSON.parse(fs.readFileSync(candidate, "utf8"));
+    if (backtest?.calibration?.buckets?.length) return backtest.calibration;
+  } catch {
+    // 較正表なしでも動作継続（winRateCalibrated が null になるだけ）
+  }
+  return null;
+}
+
+// 予測winRateをバックテスト実勝率へ写像する。表に無い値は全体実勝率へフォールバック。
+function calibrateWinRate(winRate, calibration) {
+  if (winRate == null || !calibration) return null;
+  const bucket = calibration.buckets.find((b) => winRate >= b.minWinRate && winRate <= b.maxWinRate);
+  const value = bucket?.calibratedWinPct ?? calibration.overallWinPct;
+  return value != null ? Math.round(value) : null;
+}
+
+const winRateCalibration = loadWinRateCalibration();
+
 function resolveAppJsPath() {
   const candidates = [
     process.env.APP_JS_PATH,
@@ -265,8 +287,26 @@ function quoteHistory(quote) {
     .map((item) => ({
       date: item.date || null,
       close: Number(item.close),
-      volume: num(item.volume, null)
+      volume: num(item.volume, null),
+      high: Number.isFinite(Number(item.high)) ? Number(item.high) : null,
+      low: Number.isFinite(Number(item.low)) ? Number(item.low) : null
     }));
+}
+
+// ATR(14): 実測ボラティリティ。高値/安値が無い行（H/L保存前の履歴）は終値差分で代替する。
+function calcAtr(history, window = 14) {
+  if (history.length < window + 1) return null;
+  const trs = [];
+  for (let i = history.length - window; i < history.length; i += 1) {
+    const prevClose = history[i - 1].close;
+    const { high, low } = history[i];
+    if (high != null && low != null) {
+      trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
+    } else {
+      trs.push(Math.abs(history[i].close - prevClose));
+    }
+  }
+  return avg(trs);
 }
 
 function instrumentScore(instrument) {
@@ -287,6 +327,19 @@ function fundFlowScore(quote) {
   const trend = p90 * 0.28 + p30 * 0.36 + p7 * 0.36;
   const volume = clamp(v30 * 0.25 + v7 * 0.35, -20, 40);
   return clamp(Math.round(50 + trend * 1.2 + volume));
+}
+
+// 投資部門別売買状況（TSEプライム）の海外投資家 直近4週の買越/売越で、市場全体の資金フローを
+// fundFlowScore に加点減点する（±5）。J-Quants Lightで取得できる唯一の本物の需給データ。
+function investorFlowBonus(marketData) {
+  const flows = marketData?.investorFlows;
+  const weeks = Array.isArray(flows?.weeks) ? flows.weeks : [];
+  const recent = weeks.slice(-4).map((w) => num(w.foreignersNet, null)).filter((v) => v != null);
+  if (!recent.length) return 0;
+  const sum = recent.reduce((a, b) => a + b, 0);
+  const positive = recent.filter((v) => v > 0).length;
+  if (sum > 0) return positive >= 3 ? 5 : 3;
+  return positive <= 1 ? -5 : -3;
 }
 
 // 地合い（マーケットレジーム）: TOPIX連動ETF(1306)、無ければ日経225連動(1321)の終値と25日線で判定。
@@ -375,11 +428,23 @@ function estimateTradePlan(technical, quote) {
   if (!price) return { buy: null, tp: null, sl: null, rr: null, winRate: null };
   const deviation = num(technical?.deviation, 0);
   const rsi = num(technical?.rsi, 50);
-  const volatility = Math.max(0.035, Math.min(0.12, Math.abs(num(quote?.changes?.["30d"])) / 100 / 3));
   const buyDiscount = deviation > 4 ? 0.03 : deviation < -4 ? 0.005 : 0.015;
   const buy = Math.round(price * (1 - buyDiscount));
-  const sl = Math.round(buy * (1 - Math.max(0.035, volatility * 0.9)));
-  const tp = Math.round(buy * (1 + Math.max(0.07, volatility * 1.7)));
+
+  // 損切/利確はATR(実測ボラティリティ)ベース。バックテスト(scripts/backtest-strategy.js)で
+  // 旧方式(30日騰落率÷3)と比較し勝率36.8%→42.5%・平均損益+0.72%→+1.21%に改善した係数を採用。
+  // ATRが計算できない場合(履歴不足)のみ旧方式にフォールバック。
+  const atr = calcAtr(quoteHistory(quote));
+  let sl;
+  let tp;
+  if (atr && atr > 0) {
+    sl = Math.round(buy - atr * 2.0);
+    tp = Math.round(buy + atr * 3.5);
+  } else {
+    const volatility = Math.max(0.035, Math.min(0.12, Math.abs(num(quote?.changes?.["30d"])) / 100 / 3));
+    sl = Math.round(buy * (1 - Math.max(0.035, volatility * 0.9)));
+    tp = Math.round(buy * (1 + Math.max(0.07, volatility * 1.7)));
+  }
   const rr = (buy - sl) > 0 ? Number(((tp - buy) / (buy - sl)).toFixed(2)) : null;
 
   let winRate = 50;
@@ -649,7 +714,7 @@ function signalFor(stock) {
 function buildStock(ticker, instrument, quote, financial = null, marketData = null) {
   const technical = technicalSignal(quote);
   const overheat = overheatAdjustments(quote, technical);
-  let flow = clamp(fundFlowScore(quote) - overheat.flowPenalty);
+  let flow = clamp(fundFlowScore(quote) - overheat.flowPenalty + investorFlowBonus(marketData));
   const baseTreasure = instrumentScore(instrument);
   const kind = stockSignalKind(instrument, quote);
   const signalBonus = kind === "buy" ? 18 : kind === "watch" ? 12 : kind === "early" ? 7 : -8;
@@ -692,6 +757,7 @@ function buildStock(ticker, instrument, quote, financial = null, marketData = nu
     sl: trade.sl,
     rr: trade.rr,
     winRate: trade.winRate,
+    winRateCalibrated: calibrateWinRate(trade.winRate, winRateCalibration),
     checks,
     changes: {
       "7d": num(quote?.changes?.["7d"], null),
@@ -748,10 +814,12 @@ function main() {
 
   writeJson(outputPath, {
     source: "fund-flow-treasure-kabukazidou",
-    logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ",
+    logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime)",
     updatedAt: new Date().toISOString(),
     marketUpdatedAt: marketData.updatedAt || null,
     marketRegime: marketRegime(quotes),
+    winRateCalibration: winRateCalibration ? winRateCalibration.basis : null,
+    investorFlows: marketData.investorFlows || null,
     stocks
   });
 
