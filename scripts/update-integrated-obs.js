@@ -40,6 +40,18 @@ const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
 const BUY_CATEGORIES = new Set(["統合買い候補", "確認候補"]);
 
+// 実戦候補の初期優先度（2026-07-02の検討結果）。成績（損益率）に差が付くまでの同率時の並び順:
+//   標準 > ゆるめ … 標準は深い押し目(基準価格-0.5〜3%)エントリーでRR約2:1と構造的に有利。
+//                    ゆるめは浅い押し目(-0.1%〜)で早く入る分、同じ利確/損切価格に対しRRが悪い
+//   100万固定 > 1単元 … 全銘柄同額＝戦略の期待値がそのまま資金曲線に出る。1単元は株価で重みが偏る
+// 損益率に差が出た後は評価額ベースで自動的に順位が入れ替わる（candidateRanking）。
+const STRUCTURAL_PRIORITY = [
+  { mode: "standard", variant: "fixed" },
+  { mode: "standard", variant: "unit" },
+  { mode: "relax", variant: "fixed" },
+  { mode: "relax", variant: "unit" }
+];
+
 // LINE通知（買い目標到達＝仮想購入時）。標準/ゆるめ × 100万固定/1単元 の4バケットの結果を
 // 1銘柄=1通にまとめて送る。LINE_ACCESS_TOKEN / LINE_USER_ID 未設定なら自動スキップ。
 const MODE_LABELS = { standard: "標準", relax: "ゆるめ" };
@@ -209,7 +221,8 @@ async function sendLine(message) {
 }
 
 // 1銘柄×1モードの買い目標到達イベント（100万固定/1単元の両方式の結果込み）をLINE本文に整形する。
-function buildBuyMessage(ev) {
+// rankMap: "mode:variant" -> 実戦候補順位（candidateRanking）。どの通知を実弾にするかの目安を本文に併記する。
+function buildBuyMessage(ev, rankMap) {
   const yen = (n) => `${Math.round(n).toLocaleString()}円`;
   const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
   const emoji = MODE_EMOJI[ev.mode] || "🎯";
@@ -224,7 +237,8 @@ function buildBuyMessage(ev) {
   lines.push(`利確 ${ev.tp != null ? yen(ev.tp) : "—"} ／ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`);
   lines.push("──────────");
   for (const e of ev.entries) {
-    const variant = VARIANT_LABELS[e.variant] || e.variant;
+    const rank = rankMap ? rankMap[`${ev.mode}:${e.variant}`] : null;
+    const variant = (VARIANT_LABELS[e.variant] || e.variant) + (rank ? `〔第${rank}候補〕` : "");
     if (e.action === "buy") {
       const detail = e.variant === "unit"
         ? `${e.shares}株（${Math.round(e.cost).toLocaleString()}円）`
@@ -459,6 +473,28 @@ async function main() {
     }
   }
 
+  // 5) 実戦候補の優先順位: 4バケットを損益率でランク付けし、同率は STRUCTURAL_PRIORITY 順。
+  //    どの通知・方式を実弾に使うか絞るための表示用（観測スペースのバッジ / LINE通知に反映）。
+  const rankedCandidates = STRUCTURAL_PRIORITY.map((c, idx) => {
+    const pf = obs.portfolio[c.mode][c.variant];
+    const initial = Number(pf.initialCapital) || INITIAL_CAPITAL;
+    return {
+      mode: c.mode,
+      variant: c.variant,
+      equity: pf.equity,
+      pnlPct: Number((((pf.equity - initial) / initial) * 100).toFixed(3)),
+      decided: (Number(pf.tpCount) || 0) + (Number(pf.slCount) || 0),
+      structuralOrder: idx
+    };
+  }).sort((a, b) => (b.pnlPct - a.pnlPct) || (a.structuralOrder - b.structuralOrder));
+  const pcts = rankedCandidates.map((c) => c.pnlPct);
+  obs.candidateRanking = {
+    // basis: structural=まだ成績差が無く初期優先度で並んでいる / equity=損益率の実績で並んでいる
+    basis: Math.max(...pcts) === Math.min(...pcts) ? "structural" : "equity",
+    rankedAt: nowIso,
+    items: rankedCandidates.map((c, i) => ({ rank: i + 1, ...c }))
+  };
+
   obs.source = "github-actions-integrated-obs";
   obs.updatedAt = nowIso;
   obs.marketUpdatedAt = treasure.marketUpdatedAt || treasure.updatedAt || null;
@@ -466,10 +502,11 @@ async function main() {
   writeJson(obsPath, obs);
 
   // 新規に買い目標到達した銘柄を 1銘柄=1通 でLINE通知（4バケットの買い/資金不足を本文に併記）。
+  const rankMap = Object.fromEntries(obs.candidateRanking.items.map((c) => [`${c.mode}:${c.variant}`, c.rank]));
   const notifyCodes = Object.keys(buyEvents);
   let notified = 0;
   for (const code of notifyCodes) {
-    if (await sendLine(buildBuyMessage(buyEvents[code]))) notified += 1;
+    if (await sendLine(buildBuyMessage(buyEvents[code], rankMap))) notified += 1;
   }
 
   console.log(JSON.stringify({

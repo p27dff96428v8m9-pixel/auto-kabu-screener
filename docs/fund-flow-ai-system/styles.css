@@ -2505,6 +2505,14 @@ footer p {
   border-color: #0369a1;
 }
 
+/* 実戦候補順位の一覧（どのモード×方式から実弾に使うか。損益率で自動更新） */
+.obs-global-counts .mode-stat.ranking {
+  background: #fffbeb;
+  border-color: #d97706;
+  white-space: normal;
+  cursor: help;
+}
+
 .obs-global-counts strong {
   font-weight: 700;
   color: #0f172a;
@@ -2689,6 +2697,37 @@ footer p {
   color: #334155;
   white-space: nowrap;
   cursor: help;
+}
+
+/* 実戦候補順位バッジ（第1候補=濃い金色→第4候補=薄グレーの順で目立たせる） */
+.obs-pf-rank {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  cursor: help;
+  background: #e2e8f0;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.obs-pf-rank.rank-1 {
+  background: #d97706;
+  color: #fffbeb;
+  border-color: #b45309;
+}
+
+.obs-pf-rank.rank-2 {
+  background: #fde68a;
+  color: #78350f;
+  border-color: #d97706;
+}
+
+.obs-pf-rank.rank-3 {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #94a3b8;
 }
 
 .obs-pf-actions {

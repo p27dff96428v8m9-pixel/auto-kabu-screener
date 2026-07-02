@@ -2566,6 +2566,16 @@ function getPortfolioVariants(obs, modeKey) {
   return (m && typeof m === 'object') ? m : null;
 }
 
+// 実戦候補順位（サーバー側 candidateRanking）。どのモード×方式の通知を実弾に使うかの目安。
+// 損益率で自動更新され、成績差が無い間は初期優先度（標準>ゆるめ、100万固定>1単元）で並ぶ。
+function getCandidateRank(obs, modeKey, variantKey) {
+  const items = obs && obs.candidateRanking && Array.isArray(obs.candidateRanking.items)
+    ? obs.candidateRanking.items : null;
+  if (!items) return null;
+  const found = items.find((c) => c.mode === modeKey && c.variant === variantKey);
+  return found ? found.rank : null;
+}
+
 function renderPortfolioPanel(modeKey, obs) {
   const el = document.getElementById(modeKey === 'relax' ? 'relaxPortfolio' : 'standardPortfolio');
   if (!el) return;
@@ -2592,10 +2602,16 @@ function renderPortfolioPanel(modeKey, obs) {
     const unreal = Number(pf.unrealizedPnl || 0);
     const realized = Number(pf.realizedPnl || 0);
     const skippedCount = (pf.skipped || []).length;
+    const rank = getCandidateRank(obs, modeKey, def.key);
+    const rankBasis = obs.candidateRanking ? obs.candidateRanking.basis : null;
+    const rankHtml = rank
+      ? `<span class="obs-pf-rank rank-${rank}" title="実戦で絞る場合の優先順位。損益率で自動更新${rankBasis === 'structural' ? '（現在は成績差が無いため初期優先度: 標準>ゆるめ・100万固定>1単元）' : ''}">第${rank}候補</span>`
+      : '';
     return `
       <div class="obs-pf-variant">
         <div class="obs-pf-main">
           <span class="obs-pf-label" title="${def.hint}">${def.label}</span>
+          ${rankHtml}
           <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（見送り・監視継続シグナルは購入対象外）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
         </div>
         <div class="obs-pf-detail">
@@ -2783,7 +2799,16 @@ function renderBuyTargetObservations() {
     };
     const s = vc('standard');
     const r = vc('relax');
+    // 実戦候補順位の一覧（サーバー計算）。実弾に移すときはこの順に絞る。
+    const cr = obs.candidateRanking;
+    let rankLine = '';
+    if (cr && Array.isArray(cr.items) && cr.items.length) {
+      const nm = (c) => `${c.mode === 'relax' ? 'ゆるめ' : '標準'}×${c.variant === 'unit' ? '1単元' : '100万固定'}`;
+      const body = cr.items.map((c) => `<b>第${c.rank}候補</b> ${nm(c)} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct}%)`).join('　');
+      rankLine = `<span class="mode-stat ranking" title="実戦で絞る場合の優先順位。損益率で自動更新${cr.basis === 'structural' ? '（現在は成績差が無いため初期優先度: 標準>ゆるめ・100万固定>1単元）' : ''}。LINE通知にも同じ順位を表示">🏅 実戦候補順位: ${body}</span>`;
+    }
     g.innerHTML = `
+      ${rankLine}
       <span class="mode-stat standard" title="観測ベース(両方式合算) 利確${sTp}回/損切${sSl}回"><strong>標準モード</strong> 100万固定 利確${s.fxTp}/損切${s.fxSl} ｜ 1単元 利確${s.unTp}/損切${s.unSl}</span>
       <span class="mode-stat relax" title="観測ベース(両方式合算) 利確${rTp}回/損切${rSl}回"><strong>ゆるめモード</strong> 100万固定 利確${r.fxTp}/損切${r.fxSl} ｜ 1単元 利確${r.unTp}/損切${r.unSl}</span>
     `;
