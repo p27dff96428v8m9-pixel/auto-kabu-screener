@@ -7,7 +7,12 @@
 //   price <= buy が構造的に成立しない。そこで「JST日付ごとに最初の実行時点の buy/tp/sl を固定保存」し、
 //   以降の実行で現在価格がその固定目標に到達したかを判定する。
 //   - 標準モード: price <= buy（目標として保存した水準まで実際に下がったら追跡開始）
-//   - ゆるめモード: price <= buy × 1.02
+//   - ゆるめモード: price <= min(buy × 1.02, 目標設定時の基準価格 × 0.999)
+//     buyの割引率が2%未満（乖離率+4%以下の銘柄＝大多数）だと buy×1.02 が基準価格を超え、
+//     夜間の stale な前日終値で即到達してしまうため、基準価格×0.999 を上限にして
+//     「少なくとも基準価格から0.1%下がらないと到達しない」ことを保証する。
+// 新規到達の判定は市場時間内（JST 平日 9:00〜15:30）のみ行う。夜間・休日は価格が
+// 前日終値のまま動かず、実際には執行できない価格でのエントリーが記録されるため。
 // 対象は統合銘柄ランキング上位の個別株（TARGET_LIMIT件、ETF/REIT/指数連動を除く）。
 // 利確/損切は全銘柄の最新価格で判定する（ランキング圏外に落ちた銘柄も決済まで追跡）。
 
@@ -15,6 +20,7 @@ const fs = require("fs");
 const path = require("path");
 
 const RELAX_FACTOR = 1.02;
+const RELAX_REF_CAP = 0.999; // ゆるめしきい値の上限: 目標設定時の基準価格 × 0.999
 const TARGET_LIMIT = 15; // 標準表示10件 + ゆるめ表示15件をカバー
 const CLOSED_LIMIT = 80;
 
@@ -60,6 +66,17 @@ function writeJson(filePath, payload) {
 
 function jstDateKey(date = new Date()) {
   return new Date(date.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+// 東証の取引時間（JST 平日 9:00〜15:30）かどうか。新規到達判定はこの間のみ行う。
+// 祝日は判定してしまうが、価格が前日終値のまま動かないため到達は発生しない
+// （標準は buy < 基準価格、ゆるめも基準価格×0.999 上限のため）。
+function isMarketHoursJst(date = new Date()) {
+  const jst = new Date(date.getTime() + 9 * 3600 * 1000);
+  const day = jst.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const minutes = jst.getUTCHours() * 60 + jst.getUTCMinutes();
+  return minutes >= 9 * 60 && minutes <= 15 * 60 + 30;
 }
 
 function isIndexLinkedType(type = "", name = "") {
@@ -199,8 +216,8 @@ function buildBuyMessage(ev) {
     `区分: ${ev.category || "—"}`,
     `現在値 ${yen(ev.price)} ≤ ${modeLabel}基準 ${yen(ev.threshold)}`
   ];
-  // ゆるめは 買い目標×1.02 がしきい値なので、根拠を明示（標準は買い目標そのものなので省略）。
-  if (ev.factor !== 1) lines.push(`(買い目標 ${yen(ev.buy)} ×${ev.factor})`);
+  // ゆるめは min(買い目標×1.02, 基準価格×0.999) がしきい値なので、根拠を明示（標準は買い目標そのものなので省略）。
+  if (ev.factor !== 1) lines.push(`(買い目標 ${yen(ev.buy)} ×${ev.factor}・基準値×0.999 の低い方)`);
   lines.push(`利確 ${ev.tp != null ? yen(ev.tp) : "—"} ／ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`);
   lines.push("──────────");
   for (const e of ev.entries) {
@@ -327,7 +344,11 @@ async function main() {
   }
 
   // 2) 保存済みの固定目標に対する到達判定（目標は前回のJST日付切替時点の値）
+  //    市場時間外は価格が前日終値のまま動かず、執行不可能な価格での到達＝購入になるため判定しない
+  const marketOpen = isMarketHoursJst();
+  if (!marketOpen) console.log("市場時間外（JST平日9:00〜15:30以外）のため新規到達判定をスキップ");
   for (const def of modeDefs) {
+    if (!marketOpen) break;
     const data = obs[def.key];
     const activeCodes = new Set(data.active.map((it) => it.code));
     for (const [code, target] of Object.entries(obs.targets)) {
@@ -339,7 +360,14 @@ async function main() {
       if (!Number.isFinite(buy) || buy <= 0) continue;
       // すでに損切ライン以下まで崩れている場合はエントリー機会として不適切なので追跡しない
       if (Number.isFinite(sl) && curPrice <= sl) continue;
-      if (curPrice <= buy * def.factor) {
+      // ゆるめは buy×1.02 だが、目標設定時の基準価格×0.999 を上限にする
+      // （buyの割引率が2%未満だと ×1.02 が基準価格を超え、下がっていないのに即到達するため）
+      const refPrice = Number(target.price);
+      let threshold = buy * def.factor;
+      if (def.factor !== 1 && Number.isFinite(refPrice) && refPrice > 0) {
+        threshold = Math.min(threshold, refPrice * RELAX_REF_CAP);
+      }
+      if (curPrice <= threshold) {
         data.active.push({
           code,
           name: target.name || code,
@@ -369,7 +397,7 @@ async function main() {
                 mode: def.key,
                 category: getCategoryLabel(target.signal),
                 factor: def.factor,
-                threshold: buy * def.factor,
+                threshold,
                 price: curPrice,
                 buy,
                 tp: Number.isFinite(Number(target.tp)) ? Number(target.tp) : null,
@@ -396,10 +424,13 @@ async function main() {
     const buy = Number(stock.buy);
     if (!code || !Number.isFinite(buy) || buy <= 0) continue;
     const existing = obs.targets[code];
-    if (existing && existing.setDate === today) continue;
+    // price（基準価格）を持たない旧形式の目標は、ゆるめの上限判定ができないため当日中でも再固定する
+    if (existing && existing.setDate === today && Number.isFinite(Number(existing.price))) continue;
+    const price = Number(stock.price);
     obs.targets[code] = {
       name: stock.name || code,
       buy,
+      price: Number.isFinite(price) && price > 0 ? price : null,
       tp: Number.isFinite(Number(stock.tp)) ? Number(stock.tp) : null,
       sl: Number.isFinite(Number(stock.sl)) ? Number(stock.sl) : null,
       signal: stock.signal || "見送り",
@@ -440,6 +471,7 @@ async function main() {
 
   console.log(JSON.stringify({
     ...summary,
+    marketOpen,
     notified,
     targets: Object.keys(obs.targets).length,
     standardActive: obs.standard.active.length,

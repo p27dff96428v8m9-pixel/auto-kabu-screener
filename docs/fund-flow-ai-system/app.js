@@ -3043,8 +3043,14 @@ function renderIntegratedRanking() {
     const priceNum = Number(stock.price) || 0;
     const fixedTarget = fixedTargets ? fixedTargets[String(stock.code || '').trim()] : null;
     const fixedBuy = fixedTarget ? Number(fixedTarget.buy) : NaN;
+    // ゆるめのしきい値はサーバー(update-integrated-obs.js)と同じ min(buy×1.02, 基準価格×0.999)
+    const fixedRef = fixedTarget ? Number(fixedTarget.price) : NaN;
+    let targetThreshold = fixedBuy * (isRelax ? 1.02 : 1.0);
+    if (isRelax && Number.isFinite(fixedRef) && fixedRef > 0) {
+      targetThreshold = Math.min(targetThreshold, fixedRef * 0.999);
+    }
     const isAtTarget = Number.isFinite(fixedBuy) && fixedBuy > 0 && priceNum > 0
-      && priceNum <= fixedBuy * (isRelax ? 1.02 : 1.0);
+      && priceNum <= targetThreshold;
     return `
       <article class="integrated-stock-card ${isAtTarget ? 'at-buy-target' : ''} ${isRelax ? 'relax-mode' : ''}">
         <div class="integrated-rank-block">
@@ -3055,7 +3061,7 @@ function renderIntegratedRanking() {
           <div class="integrated-stock-title">
             <strong>${stock.code || "-"}</strong>
             <span>${stock.name || "-"}</span>
-            ${isAtTarget ? `<span class="buy-target-badge" title="日次固定の買い目標 ${formatNumber(fixedBuy)}${isRelax ? '×1.02' : ''} に到達">🎯 目標到達</span>` : ""}
+            ${isAtTarget ? `<span class="buy-target-badge" title="日次固定の買い目標 ${formatNumber(fixedBuy)}${isRelax ? '×1.02(基準値×0.999上限)' : ''} に到達">🎯 目標到達</span>` : ""}
           </div>
           <div class="integrated-stock-meta">
             <span>${stock.type || "-"}</span>
