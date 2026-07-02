@@ -400,7 +400,7 @@ async function main() {
 
   // 予測winRate→実勝率の較正表（update-treasure-stocks.js が winRateCalibrated の算出に使う）。
   // サンプルが少ない帯は全体実勝率へ寄せる（重み n/(n+50)）。実勝率は本番運用と同じ
-  // 地合いフィルタON側から作る。
+  // 地合いフィルタOFF側から作る（2026-07-02にフィルタ撤去）。
   const buildCalibration = (agg) => {
     const overallWin = agg.overall.winPct;
     return Object.entries(agg.byWinRateBucket)
@@ -432,9 +432,9 @@ async function main() {
     regimeFilterOff: aggregate(withoutFilter)
   };
   result.calibration = {
-    basis: `backtest ${SLTP_MODE} / 地合いフィルタON / ${result.regimeFilterOn.overall.trades}件`,
-    overallWinPct: result.regimeFilterOn.overall.winPct,
-    buckets: buildCalibration(result.regimeFilterOn)
+    basis: `backtest ${SLTP_MODE} / 地合いフィルタOFF(本番同等) / ${result.regimeFilterOff.overall.trades}件`,
+    overallWinPct: result.regimeFilterOff.overall.winPct,
+    buckets: buildCalibration(result.regimeFilterOff)
   };
   fs.mkdirSync(dataDir, { recursive: true });
   // コミット用はサマリー＋較正表のみ（軽量）。全トレード明細は分析用にローカルキャッシュへ。

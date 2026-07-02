@@ -2800,12 +2800,12 @@ function renderBuyTargetObservations() {
     };
     const s = vc('standard');
     const r = vc('relax');
-    // 地合いフィルタ（指数25日線割れ）発動中は新規エントリー停止中であることを明示する
+    // 地合いは参考表示のみ（2026-07-02のバックテスト結果を受けてエントリー停止フィルタは撤去済み）
     const guard = obs.entryGuard;
     let guardLine = '';
     if (guard && guard.regime && guard.regime.bullish === false) {
       const g = guard.regime;
-      guardLine = `<span class="mode-stat guard" title="指数が25日線を割っている間は新規エントリー（買い目標到達→仮想購入・LINE通知）を停止します。保有銘柄の利確/損切追跡は継続。押し目買い戦略は下落局面では損切だけが先に成立しやすいための保護です">⛔ 地合いフィルタ発動中: ${g.index} 25日線比 ${g.deviationPct}% ・新規エントリー停止（決済追跡は継続）</span>`;
+      guardLine = `<span class="mode-stat guard" title="指数が25日線を下回っています。参考情報であり、新規エントリーは通常どおり行われます（バックテスト検証によりエントリー停止フィルタは撤去済み）">📉 地合い弱め（参考）: ${g.index} 25日線比 ${g.deviationPct}%・エントリーは継続</span>`;
     }
     // 実戦候補順位の一覧（サーバー計算）。実弾に移すときはこの順に絞る。
     const cr = obs.candidateRanking;
