@@ -2800,6 +2800,13 @@ function renderBuyTargetObservations() {
     };
     const s = vc('standard');
     const r = vc('relax');
+    // 地合いフィルタ（指数25日線割れ）発動中は新規エントリー停止中であることを明示する
+    const guard = obs.entryGuard;
+    let guardLine = '';
+    if (guard && guard.regime && guard.regime.bullish === false) {
+      const g = guard.regime;
+      guardLine = `<span class="mode-stat guard" title="指数が25日線を割っている間は新規エントリー（買い目標到達→仮想購入・LINE通知）を停止します。保有銘柄の利確/損切追跡は継続。押し目買い戦略は下落局面では損切だけが先に成立しやすいための保護です">⛔ 地合いフィルタ発動中: ${g.index} 25日線比 ${g.deviationPct}% ・新規エントリー停止（決済追跡は継続）</span>`;
+    }
     // 実戦候補順位の一覧（サーバー計算）。実弾に移すときはこの順に絞る。
     const cr = obs.candidateRanking;
     let rankLine = '';
@@ -2809,6 +2816,7 @@ function renderBuyTargetObservations() {
       rankLine = `<span class="mode-stat ranking" title="実戦で絞る場合の優先順位。損益率で自動更新${cr.basis === 'structural' ? '（現在は成績差が無いため初期優先度: 標準>ゆるめ・100万固定>1単元）' : ''}。LINE通知にも同じ順位を表示">🏅 実戦候補順位: ${body}</span>`;
     }
     g.innerHTML = `
+      ${guardLine}
       ${rankLine}
       <span class="mode-stat standard" title="観測ベース(両方式合算) 利確${sTp}回/損切${sSl}回"><strong>標準モード</strong> 100万固定 利確${s.fxTp}/損切${s.fxSl} ｜ 1単元 利確${s.unTp}/損切${s.unSl}</span>
       <span class="mode-stat relax" title="観測ベース(両方式合算) 利確${rTp}回/損切${rSl}回"><strong>ゆるめモード</strong> 100万固定 利確${r.fxTp}/損切${r.fxSl} ｜ 1単元 利確${r.unTp}/損切${r.unSl}</span>

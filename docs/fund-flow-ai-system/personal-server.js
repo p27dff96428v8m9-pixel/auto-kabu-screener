@@ -171,7 +171,16 @@ async function handleRecomputeThemes(res) {
     if (fs.existsSync(treasureScript)) {
       try {
         // 完了を待ってからレスポンスを返す（クライアントがすぐに loadIntegratedRanking するので重要）
-        await execFileAsync(process.execPath, [treasureScript], { cwd: repoRoot });
+        // 入出力パスは明示指定する。リポジトリ直下に古い data/market-data.json が残っていると
+        // デフォルトのパス探索がそちらを拾ってしまうため（地合い判定 marketRegime が null になる等）。
+        await execFileAsync(process.execPath, [treasureScript], {
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            MARKET_DATA_INPUT_PATH: path.join(root, 'data', 'market-data.json'),
+            TREASURE_STOCKS_OUTPUT_PATH: path.join(root, 'data', 'treasure-stocks.json')
+          }
+        });
       } catch (e) {
         console.warn('[recompute] update-treasure-stocks.js failed or had warnings:', e.message || e);
       }

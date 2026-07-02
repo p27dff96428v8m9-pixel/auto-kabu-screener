@@ -289,6 +289,29 @@ function fundFlowScore(quote) {
   return clamp(Math.round(50 + trend * 1.2 + volume));
 }
 
+// 地合い（マーケットレジーム）: TOPIX連動ETF(1306)、無ければ日経225連動(1321)の終値と25日線で判定。
+// bullish=false（25日線割れ）の間、観測スペースは新規エントリーを停止する（決済追跡は継続）。
+// 押し目買い+損切-3.5%/利確+7%の戦略は下落局面では損切だけが先に成立しやすいため、その期間を避ける。
+function marketRegime(quotes) {
+  for (const code of ["1306", "1321"]) {
+    const history = quoteHistory(quotes?.[code]);
+    if (history.length < 25) continue;
+    const closes = history.map((item) => item.close);
+    const current = closes[closes.length - 1];
+    const sma25 = avg(last(closes, 25));
+    if (!sma25 || !Number.isFinite(current)) continue;
+    return {
+      index: code === "1306" ? "TOPIX連動(1306)" : "日経225連動(1321)",
+      current,
+      sma25: Number(sma25.toFixed(2)),
+      deviationPct: Number((((current - sma25) / sma25) * 100).toFixed(2)),
+      bullish: current >= sma25,
+      date: history[history.length - 1].date || null
+    };
+  }
+  return null;
+}
+
 function stockSignalKind(instrument, quote) {
   const c = quote?.changes || {};
   const p90 = num(c["90d"], NaN);
@@ -728,6 +751,7 @@ function main() {
     logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ",
     updatedAt: new Date().toISOString(),
     marketUpdatedAt: marketData.updatedAt || null,
+    marketRegime: marketRegime(quotes),
     stocks
   });
 

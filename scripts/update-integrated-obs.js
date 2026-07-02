@@ -13,6 +13,10 @@
 //     「少なくとも基準価格から0.1%下がらないと到達しない」ことを保証する。
 // 新規到達の判定は市場時間内（JST 平日 9:00〜15:30）のみ行う。夜間・休日は価格が
 // 前日終値のまま動かず、実際には執行できない価格でのエントリーが記録されるため。
+// さらに地合いフィルタ: treasure-stocks.json の marketRegime（TOPIX連動ETFの25日線判定）が
+// bullish=false（下落局面）の間も新規エントリーを止める。押し目買い戦略は下げ相場では
+// 損切だけが先に成立しやすいため。利確/損切の決済追跡は地合いに関係なく常時続ける。
+// regime データが無い場合はフィルタ無しで従来動作（フェイルオープン）。
 // 対象は統合銘柄ランキング上位の個別株（TARGET_LIMIT件、ETF/REIT/指数連動を除く）。
 // 利確/損切は全銘柄の最新価格で判定する（ランキング圏外に落ちた銘柄も決済まで追跡）。
 
@@ -362,10 +366,17 @@ async function main() {
 
   // 2) 保存済みの固定目標に対する到達判定（目標は前回のJST日付切替時点の値）
   //    市場時間外は価格が前日終値のまま動かず、執行不可能な価格での到達＝購入になるため判定しない
+  //    地合い（指数25日線割れ）が悪い間も新規エントリーは止める（決済追跡は step 1 で継続）
   const marketOpen = isMarketHoursJst();
+  const regime = treasure.marketRegime || null;
+  const regimeOk = !regime || regime.bullish !== false;
+  const entryAllowed = marketOpen && regimeOk;
   if (!marketOpen) console.log("市場時間外（JST平日9:00〜15:30以外）のため新規到達判定をスキップ");
+  else if (!regimeOk) console.log(`地合いフィルタ発動（${regime.index} 25日線比 ${regime.deviationPct}%）のため新規到達判定をスキップ`);
+  // UI表示用に判定状態を公開データへ保存
+  obs.entryGuard = { marketOpen, regime, entryAllowed, checkedAt: nowIso };
   for (const def of modeDefs) {
-    if (!marketOpen) break;
+    if (!entryAllowed) break;
     const data = obs[def.key];
     const activeCodes = new Set(data.active.map((it) => it.code));
     for (const [code, target] of Object.entries(obs.targets)) {
@@ -512,6 +523,8 @@ async function main() {
   console.log(JSON.stringify({
     ...summary,
     marketOpen,
+    regime: regime ? { index: regime.index, bullish: regime.bullish, deviationPct: regime.deviationPct } : null,
+    entryAllowed,
     notified,
     targets: Object.keys(obs.targets).length,
     standardActive: obs.standard.active.length,
