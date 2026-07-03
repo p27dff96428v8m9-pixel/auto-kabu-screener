@@ -1,0 +1,818 @@
+{
+ "source": "backtest-strategy grid experiment",
+ "ranAt": "2026-07-03T13:25:11.267Z",
+ "note": "銘柄別ATR倍率グリッドサーチ(学習75%/検証25%) vs 一律 損切2.0×ATR/利確3.5×ATR。検証25%期間のみで比較。",
+ "holdLimitSessions": 90,
+ "slMultCandidates": [
+  0.75,
+  1,
+  1.5,
+  2,
+  2.5
+ ],
+ "tpMultCandidates": [
+  2,
+  2.5,
+  3,
+  3.5,
+  4,
+  5
+ ],
+ "minTrainTrades": 5,
+ "stocks": 76,
+ "fallbackStocks": 0,
+ "perStockGrid": {
+  "overall": {
+   "trades": 1221,
+   "tp": 454,
+   "sl": 690,
+   "timeout": 77,
+   "winPct": 39.7,
+   "avgPnlPct": 2.9,
+   "totalPnlPct": 3540.8,
+   "avgHoldSessions": 15.4
+  },
+  "byWinRateBucket": {
+   "50-54": {
+    "trades": 1221,
+    "tp": 454,
+    "sl": 690,
+    "timeout": 77,
+    "winPct": 39.7,
+    "avgPnlPct": 2.9,
+    "totalPnlPct": 3540.8
+   }
+  },
+  "byTier": {
+   "grid": {
+    "trades": 1221,
+    "tp": 454,
+    "sl": 690,
+    "timeout": 77,
+    "winPct": 39.7,
+    "avgPnlPct": 2.9,
+    "totalPnlPct": 3540.8
+   }
+  },
+  "byYear": {
+   "2025": {
+    "trades": 709,
+    "tp": 321,
+    "sl": 377,
+    "timeout": 11,
+    "winPct": 46,
+    "avgPnlPct": 4.52,
+    "totalPnlPct": 3206
+   },
+   "2026": {
+    "trades": 512,
+    "tp": 133,
+    "sl": 313,
+    "timeout": 66,
+    "winPct": 29.8,
+    "avgPnlPct": 0.65,
+    "totalPnlPct": 334.9
+   }
+  }
+ },
+ "baseline": {
+  "overall": {
+   "trades": 1252,
+   "tp": 551,
+   "sl": 629,
+   "timeout": 72,
+   "winPct": 46.7,
+   "avgPnlPct": 2.57,
+   "totalPnlPct": 3220.4,
+   "avgHoldSessions": 14.7
+  },
+  "byWinRateBucket": {
+   "50-54": {
+    "trades": 1252,
+    "tp": 551,
+    "sl": 629,
+    "timeout": 72,
+    "winPct": 46.7,
+    "avgPnlPct": 2.57,
+    "totalPnlPct": 3220.4
+   }
+  },
+  "byTier": {
+   "grid": {
+    "trades": 1252,
+    "tp": 551,
+    "sl": 629,
+    "timeout": 72,
+    "winPct": 46.7,
+    "avgPnlPct": 2.57,
+    "totalPnlPct": 3220.4
+   }
+  },
+  "byYear": {
+   "2025": {
+    "trades": 722,
+    "tp": 382,
+    "sl": 335,
+    "timeout": 5,
+    "winPct": 53.3,
+    "avgPnlPct": 3.9,
+    "totalPnlPct": 2816.6
+   },
+   "2026": {
+    "trades": 530,
+    "tp": 169,
+    "sl": 294,
+    "timeout": 67,
+    "winPct": 36.5,
+    "avgPnlPct": 0.76,
+    "totalPnlPct": 403.8
+   }
+  }
+ },
+ "perStock": [
+  {
+   "code": "1328",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 22,
+   "trainAvgPnlPct": 1.85,
+   "testTrades": 13,
+   "testAvgPnlPct": 0.69
+  },
+  {
+   "code": "1343",
+   "slMult": 2.5,
+   "tpMult": 3,
+   "trainTrades": 29,
+   "trainAvgPnlPct": 0.3,
+   "testTrades": 10,
+   "testAvgPnlPct": 1.16
+  },
+  {
+   "code": "1540",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 21,
+   "trainAvgPnlPct": 1.59,
+   "testTrades": 16,
+   "testAvgPnlPct": 0.97
+  },
+  {
+   "code": "1615",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 24,
+   "trainAvgPnlPct": 4.72,
+   "testTrades": 10,
+   "testAvgPnlPct": 8.15
+  },
+  {
+   "code": "1801",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 29,
+   "trainAvgPnlPct": 3.13,
+   "testTrades": 15,
+   "testAvgPnlPct": 4.04
+  },
+  {
+   "code": "1802",
+   "slMult": 2.5,
+   "tpMult": 3.5,
+   "trainTrades": 36,
+   "trainAvgPnlPct": 3.24,
+   "testTrades": 14,
+   "testAvgPnlPct": 0.7
+  },
+  {
+   "code": "1803",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 28,
+   "trainAvgPnlPct": 2.73,
+   "testTrades": 14,
+   "testAvgPnlPct": 4.07
+  },
+  {
+   "code": "2516",
+   "slMult": 0.75,
+   "tpMult": 3.5,
+   "trainTrades": 102,
+   "trainAvgPnlPct": 0.16,
+   "testTrades": 33,
+   "testAvgPnlPct": 0.73
+  },
+  {
+   "code": "2768",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 26,
+   "trainAvgPnlPct": 2.97,
+   "testTrades": 13,
+   "testAvgPnlPct": 2.02
+  },
+  {
+   "code": "3099",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 27,
+   "trainAvgPnlPct": 3.67,
+   "testTrades": 13,
+   "testAvgPnlPct": 2.62
+  },
+  {
+   "code": "3283",
+   "slMult": 1.5,
+   "tpMult": 2,
+   "trainTrades": 75,
+   "trainAvgPnlPct": 0.48,
+   "testTrades": 23,
+   "testAvgPnlPct": 0.89
+  },
+  {
+   "code": "3462",
+   "slMult": 1,
+   "tpMult": 2,
+   "trainTrades": 63,
+   "trainAvgPnlPct": 0.43,
+   "testTrades": 22,
+   "testAvgPnlPct": 0.06
+  },
+  {
+   "code": "4004",
+   "slMult": 2.5,
+   "tpMult": 3,
+   "trainTrades": 45,
+   "trainAvgPnlPct": 1.32,
+   "testTrades": 20,
+   "testAvgPnlPct": 8.97
+  },
+  {
+   "code": "4063",
+   "slMult": 1,
+   "tpMult": 2,
+   "trainTrades": 100,
+   "trainAvgPnlPct": 0.33,
+   "testTrades": 39,
+   "testAvgPnlPct": 0.18
+  },
+  {
+   "code": "4188",
+   "slMult": 1.5,
+   "tpMult": 4,
+   "trainTrades": 44,
+   "trainAvgPnlPct": 0.67,
+   "testTrades": 22,
+   "testAvgPnlPct": 2.73
+  },
+  {
+   "code": "4478",
+   "slMult": 0.75,
+   "tpMult": 2,
+   "trainTrades": 169,
+   "trainAvgPnlPct": 0.51,
+   "testTrades": 50,
+   "testAvgPnlPct": 0.87
+  },
+  {
+   "code": "4483",
+   "slMult": 1,
+   "tpMult": 3,
+   "trainTrades": 119,
+   "trainAvgPnlPct": 0.23,
+   "testTrades": 33,
+   "testAvgPnlPct": 0.26
+  },
+  {
+   "code": "4502",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 24,
+   "trainAvgPnlPct": 1.9,
+   "testTrades": 8,
+   "testAvgPnlPct": -0.58
+  },
+  {
+   "code": "4519",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 38,
+   "trainAvgPnlPct": 1.66,
+   "testTrades": 12,
+   "testAvgPnlPct": -1.98
+  },
+  {
+   "code": "4568",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 25,
+   "trainAvgPnlPct": 1.69,
+   "testTrades": 10,
+   "testAvgPnlPct": -2.26
+  },
+  {
+   "code": "4661",
+   "slMult": 1,
+   "tpMult": 3,
+   "trainTrades": 82,
+   "trainAvgPnlPct": 0.38,
+   "testTrades": 30,
+   "testAvgPnlPct": -0.66
+  },
+  {
+   "code": "5713",
+   "slMult": 1,
+   "tpMult": 3.5,
+   "trainTrades": 79,
+   "trainAvgPnlPct": 0.52,
+   "testTrades": 31,
+   "testAvgPnlPct": 1.61
+  },
+  {
+   "code": "6146",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 31,
+   "trainAvgPnlPct": 4.15,
+   "testTrades": 11,
+   "testAvgPnlPct": 9.46
+  },
+  {
+   "code": "6208",
+   "slMult": 2,
+   "tpMult": 4,
+   "trainTrades": 42,
+   "trainAvgPnlPct": 1.89,
+   "testTrades": 16,
+   "testAvgPnlPct": 2.4
+  },
+  {
+   "code": "6301",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 29,
+   "trainAvgPnlPct": 1.72,
+   "testTrades": 10,
+   "testAvgPnlPct": 3.25
+  },
+  {
+   "code": "6501",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 36,
+   "trainAvgPnlPct": 2.72,
+   "testTrades": 13,
+   "testAvgPnlPct": 4.17
+  },
+  {
+   "code": "6503",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 30,
+   "trainAvgPnlPct": 2.16,
+   "testTrades": 10,
+   "testAvgPnlPct": 7.82
+  },
+  {
+   "code": "6723",
+   "slMult": 2.5,
+   "tpMult": 2.5,
+   "trainTrades": 53,
+   "trainAvgPnlPct": 2.45,
+   "testTrades": 19,
+   "testAvgPnlPct": 6.48
+  },
+  {
+   "code": "6857",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 31,
+   "trainAvgPnlPct": 4.78,
+   "testTrades": 16,
+   "testAvgPnlPct": 12.29
+  },
+  {
+   "code": "6902",
+   "slMult": 1.5,
+   "tpMult": 3.5,
+   "trainTrades": 58,
+   "trainAvgPnlPct": 0.81,
+   "testTrades": 20,
+   "testAvgPnlPct": 1.41
+  },
+  {
+   "code": "6920",
+   "slMult": 0.75,
+   "tpMult": 5,
+   "trainTrades": 97,
+   "trainAvgPnlPct": 0.64,
+   "testTrades": 30,
+   "testAvgPnlPct": 5.81
+  },
+  {
+   "code": "6954",
+   "slMult": 1,
+   "tpMult": 5,
+   "trainTrades": 54,
+   "trainAvgPnlPct": 1.3,
+   "testTrades": 20,
+   "testAvgPnlPct": 2.15
+  },
+  {
+   "code": "6981",
+   "slMult": 2,
+   "tpMult": 3,
+   "trainTrades": 50,
+   "trainAvgPnlPct": 0.36,
+   "testTrades": 23,
+   "testAvgPnlPct": 5.79
+  },
+  {
+   "code": "7011",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 32,
+   "trainAvgPnlPct": 5.73,
+   "testTrades": 9,
+   "testAvgPnlPct": 6.23
+  },
+  {
+   "code": "7012",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 28,
+   "trainAvgPnlPct": 4.24,
+   "testTrades": 12,
+   "testAvgPnlPct": 5.96
+  },
+  {
+   "code": "7013",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 35,
+   "trainAvgPnlPct": 4.16,
+   "testTrades": 14,
+   "testAvgPnlPct": 4.85
+  },
+  {
+   "code": "7167",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 22,
+   "trainAvgPnlPct": 5.6,
+   "testTrades": 9,
+   "testAvgPnlPct": 10.73
+  },
+  {
+   "code": "7182",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 24,
+   "trainAvgPnlPct": 2.96,
+   "testTrades": 12,
+   "testAvgPnlPct": 4.59
+  },
+  {
+   "code": "7201",
+   "slMult": 1.5,
+   "tpMult": 3,
+   "trainTrades": 65,
+   "trainAvgPnlPct": 0.04,
+   "testTrades": 28,
+   "testAvgPnlPct": -0.46
+  },
+  {
+   "code": "7203",
+   "slMult": 2.5,
+   "tpMult": 4,
+   "trainTrades": 28,
+   "trainAvgPnlPct": 1.09,
+   "testTrades": 13,
+   "testAvgPnlPct": 3.23
+  },
+  {
+   "code": "7267",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 27,
+   "trainAvgPnlPct": 0.85,
+   "testTrades": 12,
+   "testAvgPnlPct": 3.42
+  },
+  {
+   "code": "7270",
+   "slMult": 2.5,
+   "tpMult": 4,
+   "trainTrades": 37,
+   "trainAvgPnlPct": 1.31,
+   "testTrades": 12,
+   "testAvgPnlPct": 1.58
+  },
+  {
+   "code": "7532",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 23,
+   "trainAvgPnlPct": 2.51,
+   "testTrades": 11,
+   "testAvgPnlPct": 1.32
+  },
+  {
+   "code": "7735",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 23,
+   "trainAvgPnlPct": 1.21,
+   "testTrades": 17,
+   "testAvgPnlPct": 9.45
+  },
+  {
+   "code": "8001",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 32,
+   "trainAvgPnlPct": 3.49,
+   "testTrades": 11,
+   "testAvgPnlPct": 4.73
+  },
+  {
+   "code": "8015",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 28,
+   "trainAvgPnlPct": 2.63,
+   "testTrades": 12,
+   "testAvgPnlPct": 7.13
+  },
+  {
+   "code": "8031",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 35,
+   "trainAvgPnlPct": 2.92,
+   "testTrades": 12,
+   "testAvgPnlPct": 3.48
+  },
+  {
+   "code": "8035",
+   "slMult": 1.5,
+   "tpMult": 3,
+   "trainTrades": 73,
+   "trainAvgPnlPct": 0.58,
+   "testTrades": 24,
+   "testAvgPnlPct": 3.23
+  },
+  {
+   "code": "8053",
+   "slMult": 1.5,
+   "tpMult": 5,
+   "trainTrades": 39,
+   "trainAvgPnlPct": 3.31,
+   "testTrades": 16,
+   "testAvgPnlPct": 3.85
+  },
+  {
+   "code": "8058",
+   "slMult": 1.5,
+   "tpMult": 5,
+   "trainTrades": 40,
+   "trainAvgPnlPct": 1.67,
+   "testTrades": 19,
+   "testAvgPnlPct": 2.73
+  },
+  {
+   "code": "8267",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 30,
+   "trainAvgPnlPct": 1.45,
+   "testTrades": 15,
+   "testAvgPnlPct": 1.07
+  },
+  {
+   "code": "8306",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 23,
+   "trainAvgPnlPct": 6.11,
+   "testTrades": 9,
+   "testAvgPnlPct": 8.91
+  },
+  {
+   "code": "8308",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 35,
+   "trainAvgPnlPct": 4.07,
+   "testTrades": 13,
+   "testAvgPnlPct": 4.37
+  },
+  {
+   "code": "8316",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 25,
+   "trainAvgPnlPct": 5.3,
+   "testTrades": 11,
+   "testAvgPnlPct": 8.54
+  },
+  {
+   "code": "8411",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 30,
+   "trainAvgPnlPct": 4.01,
+   "testTrades": 13,
+   "testAvgPnlPct": 8.29
+  },
+  {
+   "code": "8630",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 23,
+   "trainAvgPnlPct": 4.03,
+   "testTrades": 9,
+   "testAvgPnlPct": 3.72
+  },
+  {
+   "code": "8725",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 28,
+   "trainAvgPnlPct": 3.65,
+   "testTrades": 13,
+   "testAvgPnlPct": 4.24
+  },
+  {
+   "code": "8750",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 24,
+   "trainAvgPnlPct": 3.39,
+   "testTrades": 12,
+   "testAvgPnlPct": 5.88
+  },
+  {
+   "code": "8766",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 34,
+   "trainAvgPnlPct": 4.32,
+   "testTrades": 14,
+   "testAvgPnlPct": 4.34
+  },
+  {
+   "code": "8795",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 30,
+   "trainAvgPnlPct": 5.02,
+   "testTrades": 15,
+   "testAvgPnlPct": 3.2
+  },
+  {
+   "code": "8951",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 28,
+   "trainAvgPnlPct": 0.66,
+   "testTrades": 11,
+   "testAvgPnlPct": -0.36
+  },
+  {
+   "code": "8952",
+   "slMult": 1,
+   "tpMult": 2,
+   "trainTrades": 66,
+   "trainAvgPnlPct": -0.05,
+   "testTrades": 25,
+   "testAvgPnlPct": 0.31
+  },
+  {
+   "code": "8953",
+   "slMult": 2.5,
+   "tpMult": 3.5,
+   "trainTrades": 29,
+   "trainAvgPnlPct": 0.63,
+   "testTrades": 12,
+   "testAvgPnlPct": 0.56
+  },
+  {
+   "code": "9020",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 29,
+   "trainAvgPnlPct": 1.98,
+   "testTrades": 13,
+   "testAvgPnlPct": 1.97
+  },
+  {
+   "code": "9201",
+   "slMult": 2.5,
+   "tpMult": 4,
+   "trainTrades": 29,
+   "trainAvgPnlPct": 1.52,
+   "testTrades": 12,
+   "testAvgPnlPct": 2.43
+  },
+  {
+   "code": "9432",
+   "slMult": 1.5,
+   "tpMult": 5,
+   "trainTrades": 31,
+   "trainAvgPnlPct": 1.09,
+   "testTrades": 12,
+   "testAvgPnlPct": 1.81
+  },
+  {
+   "code": "9433",
+   "slMult": 1.5,
+   "tpMult": 5,
+   "trainTrades": 39,
+   "trainAvgPnlPct": 1.13,
+   "testTrades": 13,
+   "testAvgPnlPct": 2.06
+  },
+  {
+   "code": "9434",
+   "slMult": 1.5,
+   "tpMult": 4,
+   "trainTrades": 35,
+   "trainAvgPnlPct": 0.83,
+   "testTrades": 17,
+   "testAvgPnlPct": 1.08
+  },
+  {
+   "code": "9501",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 33,
+   "trainAvgPnlPct": 2.03,
+   "testTrades": 12,
+   "testAvgPnlPct": -1.01
+  },
+  {
+   "code": "9502",
+   "slMult": 2.5,
+   "tpMult": 4,
+   "trainTrades": 25,
+   "trainAvgPnlPct": 1.84,
+   "testTrades": 13,
+   "testAvgPnlPct": 3.13
+  },
+  {
+   "code": "9503",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 27,
+   "trainAvgPnlPct": 1.52,
+   "testTrades": 9,
+   "testAvgPnlPct": 1.52
+  },
+  {
+   "code": "9504",
+   "slMult": 1,
+   "tpMult": 3.5,
+   "trainTrades": 70,
+   "trainAvgPnlPct": 0.86,
+   "testTrades": 23,
+   "testAvgPnlPct": -0.99
+  },
+  {
+   "code": "9506",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 34,
+   "trainAvgPnlPct": 2.5,
+   "testTrades": 11,
+   "testAvgPnlPct": 1.45
+  },
+  {
+   "code": "9508",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 29,
+   "trainAvgPnlPct": 2.65,
+   "testTrades": 11,
+   "testAvgPnlPct": 0.25
+  },
+  {
+   "code": "9513",
+   "slMult": 2,
+   "tpMult": 5,
+   "trainTrades": 19,
+   "trainAvgPnlPct": 2.76,
+   "testTrades": 10,
+   "testAvgPnlPct": 4.71
+  },
+  {
+   "code": "9983",
+   "slMult": 2.5,
+   "tpMult": 5,
+   "trainTrades": 28,
+   "trainAvgPnlPct": 3.41,
+   "testTrades": 11,
+   "testAvgPnlPct": 7.71
+  }
+ ]
+}

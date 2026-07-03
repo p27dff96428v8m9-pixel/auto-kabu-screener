@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 実績ファイルのコミット時に rebase push するため全履歴を取得
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # LINE通知は2026-07-03に停止（観測スペース側 update-integrated-obs.js の通知に一本化）。
+      # LINE_ACCESS_TOKEN / LINE_USER_ID を渡さないことで auto_trader.py 側が自動スキップする。
+      # スクリーニング自体は観測スペースの対照群＋サイト記事生成のため継続する。
       - name: Run Auto Trader
         env:
           # GitHub Secrets に登録した URL を安全に読み込む設定です
@@ -39,9 +44,37 @@ jobs:
           WP_URL: ${{ secrets.WP_URL }}
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
-          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           SCREEN_SAMPLE_SIZE: "240"
           SCREEN_CHUNK_SIZE: "30"
           ENABLE_FINANCIAL_GEMINI: "0"
         run: python auto_trader.py
+
+      # 利確/損切実績と戦略切替状態をコミットして学習ループを永続化する（案B: 2026-07-03）。
+      # 従来はランナー上に書き捨てで毎回消えており、戦略自動切替が常に「実績少」のままだった。
+      - name: Commit trade results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add trade_results.json strategies.json
+
+          if git diff --cached --quiet; then
+            echo "No trade result changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Update trade results"
+
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "✅ Push succeeded on attempt $attempt"
+              exit 0
+            fi
+            echo "Push rejected (likely another job pushed). Fetching and rebasing..."
+            git fetch origin
+            if ! git pull --rebase origin main; then
+              git rebase --abort || true
+            fi
+            sleep 8
+          done
+          echo "❌ All 3 push attempts failed. Giving up for this run."
+          exit 1

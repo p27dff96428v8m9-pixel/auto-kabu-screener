@@ -15,6 +15,9 @@
 //   node scripts/backtest-strategy.js            # キャッシュがあれば再利用
 //   node scripts/backtest-strategy.js --refresh  # J-Quantsから日足を取り直す
 //   BACKTEST_SLTP_MODE=atr node scripts/...      # 損切/利確をATRベースに切替（比較用）
+//   BACKTEST_SLTP_MODE=grid node scripts/...     # 銘柄別ATR倍率グリッドサーチ vs 一律2.0/3.5 のA/B検証
+//                                                # （auto_trader.py の optimize_params_atr_based 移植実験。
+//                                                #   backtest.json は上書きせず backtest-grid.json に出力）
 //
 // 出力: docs/fund-flow-ai-system/data/backtest.json ＋ コンソールにサマリー
 
@@ -302,6 +305,152 @@ function simulate(codeBars, regimeByDate, { useRegimeFilter }) {
   return trades;
 }
 
+// ===== 銘柄別ATR倍率グリッドサーチ（BACKTEST_SLTP_MODE=grid）=====
+// auto_trader.py の optimize_params_atr_based の考え方を観測スペースの流れに移植した実験。
+// 各銘柄の日足の前半75%（学習）で 損切/利確のATR倍率の最適組合せを選び、後半25%（検証）だけで成績を測る。
+// 同じ検証期間を一律 損切2.0×ATR/利確3.5×ATR（本番採用値）でも走らせ、公平にA/B比較する。
+// 買い目標の決め方（乖離率ベースの割引）は本番と同一で、sl/tp の倍率だけを可変にする。
+const GRID_SL_MULTS = [0.75, 1.0, 1.5, 2.0, 2.5];
+const GRID_TP_MULTS = [2.0, 2.5, 3.0, 3.5, 4.0, 5.0];
+const GRID_MIN_TRAIN_TRADES = 5; // 学習期間の取引がこれ未満の組合せは信頼できないため候補外
+const GRID_BASELINE = { slMult: 2.0, tpMult: 3.5 };
+
+function makeGridPlan(technical, hist, slMult, tpMult) {
+  const price = technical.current;
+  const deviation = num(technical.deviation, 0);
+  const buyDiscount = deviation > 4 ? 0.03 : deviation < -4 ? 0.005 : 0.015;
+  const buy = Math.round(price * (1 - buyDiscount));
+  const atr = calcAtr(hist) || price * 0.02;
+  return { buy, sl: Math.round(buy - atr * slMult), tp: Math.round(buy + atr * tpMult) };
+}
+
+// 1銘柄を tStart〜tEnd のエントリー日についてシミュレートする（simulate() の中核と同じ約定ルール）。
+// 決済の追跡は tEnd を越えて日足の終端まで行う（エントリー日で学習/検証を区分する）。
+function simulateStockRange(code, bars, tStart, tEnd, slMult, tpMult) {
+  const trades = [];
+  let openUntil = -1;
+  for (let t = Math.max(80, tStart); t < Math.min(tEnd, bars.length); t += 1) {
+    if (t <= openUntil) continue;
+    const hist = bars.slice(0, t);
+    const technical = technicalSignal(hist);
+    if (!technical) continue;
+    const plan = makeGridPlan(technical, hist, slMult, tpMult);
+    if (!plan.buy || !plan.sl || !plan.tp) continue;
+    const day = bars[t];
+    if (!Number.isFinite(day.low) || day.low > plan.buy) continue;
+
+    const entry = Math.min(Number.isFinite(day.open) ? day.open : plan.buy, plan.buy);
+    let exit = null;
+    let result = null;
+    let exitIndex = t;
+    for (let u = t; u < Math.min(bars.length, t + HOLD_LIMIT_SESSIONS); u += 1) {
+      const b = bars[u];
+      const open = Number.isFinite(b.open) ? b.open : b.close;
+      if (u > t && open <= plan.sl) { exit = open; result = "sl"; exitIndex = u; break; }
+      if (u > t && open >= plan.tp) { exit = open; result = "tp"; exitIndex = u; break; }
+      if (Number.isFinite(b.low) && b.low <= plan.sl) { exit = plan.sl; result = "sl"; exitIndex = u; break; }
+      if (Number.isFinite(b.high) && b.high >= plan.tp) { exit = plan.tp; result = "tp"; exitIndex = u; break; }
+    }
+    if (!result) {
+      const u = Math.min(bars.length - 1, t + HOLD_LIMIT_SESSIONS - 1);
+      if (u <= t || !Number.isFinite(bars[u].close)) continue;
+      exit = bars[u].close;
+      result = "timeout";
+      exitIndex = u;
+    }
+    trades.push({
+      code,
+      entryDate: day.date,
+      exitDate: bars[exitIndex].date,
+      holdSessions: exitIndex - t + 1,
+      entry: Number(entry.toFixed(1)),
+      exit: Number(exit.toFixed(1)),
+      result,
+      pnlPct: Number((((exit - entry) / entry) * 100).toFixed(2)),
+      winRate: 50, // グリッド実験では予測winRateを使わない（aggregateの帯集計用のダミー）
+      rr: null,
+      tier: "grid"
+    });
+    openUntil = exitIndex;
+  }
+  return trades;
+}
+
+function runGridExperiment(codeBars) {
+  const gridTrades = [];
+  const baselineTrades = [];
+  const perStock = [];
+  let fallbackCount = 0;
+
+  for (const [code, bars] of Object.entries(codeBars)) {
+    if (code === "1306" || code === "1321") continue;
+    const trainEnd = Math.floor(bars.length * 0.75);
+    if (trainEnd < 120) continue; // 学習期間が短すぎる銘柄は除外
+
+    // 学習: 全組合せを前半75%で試し、平均損益%が最良の組合せを選ぶ（取引数が少なすぎる組合せは除外）
+    let best = null;
+    for (const slMult of GRID_SL_MULTS) {
+      for (const tpMult of GRID_TP_MULTS) {
+        const trades = simulateStockRange(code, bars, 80, trainEnd, slMult, tpMult);
+        if (trades.length < GRID_MIN_TRAIN_TRADES) continue;
+        const avgPnl = trades.reduce((s, tr) => s + tr.pnlPct, 0) / trades.length;
+        if (!best || avgPnl > best.avgPnl) best = { slMult, tpMult, avgPnl, trainTrades: trades.length };
+      }
+    }
+    if (!best) {
+      // 学習期間に十分な取引が無い銘柄は本番採用値にフォールバック
+      best = { ...GRID_BASELINE, avgPnl: null, trainTrades: 0 };
+      fallbackCount += 1;
+    }
+
+    // 検証: 後半25%を「銘柄別に選んだ倍率」と「一律2.0/3.5」の両方で走らせる
+    const g = simulateStockRange(code, bars, trainEnd, bars.length, best.slMult, best.tpMult);
+    const b = simulateStockRange(code, bars, trainEnd, bars.length, GRID_BASELINE.slMult, GRID_BASELINE.tpMult);
+    gridTrades.push(...g);
+    baselineTrades.push(...b);
+    perStock.push({
+      code,
+      slMult: best.slMult,
+      tpMult: best.tpMult,
+      trainTrades: best.trainTrades,
+      trainAvgPnlPct: best.avgPnl != null ? Number(best.avgPnl.toFixed(2)) : null,
+      testTrades: g.length,
+      testAvgPnlPct: g.length ? Number((g.reduce((s, tr) => s + tr.pnlPct, 0) / g.length).toFixed(2)) : null
+    });
+  }
+
+  const result = {
+    source: "backtest-strategy grid experiment",
+    ranAt: new Date().toISOString(),
+    note: "銘柄別ATR倍率グリッドサーチ(学習75%/検証25%) vs 一律 損切2.0×ATR/利確3.5×ATR。検証25%期間のみで比較。",
+    holdLimitSessions: HOLD_LIMIT_SESSIONS,
+    slMultCandidates: GRID_SL_MULTS,
+    tpMultCandidates: GRID_TP_MULTS,
+    minTrainTrades: GRID_MIN_TRAIN_TRADES,
+    stocks: perStock.length,
+    fallbackStocks: fallbackCount,
+    perStockGrid: aggregate(gridTrades),
+    baseline: aggregate(baselineTrades),
+    perStock
+  };
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, "backtest-grid.json"), JSON.stringify(result, null, 1));
+
+  const g = result.perStockGrid.overall;
+  const b = result.baseline.overall;
+  console.log("\n===== 銘柄別グリッドサーチ A/B検証（検証25%期間・地合いフィルタなし） =====");
+  console.log(`銘柄別グリッド: ${g.trades}件 勝率${g.winPct}% (利確${g.tp}/損切${g.sl}/時間切れ${g.timeout}) 平均損益${g.avgPnlPct}%`);
+  console.log(`一律2.0/3.5   : ${b.trades}件 勝率${b.winPct}% (利確${b.tp}/損切${b.sl}/時間切れ${b.timeout}) 平均損益${b.avgPnlPct}%`);
+  console.log(`対象${result.stocks}銘柄（うち学習取引不足で一律にフォールバック: ${fallbackCount}銘柄）`);
+  console.log(`出力: ${path.join(dataDir, "backtest-grid.json")}`);
+  if (g.avgPnlPct > b.avgPnlPct) {
+    console.log("→ 銘柄別グリッドが優位。update-treasure-stocks.js への採用を検討する価値あり。");
+  } else {
+    console.log("→ 一律2.0/3.5が優位または同等。現行方式を維持（銘柄別最適化は過学習の可能性）。");
+  }
+  return result;
+}
+
 function buildRegimeMap(bars1306, bars1321) {
   const map = new Map();
   const src = (bars1306 && bars1306.length >= 25) ? bars1306 : bars1321;
@@ -393,6 +542,13 @@ async function main() {
   const usable = Object.entries(bars).filter(([, b]) => b.length >= 120);
   console.log(`利用可能: ${usable.length}/${codes.length}銘柄`);
   const codeBars = Object.fromEntries(usable);
+
+  // grid モードは A/B 実験専用。backtest.json（較正表の供給元）は上書きしない。
+  if (SLTP_MODE === "grid") {
+    runGridExperiment(codeBars);
+    return;
+  }
+
   const regimeByDate = buildRegimeMap(bars["1306"], bars["1321"]);
 
   const withFilter = simulate(codeBars, regimeByDate, { useRegimeFilter: true });

@@ -28,9 +28,12 @@ const TARGET_LIMIT = 15; // 標準表示10件 + ゆるめ表示15件をカバー
 const CLOSED_LIMIT = 80;
 
 // 仮想資金シミュレーション: 観測スペースへの追加を「購入」とみなし、利確/損切で資金を増減させる。
-// 2種類の購入ルールを並行運用して比較できるようにする:
+// 3種類の購入ルールを並行運用して比較できるようにする:
 //   fixed: 1銘柄100万円固定（端株可・S株/ミニ株想定）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る
 //   unit : 1単元（100株）購入。実際の発注（単元株取引）の再現。銘柄ごとに投入額が変わる
+//   risk : リスク均等（auto_trader.py の calc_lot_size と同じ考え方）。損切までの値幅から株数を逆算し、
+//          どの銘柄も損切時の損失が RISK_BUDGET 円で揃う。損切幅が極端に狭い銘柄への過大集中を防ぐため
+//          投入額は RISK_MAX_COST 円で頭打ち。損切ラインが無い銘柄は計算不能としてスキップ記録
 // 購入するのは BUY_CATEGORIES のシグナル区分のみ。「見送り」は実運用で買わないため対象外。
 // 「監視継続」は観測実績が利確0回/損切11回（2026-07-02時点、標準5+ゆるめ6）と一方的に悪いため対象外。
 // どちらも観測・カウントには従来通り残す（対照群として引き続き検証する）。
@@ -38,7 +41,9 @@ const CLOSED_LIMIT = 80;
 const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
 const UNIT_SHARES = 100;
-const PF_VARIANTS = ["fixed", "unit"];
+const RISK_BUDGET = Number(process.env.OBS_RISK_BUDGET || 50000);
+const RISK_MAX_COST = Number(process.env.OBS_RISK_MAX_COST || 5000000);
+const PF_VARIANTS = ["fixed", "unit", "risk"];
 const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
 const BUY_CATEGORIES = new Set(["統合買い候補", "確認候補"]);
@@ -48,19 +53,22 @@ const BUY_CATEGORIES = new Set(["統合買い候補", "確認候補"]);
 //                    ゆるめは浅い押し目(-0.1%〜)で早く入る分、同じ利確/損切価格に対しRRが悪い
 //   100万固定 > 1単元 … 全銘柄同額＝戦略の期待値がそのまま資金曲線に出る。1単元は株価で重みが偏る
 // 損益率に差が出た後は評価額ベースで自動的に順位が入れ替わる（candidateRanking）。
+// リスク均等（risk）は2026-07-03追加の新参で実績ゼロのため、既存4バケットの後ろ（第5・6候補）から開始する。
 const STRUCTURAL_PRIORITY = [
   { mode: "standard", variant: "fixed" },
   { mode: "standard", variant: "unit" },
   { mode: "relax", variant: "fixed" },
-  { mode: "relax", variant: "unit" }
+  { mode: "relax", variant: "unit" },
+  { mode: "standard", variant: "risk" },
+  { mode: "relax", variant: "risk" }
 ];
 
-// LINE通知（買い目標到達＝仮想購入時）。標準/ゆるめ × 100万固定/1単元 の4バケットの結果を
-// 1銘柄=1通にまとめて送る。LINE_ACCESS_TOKEN / LINE_USER_ID 未設定なら自動スキップ。
+// LINE通知（買い目標到達＝仮想購入時、および利確/損切＝決済時）。標準/ゆるめ × 方式（100万固定/1単元/リスク均等）の
+// 結果を1銘柄=1通にまとめて送る。LINE_ACCESS_TOKEN / LINE_USER_ID 未設定なら自動スキップ。
 const MODE_LABELS = { standard: "標準", relax: "ゆるめ" };
 // 標準/ゆるめを一目で見分けるための色分け絵文字（LINEはプレーンテキストなので色付き絵文字で代用）。
 const MODE_EMOJI = { standard: "🔵", relax: "🟠" };
-const VARIANT_LABELS = { fixed: "100万固定", unit: "1単元" };
+const VARIANT_LABELS = { fixed: "100万固定", unit: "1単元", risk: "リスク均等" };
 const PAGE_URL = process.env.OBS_PAGE_URL || "https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/";
 
 function resolvePath(envName, fallback) {
@@ -174,14 +182,31 @@ function normalizeObs(obs) {
   return obs;
 }
 
-// 到達＝購入。variant に応じて 100万円分（端株）または 1単元（100株）を取得する。
-function tryBuy(pf, variant, code, name, signal, price, nowIso) {
+// 到達＝購入。variant に応じて 100万円分（端株）/ 1単元（100株）/ リスク均等分 を取得する。
+// sl はリスク均等の株数逆算に使う（fixed/unit では未使用）。
+function tryBuy(pf, variant, code, name, signal, price, nowIso, sl) {
   if (!pf.startedAt) pf.startedAt = nowIso;
   let shares;
   let cost;
   if (variant === "unit") {
     shares = UNIT_SHARES;
     cost = Math.round(UNIT_SHARES * price);
+  } else if (variant === "risk") {
+    // リスク均等: 損切時の損失が RISK_BUDGET 円になる株数 = RISK_BUDGET ÷ (現在値 − 損切ライン)
+    const riskPerShare = Number.isFinite(Number(sl)) && Number(sl) > 0 ? price - Number(sl) : NaN;
+    if (!Number.isFinite(riskPerShare) || riskPerShare <= 0) {
+      const reason = "損切ライン不明のためリスク計算不可";
+      pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+      if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+      return { action: "skip", cost: 0, reason };
+    }
+    shares = Number((RISK_BUDGET / riskPerShare).toFixed(4));
+    cost = Math.round(shares * price);
+    if (cost > RISK_MAX_COST) {
+      // 損切幅が極端に狭い銘柄への過大集中を防ぐ（投入額上限で頭打ち＝その分リスクも小さくなる）
+      shares = Number((RISK_MAX_COST / price).toFixed(4));
+      cost = Math.round(shares * price);
+    }
   } else {
     shares = Number((TRADE_BUDGET / price).toFixed(4));
     cost = TRADE_BUDGET;
@@ -256,17 +281,18 @@ function buildBuyMessage(ev, rankMap) {
 }
 
 // 利確/損切＝売却。保有していれば決済価格で現金に戻し、履歴に記録する。
+// 戻り値: 記録した履歴レコード（保有していなければ null）。LINE通知の本文組み立てに使う。
 function settlePosition(pf, item, exitType, exitPrice, nowIso) {
   const pos = pf.positions[item.code];
-  if (!pos) return;
+  if (!pos) return null;
   const proceeds = Math.round(Number(pos.shares) * exitPrice);
   const pnl = proceeds - Number(pos.investedAmount);
   pf.cash = Math.round(Number(pf.cash) + proceeds);
   pf.realizedPnl = Math.round(Number(pf.realizedPnl) + pnl);
-  // 100万固定・1単元それぞれの利確/損切回数を別々に集計する（観測スペースで分けて表示するため）。
+  // 方式（100万固定/1単元/リスク均等）ごとの利確/損切回数を別々に集計する（観測スペースで分けて表示するため）。
   if (exitType === "tp") pf.tpCount = (Number(pf.tpCount) || 0) + 1;
   else if (exitType === "sl") pf.slCount = (Number(pf.slCount) || 0) + 1;
-  pf.history.unshift({
+  const record = {
     code: item.code,
     name: item.name || item.code,
     signal: item.signal,
@@ -280,9 +306,39 @@ function settlePosition(pf, item, exitType, exitPrice, nowIso) {
     pnlPct: Number(((pnl / Number(pos.investedAmount)) * 100).toFixed(2)),
     entryAt: pos.entryAt,
     exitAt: nowIso
-  });
+  };
+  pf.history.unshift(record);
   if (pf.history.length > PF_HISTORY_LIMIT) pf.history.length = PF_HISTORY_LIMIT;
   delete pf.positions[item.code];
+  return record;
+}
+
+// 1銘柄×1モードの利確/損切イベントをLINE本文に整形する。
+// 実弾運用の判断材料になるよう、方式ごとの実現損益と実戦候補順位を併記する。
+function buildSettleMessage(ev, rankMap) {
+  const yen = (n) => `${Math.round(n).toLocaleString()}円`;
+  const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
+  const emoji = ev.exitType === "tp" ? "✅" : "⚠️";
+  const title = ev.exitType === "tp" ? "利確ライン到達" : "損切ライン到達";
+  const lines = [
+    `${emoji}${MODE_EMOJI[ev.mode] || ""}【${modeLabel}モード】${title}（仮想売買）`,
+    `${ev.name} (${ev.code})`,
+    `区分: ${ev.category || "—"}`,
+    ev.exitType === "tp"
+      ? `現在値 ${yen(ev.exitPrice)} ≥ 利確 ${ev.tp != null ? yen(ev.tp) : "—"}`
+      : `現在値 ${yen(ev.exitPrice)} ≤ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`,
+    "──────────"
+  ];
+  for (const e of ev.entries) {
+    const rank = rankMap ? rankMap[`${ev.mode}:${e.variant}`] : null;
+    const variant = (VARIANT_LABELS[e.variant] || e.variant) + (rank ? `〔第${rank}候補〕` : "");
+    const sign = e.pnl >= 0 ? "+" : "";
+    lines.push(`${variant}: ${sign}${yen(e.pnl)} (${sign}${e.pnlPct}%) 取得${yen(e.entryPrice)}→決済${yen(e.exitPrice)}`);
+  }
+  lines.push("──────────");
+  lines.push(ev.exitType === "tp" ? "実弾保有中なら利益確定の検討を。" : "実弾保有中なら迷わず損切りを。");
+  lines.push(`詳細: ${PAGE_URL}`);
+  return lines.join("\n");
 }
 
 // 公開ページの selectIntegratedRankingStocks / シートの selectSheetStocks と同じ選択ロジック
@@ -318,8 +374,10 @@ async function main() {
   const today = jstDateKey();
   const nowIso = new Date().toISOString();
   const summary = { settled: 0, hits: { standard: 0, relax: 0 } };
-  // この実行で新たに買い目標到達した銘柄を集約（code -> 4バケットの結果）。実行末に1銘柄=1通でLINE通知。
+  // この実行で新たに買い目標到達した銘柄を集約（code -> 全方式の結果）。実行末に1銘柄=1通でLINE通知。
   const buyEvents = {};
+  // この実行で利確/損切した銘柄×モードを集約。仮想資金で保有していた方式の実現損益を添えて1銘柄=1通でLINE通知。
+  const settleEvents = {};
 
   // workflow_dispatch の reset_portfolio 入力で仮想資金を初期化（観測カウント・履歴はそのまま）
   if (process.env.RESET_PORTFOLIO === "1" || process.env.RESET_PORTFOLIO === "true") {
@@ -352,9 +410,26 @@ async function main() {
         if (data.closed.length > CLOSED_LIMIT) data.closed.length = CLOSED_LIMIT;
         summary.settled += 1;
 
-        // 仮想資金: 両方式とも保有していれば決済価格で売却し現金に戻す
+        // 仮想資金: 保有している方式すべてを決済価格で売却し現金に戻す
+        const settledEntries = [];
         for (const variant of PF_VARIANTS) {
-          settlePosition(obs.portfolio[def.key][variant], item, resolved, curPrice, nowIso);
+          const record = settlePosition(obs.portfolio[def.key][variant], item, resolved, curPrice, nowIso);
+          if (record) settledEntries.push({ variant, pnl: record.pnl, pnlPct: record.pnlPct, entryPrice: record.entryPrice, exitPrice: record.exitPrice });
+        }
+        // 仮想資金で保有していた（＝買い到達通知を出した）銘柄のみ決済もLINE通知する。
+        // 対照群（見送り等）はエントリー通知が無いので決済通知も出さない。
+        if (settledEntries.length) {
+          settleEvents[`${item.code}__${def.key}`] = {
+            code: item.code,
+            name: item.name || item.code,
+            mode: def.key,
+            category: cat,
+            exitType: resolved,
+            exitPrice: curPrice,
+            tp: item.tp,
+            sl: item.sl,
+            entries: settledEntries
+          };
         }
       } else {
         stillActive.push(item);
@@ -414,7 +489,7 @@ async function main() {
           // fixed/unit は同基準・同タイミングなので同じイベントにまとめる。
           const evKey = `${code}__${def.key}`;
           for (const variant of PF_VARIANTS) {
-            const result = tryBuy(obs.portfolio[def.key][variant], variant, code, target.name || code, target.signal || "見送り", curPrice, nowIso);
+            const result = tryBuy(obs.portfolio[def.key][variant], variant, code, target.name || code, target.signal || "見送り", curPrice, nowIso, sl);
             if (!buyEvents[evKey]) {
               buyEvents[evKey] = {
                 code,
@@ -509,12 +584,19 @@ async function main() {
 
   writeJson(obsPath, obs);
 
-  // 新規に買い目標到達した銘柄を 1銘柄=1通 でLINE通知（4バケットの買い/資金不足を本文に併記）。
+  // 新規に買い目標到達した銘柄を 1銘柄=1通 でLINE通知（全方式の買い/資金不足を本文に併記）。
   const rankMap = Object.fromEntries(obs.candidateRanking.items.map((c) => [`${c.mode}:${c.variant}`, c.rank]));
   const notifyCodes = Object.keys(buyEvents);
   let notified = 0;
   for (const code of notifyCodes) {
     if (await sendLine(buildBuyMessage(buyEvents[code], rankMap))) notified += 1;
+  }
+
+  // 利確/損切した銘柄も 1銘柄×モード=1通 でLINE通知（方式ごとの実現損益を本文に併記）。
+  // 2026-07-03: auto_trader系の利確/損切通知を停止し、実弾判断はこちらの通知に一本化した。
+  let settleNotified = 0;
+  for (const key of Object.keys(settleEvents)) {
+    if (await sendLine(buildSettleMessage(settleEvents[key], rankMap))) settleNotified += 1;
   }
 
   console.log(JSON.stringify({
@@ -523,6 +605,7 @@ async function main() {
     regime: regime ? { index: regime.index, bullish: regime.bullish, deviationPct: regime.deviationPct } : null,
     entryAllowed,
     notified,
+    settleNotified,
     targets: Object.keys(obs.targets).length,
     standardActive: obs.standard.active.length,
     relaxActive: obs.relax.active.length,
