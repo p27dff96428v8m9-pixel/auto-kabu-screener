@@ -3061,12 +3061,21 @@ function renderIntegratedRanking() {
   const comparisons = state.integratedRankingComparisons;
   const comparisonByCode = Object.fromEntries((comparisons?.items || []).map((item) => [item.code, item]));
 
-  // 🎯バッジは観測スペースと同じ「日次固定の買い目標」(integrated-obs.json の targets) で判定する。
-  // リアルタイム再計算の buy（現在価格×(1-0.5〜3%)）を使うと、ゆるめモードでは ×1.02 で
-  // 閾値が現在価格より上になり、ほぼ全銘柄が常時「到達」表示になってしまうため。
+  // 🎯バッジは「サーバー(update-integrated-obs.js)が実際に到達登録した銘柄」= 観測スペースの
+  // active リストに入っているかで判定する（2026-07-06）。
+  // 理由: サーバーは市場時間内(9:00〜15:30)に固定目標まで下がった時だけ登録＋LINE通知する。
+  // クライアント側で「現在値 ≤ 固定目標」を直接計算すると、引け後や引け値だけで到達した銘柄まで
+  // バッジが点いてしまい、「バッジは出るのに今日の銘柄にもLINEにも乗らない」という表示と実態のズレが起きる。
+  // active に入っている＝実際に登録・通知された、なので表示と実態が一致する。
   if (!state.buyTargetObservations) state.buyTargetObservations = loadObservations();
-  const fixedTargets = (state.buyTargetObservations && typeof state.buyTargetObservations.targets === 'object')
-    ? state.buyTargetObservations.targets
+  const obsForBadge = state.buyTargetObservations || {};
+  const activeCodeSet = (() => {
+    const modeKey = isRelax ? 'relax' : 'standard';
+    const arr = (obsForBadge[modeKey] && Array.isArray(obsForBadge[modeKey].active)) ? obsForBadge[modeKey].active : [];
+    return new Set(arr.map((x) => String(x.code || '').trim()));
+  })();
+  const fixedTargets = (obsForBadge && typeof obsForBadge.targets === 'object')
+    ? obsForBadge.targets
     : null;
 
   if (!stocks.length) {
@@ -3106,14 +3115,8 @@ function renderIntegratedRanking() {
     const priceNum = Number(stock.price) || 0;
     const fixedTarget = fixedTargets ? fixedTargets[String(stock.code || '').trim()] : null;
     const fixedBuy = fixedTarget ? Number(fixedTarget.buy) : NaN;
-    // ゆるめのしきい値はサーバー(update-integrated-obs.js)と同じ min(buy×1.02, 基準価格×0.999)
-    const fixedRef = fixedTarget ? Number(fixedTarget.price) : NaN;
-    let targetThreshold = fixedBuy * (isRelax ? 1.02 : 1.0);
-    if (isRelax && Number.isFinite(fixedRef) && fixedRef > 0) {
-      targetThreshold = Math.min(targetThreshold, fixedRef * 0.999);
-    }
-    const isAtTarget = Number.isFinite(fixedBuy) && fixedBuy > 0 && priceNum > 0
-      && priceNum <= targetThreshold;
+    // 到達バッジは「サーバーが実際に登録した（＝active入り）」銘柄だけに点ける（表示と実態を一致）。
+    const isAtTarget = activeCodeSet.has(String(stock.code || '').trim());
     return `
       <article class="integrated-stock-card ${isAtTarget ? 'at-buy-target' : ''} ${isRelax ? 'relax-mode' : ''}">
         <div class="integrated-rank-block">

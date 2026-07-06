@@ -496,12 +496,10 @@ function selectedFinancialTickerBatch(tickers) {
   return Array.from({ length: limit }, (_, index) => unique[(start + index) % unique.length]);
 }
 
-function selectedInstrumentQuoteBatch(tickers, explicitLimit) {
+function selectedInstrumentQuoteBatch(tickers, explicitLimit, alwaysInclude = []) {
   const limit = Number.isFinite(explicitLimit) && explicitLimit > 0
     ? explicitLimit
     : Number(process.env.JQUANTS_INSTRUMENT_QUOTE_REQUESTS_PER_RUN || 36);
-  // Preserve caller-provided order (treasure tickers are prepended by caller for priority).
-  // This ensures the 統合銘柄ランキング tickers are attempted more often within the budget.
   const seen = new Set();
   const unique = [];
   for (const t of tickers.map(String)) {
@@ -511,10 +509,33 @@ function selectedInstrumentQuoteBatch(tickers, explicitLimit) {
     }
   }
   if (unique.length <= limit) return unique;
+
+  // 監視対象（treasure/統合ランキング銘柄）は毎回必ず含める（2026-07-06）。
+  // 旧実装は limit 幅の窓を毎回スライドするだけで、窓が theme 銘柄領域に来た回は
+  // treasure 価格が更新されず持ち越し→買い目標到達の判定で「場中の押し目」を取りこぼしていた。
+  // 到達判定の対象は上位15件（obs.targets）で、それらは alwaysInclude(treasure) に含まれる。
+  // treasure(~27)を毎回入れても枠36に収まり、残り枠だけ theme をローテーションする（クォータ増なし）。
+  const must = [];
+  const mustSet = new Set();
+  for (const t of alwaysInclude.map(String)) {
+    if (must.length >= limit) break;
+    if (seen.has(t) && !mustSet.has(t)) {
+      mustSet.add(t);
+      must.push(t);
+    }
+  }
+  const rest = unique.filter((t) => !mustSet.has(t));
+  const remaining = Math.max(0, limit - must.length);
+  if (remaining === 0 || rest.length === 0) return must.slice(0, limit);
+
   const runNumber = Number(process.env.GITHUB_RUN_NUMBER);
   const rawIndex = Number.isFinite(runNumber) ? runNumber - 1 : Math.floor(Date.now() / (20 * 60 * 1000));
-  const start = ((Math.trunc(rawIndex) * limit) % unique.length + unique.length) % unique.length;
-  return Array.from({ length: limit }, (_, index) => unique[(start + index) % unique.length]);
+  const start = ((Math.trunc(rawIndex) * remaining) % rest.length + rest.length) % rest.length;
+  const rotated = Array.from(
+    { length: Math.min(remaining, rest.length) },
+    (_, index) => rest[(start + index) % rest.length]
+  );
+  return [...must, ...rotated];
 }
 
 /**
@@ -837,8 +858,9 @@ async function buildMarketData() {
     quoteBatch = getRankingInstrumentTickers(); // full set, treasure first, no artificial rotation limit
     console.log(`PRIORITY_RANKING_REFRESH: forcing FULL refresh for all ${quoteBatch.length} ranking tickers (env=${envPriority}, time=${timePriority})`);
   } else {
-    // Normal mode: rotating limited batch with treasure priority
-    quoteBatch = selectedInstrumentQuoteBatch(allInstrumentTickers, instrumentQuoteLimit);
+    // Normal mode: treasure(監視対象=統合ランキング上位)は毎回必ず更新し、残り枠だけ theme をローテーション。
+    // これで買い目標到達の判定に使う価格が場中に持ち越し（stale）にならず、押し目の取りこぼしを防ぐ。
+    quoteBatch = selectedInstrumentQuoteBatch(allInstrumentTickers, instrumentQuoteLimit, treasureTickers);
   }
 
   for (const ticker of quoteBatch) {
