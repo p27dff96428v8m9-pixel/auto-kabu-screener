@@ -110,8 +110,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json docs/fund-flow-ai-system/data/ranking-history.json docs/fund-flow-ai-system/data/treasure-stocks.json docs/fund-flow-ai-system/data/integrated-ranking-history.json docs/fund-flow-ai-system/data/integrated-obs.json
-          
+
+          # All of these files are FULLY regenerated from the freshest data every run,
+          # so on a concurrent-push conflict our just-generated version is authoritative.
+          DATA_FILES="docs/fund-flow-ai-system/data/market-data.json docs/fund-flow-ai-system/data/ai-research.json docs/fund-flow-ai-system/data/ranking-history.json docs/fund-flow-ai-system/data/treasure-stocks.json docs/fund-flow-ai-system/data/integrated-ranking-history.json docs/fund-flow-ai-system/data/integrated-obs.json"
+
+          git add $DATA_FILES
+
           if git diff --cached --quiet; then
             echo "No data changes to commit"
             exit 0
@@ -119,7 +124,7 @@ jobs:
 
           git commit -m "Update market data"
 
-          echo "Pushing with retry + rebase (to handle concurrent updates from schedules or manual pushes)..."
+          echo "Pushing with retry (re-applying our regenerated data on top of latest remote to avoid rebase conflicts)..."
           for attempt in 1 2 3; do
             echo "Push attempt $attempt..."
             if git push origin main; then
@@ -127,13 +132,20 @@ jobs:
               exit 0
             fi
 
-            echo "Push rejected (likely another job pushed). Fetching and rebasing..."
-            git fetch origin
-            if ! git pull --rebase origin main; then
-              echo "Rebase encountered issues, aborting rebase..."
-              git rebase --abort || true
+            echo "Push rejected (likely another job pushed). Re-basing our data onto the latest remote (ours wins)..."
+            git fetch origin main
+            # Move HEAD + index to the latest remote tip WITHOUT touching the working tree,
+            # so our freshly generated JSON files are preserved on disk. Then stage only our
+            # data files (ours wins) and re-commit on top of the new remote tip. This is
+            # conflict-free because we never try to merge the regenerated files.
+            git reset --mixed FETCH_HEAD
+            git add $DATA_FILES
+            if git diff --cached --quiet; then
+              echo "Remote already contains equivalent data; nothing to re-push."
+              exit 0
             fi
-            sleep 8
+            git commit -m "Update market data"
+            sleep $((attempt * 3))
           done
 
           echo "❌ All 3 push attempts failed. Giving up for this run."
