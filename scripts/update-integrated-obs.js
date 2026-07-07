@@ -392,6 +392,30 @@ async function main() {
     { key: "relax", factor: RELAX_FACTOR }
   ];
 
+  // 0) 仮想資金を観測の保有状態(active)に同期する（塩漬け解消）。
+  //    tryBuy は「新規に買い目標へ到達した瞬間」だけ買うため、仮想資金の方式が出揃う前から
+  //    active に居座っている銘柄は永久に買い直されず、実現損益も決済LINE通知も出ない塩漬けになる。
+  //    そこで毎回、active のBUY対象で仮想資金が未保有のものを到達価格(hitPrice)で買い直してキャッチアップさせる。
+  //    観測の決済チェック(下記1)が active から tp/sl 到達を毎回除外するため、ここで買う銘柄は必ず tp と sl の間にあり
+  //    即決済は起きない。買い直し自体は通知しない（過去分の一括買いは通知ノイズになるため）。以後の利確/損切で通常の決済通知が出る。
+  let syncedBuys = 0;
+  for (const def of modeDefs) {
+    const data = obs[def.key];
+    for (const item of data.active) {
+      if (!BUY_CATEGORIES.has(getCategoryLabel(item.signal))) continue;
+      const entryPrice = Number.isFinite(Number(item.hitPrice)) ? Number(item.hitPrice)
+        : (Number.isFinite(Number(item.buy)) ? Number(item.buy) : NaN);
+      if (!Number.isFinite(entryPrice) || entryPrice <= 0) continue;
+      for (const variant of PF_VARIANTS) {
+        const pf = obs.portfolio[def.key][variant];
+        if (pf.positions[item.code]) continue; // 既に保有していれば何もしない（冪等）
+        const res = tryBuy(pf, variant, item.code, item.name || item.code, item.signal || "見送り", entryPrice, item.hitAt || nowIso, item.sl);
+        if (res && res.action === "buy") syncedBuys += 1;
+      }
+    }
+  }
+  if (syncedBuys > 0) console.log(`仮想資金を active に同期: ${syncedBuys}件を到達価格で買い直し`);
+
   // 1) 既存アクティブの利確/損切判定（ランキング圏外でも価格があれば決済まで追跡）
   for (const def of modeDefs) {
     const data = obs[def.key];
