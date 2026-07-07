@@ -268,9 +268,17 @@ function buildBuyMessage(ev, rankMap) {
     const rank = rankMap ? rankMap[`${ev.mode}:${e.variant}`] : null;
     const variant = (VARIANT_LABELS[e.variant] || e.variant) + (rank ? `〔第${rank}候補〕` : "");
     if (e.action === "buy") {
-      const detail = e.variant === "unit"
-        ? `${e.shares}株（${Math.round(e.cost).toLocaleString()}円）`
-        : `${Math.round(e.cost).toLocaleString()}円分`;
+      // 端株(単元未満株)でそのまま発注できるよう全方式で株数を併記する。
+      // fixed/risk は端数株になるため整数に丸め、金額も丸めた株数×到達価格で概算表示する
+      // （観測スペースの損益計算は端株のまま。表示のみ実弾発注しやすい整数株にする）。
+      let detail;
+      if (e.variant === "unit") {
+        detail = `${e.shares.toLocaleString()}株（${Math.round(e.cost).toLocaleString()}円）`;
+      } else {
+        const wholeShares = Math.round(Number(e.shares));
+        const approxCost = Math.round(wholeShares * ev.price);
+        detail = `約${wholeShares.toLocaleString()}株（約${approxCost.toLocaleString()}円）`;
+      }
       lines.push(`${variant}: 買い ${detail}`);
     } else {
       lines.push(`${variant}: ${e.reason}`);
