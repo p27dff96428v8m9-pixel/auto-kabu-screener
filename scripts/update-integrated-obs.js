@@ -633,8 +633,6 @@ async function main() {
       if (resolved) {
         const cat = getCategoryLabel(item.signal);
         data.counts[cat][resolved] = (data.counts[cat][resolved] || 0) + 1;
-        data.closed.unshift({ ...item, exitType: resolved, exitPrice: curPrice, exitAt: nowIso });
-        if (data.closed.length > CLOSED_LIMIT) data.closed.length = CLOSED_LIMIT;
         summary.settled += 1;
 
         // 仮想資金: 保有している方式すべてを決済価格で売却し現金に戻す
@@ -643,6 +641,11 @@ async function main() {
           const record = settlePosition(obs.portfolio[def.key][variant], item, resolved, curPrice, nowIso);
           if (record) settledEntries.push({ variant, pnl: record.pnl, pnlPct: record.pnlPct, entryPrice: record.entryPrice, exitPrice: record.exitPrice });
         }
+
+        // notifiedExit: この決済でLINE通知を出すか（仮想資金で保有していた＝買い到達通知済みの銘柄のみ true）。
+        // 対照群（監視継続・見送り）や資金不足で未保有だったものは false になり、ページ側で「通知なし」バッジ表示に使う。
+        data.closed.unshift({ ...item, exitType: resolved, exitPrice: curPrice, exitAt: nowIso, notifiedExit: settledEntries.length > 0 });
+        if (data.closed.length > CLOSED_LIMIT) data.closed.length = CLOSED_LIMIT;
         // 仮想資金で保有していた（＝買い到達通知を出した）銘柄のみ決済もLINE通知する。
         // 対照群（見送り等）はエントリー通知が無いので決済通知も出さない。
         if (settledEntries.length) {

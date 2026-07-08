@@ -2969,6 +2969,18 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
       const cat = getCategoryLabel(item.signal);
       const sigCls = signalClass(item.signal);
 
+      // 対照群・通知なしバッジ: LINE通知が出ない決済を明示する（「決済が見えるのに通知が来ない」混乱の防止）。
+      // notifiedExit はサーバーが決済時に記録（2026-07-08以降）。無い旧レコードは区分から推定する。
+      const isBuyCat = cat === '統合買い候補' || cat === '確認候補';
+      let noNotifyBadge = '';
+      if (item.notifiedExit === false || (item.notifiedExit == null && !isBuyCat)) {
+        const label = isBuyCat ? '通知なし(未保有)' : '対照群・通知なし';
+        const tip = isBuyCat
+          ? '買い到達時に資金不足などで仮想購入されなかったため、LINE通知の対象外です'
+          : 'この区分（監視継続・見送り）は成績検証用の対照群で仮想購入せず、買い到達・決済ともLINE通知しません';
+        noNotifyBadge = `<span class="obs-no-notify" title="${tip}">🔕 ${label}</span>`;
+      }
+
       // 参考：buy→exit の簡易リターン表示（任意）
       let ret = null;
       if (item.buy != null && item.exitPrice != null && Number(item.buy) > 0) {
@@ -2983,6 +2995,7 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
             <span class="obs-name">${item.name || ''}</span>
             <span class="obs-signal ${sigCls}">${cat}</span>
             <span class="obs-exit-badge ${exitCls}">${exitLabel}</span>
+            ${noNotifyBadge}
           </div>
           <div class="obs-trade-row">
             <span>買い ${formatNumber(item.buy)}</span>
