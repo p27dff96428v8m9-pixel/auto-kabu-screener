@@ -17,9 +17,25 @@
 // 価格の鮮度 (2026-07-08):
 //   価格ソースの J-Quants 日足(EOD)は当日終値が18時台まで公開されないため、treasure-stocks.json の
 //   価格だけでは場中の利確/損切・到達検知が原理的に不可能（みずほ利確が18:42通知になった実例）。
-//   そこで判定対象の銘柄（保有中 active + 固定目標）に限り、Yahoo Finance の遅延価格（約20分）で
-//   priceMap を上書きして判定する。取得失敗時はEOD価格のまま判定する（従来動作）。
-//   OBS_INTRADAY_PRICES=0 で無効化できる。
+//   そこで判定対象の銘柄（保有中 active + 固定目標）に限り、より新しい場中価格で priceMap を
+//   上書きして判定する。ソースは環境変数 OBS_PRICE_SOURCE で切り替え式:
+//     yahoo     (既定) Yahoo Finance の遅延価格（約20分遅れ・APIキー不要）
+//     tachibana 立花証券e支店API のリアルタイム価格（要口座。失敗時はyahooへ自動フォールバック）
+//     off       上書きしない（従来のEODのみ。OBS_INTRADAY_PRICES=0 も同義・旧互換）
+//   取得失敗時はEOD価格のまま判定する（従来動作）。
+//
+//   ★立花証券への切り替え手順（コード変更不要。口座開設後にGitHubのWeb画面だけで完了）:
+//     1. https://www.e-shiten.jp/ で口座開設（無料）し、APIの利用申請をする
+//     2. GitHubリポジトリの Settings > Secrets and variables > Actions を開く
+//        - [Secrets] タブで New repository secret:
+//            TACHIBANA_USER_ID  = e支店のログインID
+//            TACHIBANA_PASSWORD = e支店のログインパスワード
+//        - [Variables] タブで New repository variable:
+//            OBS_PRICE_SOURCE = tachibana
+//     3. 以後の実行から自動的にリアルタイム価格で判定される（切り戻しは変数を yahoo に変えるだけ）
+//     ※価格取得だけなら第二パスワード（注文用）は不要。自動発注まで拡張する時に初めて必要になる。
+//     ※APIのバージョンが上がってURLが変わったら Variables に TACHIBANA_API_BASE_URL を追加して
+//       新URL（例 https://kabuka.e-shiten.jp/e_api_v4r6/）を設定すればよい。
 // 地合い（marketRegime: TOPIX連動ETFの25日線判定）は参考情報として公開データに載せるのみで、
 // エントリーは止めない。2026-07-02のバックテスト（5年×78銘柄）でフィルタ無しの方が
 // 平均損益が良く（+1.63% vs +1.21%）、ユーザー判断でフィルタを撤去した。
@@ -254,27 +270,141 @@ async function fetchYahooDelayedPrice(code) {
   }
 }
 
-// 判定に使う銘柄（保有中 active + 固定目標）の価格を Yahoo 遅延価格で上書きする。
+// ── 立花証券 e支店 API（リアルタイム価格）──────────────────────────────
+// 口座があれば無料でリアルタイム株価が取れる純RESTのAPI。GitHub Actionsから直接呼べる。
+// 仕様: ログイン(CLMAuthLoginRequest)で仮想URL(sUrlPrice等)を受け取り、
+//       時価取得(CLMMfdsGetMarketPrice)で現在値(pDPP)と時刻を取る。リクエストは
+//       「仮想URL?URLエンコードしたJSON」のGET。詳細: https://www.e-shiten.jp/api/
+const TACHIBANA_DEFAULT_BASE_URL = "https://kabuka.e-shiten.jp/e_api_v4r5/";
+
+// p_sd_date 形式: "YYYY.MM.DD-HH:MM:SS.mmm"（JST）
+function tachibanaNow() {
+  const jst = new Date(Date.now() + 9 * 3600 * 1000);
+  const p = (n, w = 2) => String(n).padStart(w, "0");
+  return `${jst.getUTCFullYear()}.${p(jst.getUTCMonth() + 1)}.${p(jst.getUTCDate())}` +
+    `-${p(jst.getUTCHours())}:${p(jst.getUTCMinutes())}:${p(jst.getUTCSeconds())}.${p(jst.getUTCMilliseconds(), 3)}`;
+}
+
+async function tachibanaRequest(baseUrl, payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(`${baseUrl}?${encodeURIComponent(JSON.stringify(payload))}`, { signal: controller.signal });
+    if (!res.ok) return null;
+    // 応答が Shift_JIS のことがあるため明示的にデコードする（UTF-8ならそのまま解釈できる）
+    const buf = await res.arrayBuffer();
+    let text;
+    try { text = new TextDecoder("shift_jis").decode(buf); } catch { text = new TextDecoder().decode(buf); }
+    if (/[�]/.test(text)) text = new TextDecoder().decode(buf);
+    return JSON.parse(text);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 立花証券からリアルタイム現在値をまとめて取得する。戻り値: { code: { price, at } } / 失敗時 null。
+// 認証情報未設定・ログイン失敗・応答形式不明はすべて null を返し、呼び出し側が Yahoo にフォールバックする。
+async function fetchTachibanaPrices(codes) {
+  const userId = process.env.TACHIBANA_USER_ID;
+  const password = process.env.TACHIBANA_PASSWORD;
+  if (!userId || !password) {
+    console.log("立花証券の認証情報(TACHIBANA_USER_ID/TACHIBANA_PASSWORD)が未設定");
+    return null;
+  }
+  const base = String(process.env.TACHIBANA_API_BASE_URL || TACHIBANA_DEFAULT_BASE_URL).replace(/\/?$/, "/");
+  let pNo = 1;
+  const login = await tachibanaRequest(`${base}auth/`, {
+    p_no: String(pNo++),
+    p_sd_date: tachibanaNow(),
+    sCLMID: "CLMAuthLoginRequest",
+    sUserId: userId,
+    sPassword: password,
+    sJsonOfmt: "4"
+  });
+  if (!login || String(login.sResultCode) !== "0" || !login.sUrlPrice) {
+    console.error(`立花証券ログイン失敗: ${login ? `sResultCode=${login.sResultCode} ${login.sResultText || ""}` : "応答なし/形式不明"}`);
+    return null;
+  }
+  const quotes = {};
+  try {
+    for (let i = 0; i < codes.length; i += 50) {
+      const chunk = codes.slice(i, i + 50);
+      const res = await tachibanaRequest(login.sUrlPrice, {
+        p_no: String(pNo++),
+        p_sd_date: tachibanaNow(),
+        sCLMID: "CLMMfdsGetMarketPrice",
+        sTargetIssueCode: chunk.join(","),
+        sTargetColumn: "pDPP,tDPP:T", // pDPP=現在値 / tDPP:T=現在値の時刻
+        sJsonOfmt: "4"
+      });
+      const rows = (res && (res.aCLMMfdsMarketPrice || res.CLMMfdsMarketPrice)) || [];
+      for (const row of rows) {
+        const code = String(row.sIssueCode || "").trim();
+        const price = Number(row.pDPP);
+        if (code && Number.isFinite(price) && price > 0) quotes[code] = { price, at: row["tDPP:T"] || null };
+      }
+    }
+  } finally {
+    // ログアウトはベストエフォート（失敗してもセッションはタイムアウトで解放される）
+    await tachibanaRequest(login.sUrlRequest || `${base}auth/`, {
+      p_no: String(pNo++),
+      p_sd_date: tachibanaNow(),
+      sCLMID: "CLMAuthLogoutRequest",
+      sJsonOfmt: "4"
+    });
+  }
+  return Object.keys(quotes).length ? quotes : null;
+}
+
+// 判定用の場中価格ソースを決める。off / yahoo / tachibana（ファイル冒頭の切り替え手順コメント参照）
+function resolvePriceSource() {
+  if (process.env.OBS_INTRADAY_PRICES === "0") return "off"; // 旧スイッチ互換
+  const v = String(process.env.OBS_PRICE_SOURCE || "yahoo").trim().toLowerCase();
+  if (v === "0" || v === "off" || v === "none") return "off";
+  return v === "tachibana" ? "tachibana" : "yahoo";
+}
+
+// 判定に使う銘柄（保有中 active + 固定目標）の価格を場中価格ソースで上書きする。
 // EOD価格と2割以上乖離する値は銘柄不一致・株式分割等の異常とみなして採用しない。
-async function refreshPricesFromYahoo(priceMap, obs) {
+async function refreshJudgePrices(priceMap, obs) {
+  const source = resolvePriceSource();
+  if (source === "off") return null;
   const codes = new Set();
   for (const key of ["standard", "relax"]) {
     for (const item of obs[key].active) codes.add(String(item.code));
   }
   for (const code of Object.keys(obs.targets)) codes.add(String(code));
+  const codeList = [...codes];
+
+  let quotes = null;
+  let usedSource = "yahoo-delayed";
+  if (source === "tachibana") {
+    quotes = await fetchTachibanaPrices(codeList);
+    if (quotes) usedSource = "tachibana-realtime";
+    else console.log("立花証券APIから取得できないため Yahoo遅延価格にフォールバック");
+  }
+  if (!quotes) {
+    quotes = {};
+    for (const code of codeList) {
+      const q = await fetchYahooDelayedPrice(code);
+      if (q) quotes[code] = q;
+    }
+  }
+
   let refreshed = 0;
   let latestAt = null;
-  for (const code of codes) {
-    const quote = await fetchYahooDelayedPrice(code);
-    if (!quote) continue;
+  for (const [code, quote] of Object.entries(quotes)) {
     const eod = priceMap[code];
     if (Number.isFinite(eod) && Math.abs(quote.price / eod - 1) > 0.2) continue;
     priceMap[code] = quote.price;
     refreshed += 1;
-    if (quote.at && (!latestAt || quote.at > latestAt)) latestAt = quote.at;
+    if (quote.at && (!latestAt || String(quote.at) > String(latestAt))) latestAt = quote.at;
   }
-  console.log(`Yahoo遅延価格で判定用価格を上書き: ${refreshed}/${codes.size}件${latestAt ? `（最新気配 ${latestAt}）` : ""}`);
-  return { source: "yahoo-delayed", refreshed, total: codes.size, latestQuoteAt: latestAt };
+  const label = usedSource === "tachibana-realtime" ? "立花証券リアルタイム価格" : "Yahoo遅延価格";
+  console.log(`${label}で判定用価格を上書き: ${refreshed}/${codeList.length}件${latestAt ? `（最新気配 ${latestAt}）` : ""}`);
+  return { source: usedSource, refreshed, total: codeList.length, latestQuoteAt: latestAt };
 }
 
 // LINE Messaging API でテキストを push 送信する（auto_trader.py / gas_code.gs と同じ方式）。
@@ -437,11 +567,10 @@ async function main() {
   const today = jstDateKey();
   const nowIso = new Date().toISOString();
 
-  // J-Quants(EOD)の価格を、判定対象銘柄だけYahooの遅延価格(約20分)で上書きして鮮度を補う。
-  // これにより利確/損切・買い目標到達を場中に（最大 実行間隔+20分 の遅れで）検知できる。
-  if (process.env.OBS_INTRADAY_PRICES !== "0") {
-    obs.intradayPrices = { ...(await refreshPricesFromYahoo(priceMap, obs)), fetchedAt: nowIso };
-  }
+  // J-Quants(EOD)の価格を、判定対象銘柄だけ場中価格ソース（既定Yahoo遅延約20分/切替で立花証券リアルタイム）
+  // で上書きして鮮度を補う。これにより利確/損切・買い目標到達を場中に検知できる。
+  const intraday = await refreshJudgePrices(priceMap, obs);
+  if (intraday) obs.intradayPrices = { ...intraday, fetchedAt: nowIso };
 
   const summary = { settled: 0, hits: { standard: 0, relax: 0 } };
   // この実行で新たに買い目標到達した銘柄を集約（code -> 全方式の結果）。実行末に1銘柄=1通でLINE通知。

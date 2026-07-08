@@ -90,6 +90,13 @@ jobs:
           # 買い目標到達（仮想購入）を 1銘柄=1通 でLINE通知（4バケットの結果込み）。未設定なら自動スキップ。
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          # 判定用の場中価格ソース: yahoo(既定・約20分遅延) / tachibana(立花証券e支店API・リアルタイム) / off
+          # 立花証券への切り替え手順は scripts/update-integrated-obs.js 冒頭のコメント参照
+          # （リポジトリの Variables に OBS_PRICE_SOURCE=tachibana、Secrets に TACHIBANA_USER_ID/PASSWORD を設定するだけ）
+          OBS_PRICE_SOURCE: ${{ vars.OBS_PRICE_SOURCE || 'yahoo' }}
+          TACHIBANA_USER_ID: ${{ secrets.TACHIBANA_USER_ID }}
+          TACHIBANA_PASSWORD: ${{ secrets.TACHIBANA_PASSWORD }}
+          TACHIBANA_API_BASE_URL: ${{ vars.TACHIBANA_API_BASE_URL }}
         run: node scripts/update-integrated-obs.js
 
       - name: Sync integrated ranking to Google Sheet
