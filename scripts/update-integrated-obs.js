@@ -13,6 +13,13 @@
 //     「少なくとも基準価格から0.1%下がらないと到達しない」ことを保証する。
 // 新規到達の判定は市場時間内（JST 平日 9:00〜15:30）のみ行う。夜間・休日は価格が
 // 前日終値のまま動かず、実際には執行できない価格でのエントリーが記録されるため。
+//
+// 価格の鮮度 (2026-07-08):
+//   価格ソースの J-Quants 日足(EOD)は当日終値が18時台まで公開されないため、treasure-stocks.json の
+//   価格だけでは場中の利確/損切・到達検知が原理的に不可能（みずほ利確が18:42通知になった実例）。
+//   そこで判定対象の銘柄（保有中 active + 固定目標）に限り、Yahoo Finance の遅延価格（約20分）で
+//   priceMap を上書きして判定する。取得失敗時はEOD価格のまま判定する（従来動作）。
+//   OBS_INTRADAY_PRICES=0 で無効化できる。
 // 地合い（marketRegime: TOPIX連動ETFの25日線判定）は参考情報として公開データに載せるのみで、
 // エントリーは止めない。2026-07-02のバックテスト（5年×78銘柄）でフィルタ無しの方が
 // 平均損益が良く（+1.63% vs +1.21%）、ユーザー判断でフィルタを撤去した。
@@ -222,6 +229,54 @@ function tryBuy(pf, variant, code, name, signal, price, nowIso, sl) {
   return { action: "skip", cost, reason };
 }
 
+// Yahoo Finance の chart API から遅延価格（東証は約20分遅れ）を1銘柄分取得する。
+// APIキー不要。失敗（HTTPエラー/タイムアウト/形式不明）は null を返し、呼び出し側でEOD価格にフォールバックする。
+async function fetchYahooDelayedPrice(code) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(code)}.T?interval=1d&range=1d`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; auto-kabu-screener)" },
+      signal: controller.signal
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    const price = Number(meta?.regularMarketPrice);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    const time = Number(meta?.regularMarketTime);
+    return { price, at: Number.isFinite(time) ? new Date(time * 1000).toISOString() : null };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 判定に使う銘柄（保有中 active + 固定目標）の価格を Yahoo 遅延価格で上書きする。
+// EOD価格と2割以上乖離する値は銘柄不一致・株式分割等の異常とみなして採用しない。
+async function refreshPricesFromYahoo(priceMap, obs) {
+  const codes = new Set();
+  for (const key of ["standard", "relax"]) {
+    for (const item of obs[key].active) codes.add(String(item.code));
+  }
+  for (const code of Object.keys(obs.targets)) codes.add(String(code));
+  let refreshed = 0;
+  let latestAt = null;
+  for (const code of codes) {
+    const quote = await fetchYahooDelayedPrice(code);
+    if (!quote) continue;
+    const eod = priceMap[code];
+    if (Number.isFinite(eod) && Math.abs(quote.price / eod - 1) > 0.2) continue;
+    priceMap[code] = quote.price;
+    refreshed += 1;
+    if (quote.at && (!latestAt || quote.at > latestAt)) latestAt = quote.at;
+  }
+  console.log(`Yahoo遅延価格で判定用価格を上書き: ${refreshed}/${codes.size}件${latestAt ? `（最新気配 ${latestAt}）` : ""}`);
+  return { source: "yahoo-delayed", refreshed, total: codes.size, latestQuoteAt: latestAt };
+}
+
 // LINE Messaging API でテキストを push 送信する（auto_trader.py / gas_code.gs と同じ方式）。
 async function sendLine(message) {
   const token = process.env.LINE_ACCESS_TOKEN;
@@ -381,6 +436,13 @@ async function main() {
   const obs = normalizeObs(readJson(obsPath, {}));
   const today = jstDateKey();
   const nowIso = new Date().toISOString();
+
+  // J-Quants(EOD)の価格を、判定対象銘柄だけYahooの遅延価格(約20分)で上書きして鮮度を補う。
+  // これにより利確/損切・買い目標到達を場中に（最大 実行間隔+20分 の遅れで）検知できる。
+  if (process.env.OBS_INTRADAY_PRICES !== "0") {
+    obs.intradayPrices = { ...(await refreshPricesFromYahoo(priceMap, obs)), fetchedAt: nowIso };
+  }
+
   const summary = { settled: 0, hits: { standard: 0, relax: 0 } };
   // この実行で新たに買い目標到達した銘柄を集約（code -> 全方式の結果）。実行末に1銘柄=1通でLINE通知。
   const buyEvents = {};
