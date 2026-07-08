@@ -2820,6 +2820,27 @@ function renderBuyTargetObservations() {
     };
     const s = vc('standard');
     const r = vc('relax');
+    // 判定に使っている価格ソース（サーバー側 intradayPrices）: 立花証券リアルタイム / Yahoo遅延 / J-Quants EODのみ
+    const ip = obs.intradayPrices;
+    let priceSrcLine = '';
+    if (ip) {
+      let atText = '';
+      if (ip.latestQuoteAt) {
+        const at = new Date(ip.latestQuoteAt);
+        atText = !isNaN(at)
+          ? `・最新気配 ${at.toLocaleString('ja-JP', { hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+          : `・最新気配 ${ip.latestQuoteAt}`;
+      }
+      let label;
+      if (ip.source === 'tachibana-realtime') {
+        label = `🟢 価格: 立花証券リアルタイム（${ip.refreshed}/${ip.total}件${atText}）`;
+      } else if (ip.source === 'yahoo-delayed' && ip.refreshed > 0) {
+        label = `🟡 価格: Yahoo遅延 約20分（${ip.refreshed}/${ip.total}件${atText}）`;
+      } else {
+        label = '⚪ 価格: J-Quants 日足のみ（当日終値は18時台反映・場中の到達検知なし）';
+      }
+      priceSrcLine = `<span class="mode-stat price-source" title="利確/損切・買い目標到達の判定に使っている株価の鮮度。サーバー実行（約20分毎）のたびに更新される">${label}</span>`;
+    }
     // 地合いは参考表示のみ（2026-07-02のバックテスト結果を受けてエントリー停止フィルタは撤去済み）
     const guard = obs.entryGuard;
     let guardLine = '';
@@ -2836,6 +2857,7 @@ function renderBuyTargetObservations() {
       rankLine = `<span class="mode-stat ranking" title="実戦で絞る場合の優先順位。損益率で自動更新${cr.basis === 'structural' ? '（現在は成績差が無いため初期優先度: 標準>ゆるめ・100万固定>1単元）' : ''}。LINE通知にも同じ順位を表示">🏅 実戦候補順位: ${body}</span>`;
     }
     g.innerHTML = `
+      ${priceSrcLine}
       ${guardLine}
       ${rankLine}
       <span class="mode-stat standard" title="観測ベース(全方式合算) 利確${sTp}回/損切${sSl}回"><strong>標準モード</strong> 100万固定 利確${s.fxTp}/損切${s.fxSl} ｜ 1単元 利確${s.unTp}/損切${s.unSl} ｜ リスク均等 利確${s.rkTp}/損切${s.rkSl}</span>

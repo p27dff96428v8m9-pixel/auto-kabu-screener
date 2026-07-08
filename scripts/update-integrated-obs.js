@@ -569,8 +569,12 @@ async function main() {
 
   // J-Quants(EOD)の価格を、判定対象銘柄だけ場中価格ソース（既定Yahoo遅延約20分/切替で立花証券リアルタイム）
   // で上書きして鮮度を補う。これにより利確/損切・買い目標到達を場中に検知できる。
+  // 使ったソースは intradayPrices として公開し、観測スペースに「価格ソース」バッジで表示される。
+  // off や全件取得失敗のときも状態を上書きし、前回実行の古い表示が残らないようにする。
   const intraday = await refreshJudgePrices(priceMap, obs);
-  if (intraday) obs.intradayPrices = { ...intraday, fetchedAt: nowIso };
+  obs.intradayPrices = intraday
+    ? { ...intraday, fetchedAt: nowIso }
+    : { source: "eod-only", refreshed: 0, total: 0, latestQuoteAt: null, fetchedAt: nowIso };
 
   const summary = { settled: 0, hits: { standard: 0, relax: 0 } };
   // この実行で新たに買い目標到達した銘柄を集約（code -> 全方式の結果）。実行末に1銘柄=1通でLINE通知。
