@@ -49,6 +49,10 @@ const RELAX_FACTOR = 1.02;
 const RELAX_REF_CAP = 0.999; // ゆるめしきい値の上限: 目標設定時の基準価格 × 0.999
 const TARGET_LIMIT = 15; // 標準表示10件 + ゆるめ表示15件をカバー
 const CLOSED_LIMIT = 80;
+// 保有期限（暦日）。バックテスト(backtest-strategy.js)は90営業日で強制決済して較正しているのに
+// ライブは無期限で、ATRベースの遠い利確(+20%超もある)が塩漬けを生んでいた。90営業日≒126暦日で
+// 時間切れ手仕舞い(exitType="timeout")し、tp/slとは別に集計する（勝率の分母には入れない＝バックテストと同じ扱い）。
+const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 
 // 仮想資金シミュレーション: 観測スペースへの追加を「購入」とみなし、利確/損切で資金を増減させる。
 // 3種類の購入ルールを並行運用して比較できるようにする:
@@ -71,19 +75,22 @@ const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
 const BUY_CATEGORIES = new Set(["統合買い候補", "確認候補"]);
 
-// 実戦候補の初期優先度（2026-07-02の検討結果）。成績（損益率）に差が付くまでの同率時の並び順:
-//   標準 > ゆるめ … 標準は深い押し目(基準価格-0.5〜3%)エントリーでRR約2:1と構造的に有利。
-//                    ゆるめは浅い押し目(-0.1%〜)で早く入る分、同じ利確/損切価格に対しRRが悪い
+// 実戦候補の初期優先度。成績（損益率）に差が付くまでの同率時の並び順:
+//   ゆるめ > 標準 (2026-07-09入替) … 当初は「標準は深い押し目でRR有利」の理屈で標準を上位にしていたが、
+//     5年バックテストで ゆるめ5078件 勝率53.4% 合計+7673pt vs 標準4271件 勝率43.3% 合計+6978pt と
+//     ゆるめが勝率+10pt・総益でも優位、ライブ観測でも ゆるめ70% vs 標準40% と同方向だったため入替。
+//     深い押し目待ちは「悪材料で下げた銘柄だけ約定する」逆選択が起きているとみられる
+//     （平均損益/件のみ標準+1.63% vs ゆるめ+1.51%で僅差逆転＝深押しの生存者は伸びるが勝率が低い）。
 //   100万固定 > 1単元 … 全銘柄同額＝戦略の期待値がそのまま資金曲線に出る。1単元は株価で重みが偏る
 // 損益率に差が出た後は評価額ベースで自動的に順位が入れ替わる（candidateRanking）。
-// リスク均等（risk）は2026-07-03追加の新参で実績ゼロのため、既存4バケットの後ろ（第5・6候補）から開始する。
+// リスク均等（risk）は2026-07-03追加の新参で実績が浅いため、既存4バケットの後ろ（第5・6候補）から開始する。
 const STRUCTURAL_PRIORITY = [
-  { mode: "standard", variant: "fixed" },
-  { mode: "standard", variant: "unit" },
   { mode: "relax", variant: "fixed" },
   { mode: "relax", variant: "unit" },
-  { mode: "standard", variant: "risk" },
-  { mode: "relax", variant: "risk" }
+  { mode: "standard", variant: "fixed" },
+  { mode: "standard", variant: "unit" },
+  { mode: "relax", variant: "risk" },
+  { mode: "standard", variant: "risk" }
 ];
 
 // LINE通知（買い目標到達＝仮想購入時、および利確/損切＝決済時）。標準/ゆるめ × 方式（100万固定/1単元/リスク均等）の
@@ -134,10 +141,10 @@ function isIndexLinkedType(type = "", name = "") {
 
 function makeEmptyCounts() {
   return {
-    "統合買い候補": { tp: 0, sl: 0 },
-    "監視継続": { tp: 0, sl: 0 },
-    "確認候補": { tp: 0, sl: 0 },
-    "見送り": { tp: 0, sl: 0 }
+    "統合買い候補": { tp: 0, sl: 0, timeout: 0 },
+    "監視継続": { tp: 0, sl: 0, timeout: 0 },
+    "確認候補": { tp: 0, sl: 0, timeout: 0 },
+    "見送り": { tp: 0, sl: 0, timeout: 0 }
   };
 }
 
@@ -174,7 +181,8 @@ function normalizeObs(obs) {
     if (!Array.isArray(d.closed)) d.closed = [];
     if (!d.counts || typeof d.counts !== "object") d.counts = makeEmptyCounts();
     for (const cat of Object.keys(makeEmptyCounts())) {
-      if (!d.counts[cat] || typeof d.counts[cat] !== "object") d.counts[cat] = { tp: 0, sl: 0 };
+      if (!d.counts[cat] || typeof d.counts[cat] !== "object") d.counts[cat] = { tp: 0, sl: 0, timeout: 0 };
+      if (!Number.isFinite(Number(d.counts[cat].timeout))) d.counts[cat].timeout = 0;
     }
   }
   if (!obs.targets || typeof obs.targets !== "object") obs.targets = {};
@@ -199,6 +207,7 @@ function normalizeObs(obs) {
       if (!Number.isFinite(Number(p.realizedPnl))) p.realizedPnl = 0;
       if (!Number.isFinite(Number(p.tpCount))) p.tpCount = 0;
       if (!Number.isFinite(Number(p.slCount))) p.slCount = 0;
+      if (!Number.isFinite(Number(p.timeoutCount))) p.timeoutCount = 0;
     }
     obs.portfolio[key] = m;
   }
@@ -482,9 +491,10 @@ function settlePosition(pf, item, exitType, exitPrice, nowIso) {
   const pnl = proceeds - Number(pos.investedAmount);
   pf.cash = Math.round(Number(pf.cash) + proceeds);
   pf.realizedPnl = Math.round(Number(pf.realizedPnl) + pnl);
-  // 方式（100万固定/1単元/リスク均等）ごとの利確/損切回数を別々に集計する（観測スペースで分けて表示するため）。
+  // 方式（100万固定/1単元/リスク均等）ごとの利確/損切/時間切れ回数を別々に集計する（観測スペースで分けて表示するため）。
   if (exitType === "tp") pf.tpCount = (Number(pf.tpCount) || 0) + 1;
   else if (exitType === "sl") pf.slCount = (Number(pf.slCount) || 0) + 1;
+  else if (exitType === "timeout") pf.timeoutCount = (Number(pf.timeoutCount) || 0) + 1;
   const record = {
     code: item.code,
     name: item.name || item.code,
@@ -511,15 +521,19 @@ function settlePosition(pf, item, exitType, exitPrice, nowIso) {
 function buildSettleMessage(ev, rankMap) {
   const yen = (n) => `${Math.round(n).toLocaleString()}円`;
   const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
-  const emoji = ev.exitType === "tp" ? "✅" : "⚠️";
-  const title = ev.exitType === "tp" ? "利確ライン到達" : "損切ライン到達";
+  const emoji = ev.exitType === "tp" ? "✅" : ev.exitType === "timeout" ? "⏱️" : "⚠️";
+  const title = ev.exitType === "tp" ? "利確ライン到達"
+    : ev.exitType === "timeout" ? `保有期限(${HOLD_LIMIT_DAYS}日)到達・手仕舞い`
+    : "損切ライン到達";
   const lines = [
     `${emoji}${MODE_EMOJI[ev.mode] || ""}【${modeLabel}モード】${title}（仮想売買）`,
     `${ev.name} (${ev.code})`,
     `区分: ${ev.category || "—"}`,
     ev.exitType === "tp"
       ? `現在値 ${yen(ev.exitPrice)} ≥ 利確 ${ev.tp != null ? yen(ev.tp) : "—"}`
-      : `現在値 ${yen(ev.exitPrice)} ≤ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`,
+      : ev.exitType === "timeout"
+        ? `現在値 ${yen(ev.exitPrice)}（利確/損切に未到達のまま期限超過）`
+        : `現在値 ${yen(ev.exitPrice)} ≤ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`,
     "──────────"
   ];
   for (const e of ev.entries) {
@@ -529,7 +543,9 @@ function buildSettleMessage(ev, rankMap) {
     lines.push(`${variant}: ${sign}${yen(e.pnl)} (${sign}${e.pnlPct}%) 取得${yen(e.entryPrice)}→決済${yen(e.exitPrice)}`);
   }
   lines.push("──────────");
-  lines.push(ev.exitType === "tp" ? "実弾保有中なら利益確定の検討を。" : "実弾保有中なら迷わず損切りを。");
+  lines.push(ev.exitType === "tp" ? "実弾保有中なら利益確定の検討を。"
+    : ev.exitType === "timeout" ? "実弾保有中なら資金回転のため手仕舞いの検討を。"
+    : "実弾保有中なら迷わず損切りを。");
   lines.push(`詳細: ${PAGE_URL}`);
   return lines.join("\n");
 }
@@ -629,6 +645,10 @@ async function main() {
       if (Number.isFinite(curPrice)) {
         if (item.tp != null && curPrice >= Number(item.tp)) resolved = "tp";
         else if (item.sl != null && curPrice <= Number(item.sl)) resolved = "sl";
+        else if (item.hitAt && Date.now() - Date.parse(item.hitAt) > HOLD_LIMIT_DAYS * 86400000) {
+          // 保有期限超過＝時間切れ手仕舞い（バックテストの90営業日強制決済と整合させる）
+          resolved = "timeout";
+        }
       }
       if (resolved) {
         const cat = getCategoryLabel(item.signal);
@@ -786,9 +806,13 @@ async function main() {
     }
   }
 
-  // 5) 実戦候補の優先順位: 4バケットを損益率でランク付けし、同率は STRUCTURAL_PRIORITY 順。
+  // 5) 実戦候補の優先順位: 6バケットを損益率でランク付けし、同率は STRUCTURAL_PRIORITY 順。
   //    どの通知・方式を実弾に使うか絞るための表示用（観測スペースのバッジ / LINE通知に反映）。
-  const rankedCandidates = STRUCTURAL_PRIORITY.map((c, idx) => {
+  //    決済実績が MIN_DECIDED_FOR_EQUITY 件貯まるまでは、含み損益の日次ノイズで順位が
+  //    入れ替わるのを防ぐため初期優先度(structural)のまま並べる（資金リセット直後の decided=1 で
+  //    第1候補が日替わりしていた実例への対策）。
+  const MIN_DECIDED_FOR_EQUITY = 10; // 6バケット合計の利確+損切件数
+  const candidates = STRUCTURAL_PRIORITY.map((c, idx) => {
     const pf = obs.portfolio[c.mode][c.variant];
     const initial = Number(pf.initialCapital) || INITIAL_CAPITAL;
     return {
@@ -799,11 +823,18 @@ async function main() {
       decided: (Number(pf.tpCount) || 0) + (Number(pf.slCount) || 0),
       structuralOrder: idx
     };
-  }).sort((a, b) => (b.pnlPct - a.pnlPct) || (a.structuralOrder - b.structuralOrder));
-  const pcts = rankedCandidates.map((c) => c.pnlPct);
+  });
+  const totalDecided = candidates.reduce((sum, c) => sum + c.decided, 0);
+  const pcts = candidates.map((c) => c.pnlPct);
+  const useEquity = totalDecided >= MIN_DECIDED_FOR_EQUITY && Math.max(...pcts) !== Math.min(...pcts);
+  const rankedCandidates = [...candidates].sort(useEquity
+    ? (a, b) => (b.pnlPct - a.pnlPct) || (a.structuralOrder - b.structuralOrder)
+    : (a, b) => a.structuralOrder - b.structuralOrder);
   obs.candidateRanking = {
-    // basis: structural=まだ成績差が無く初期優先度で並んでいる / equity=損益率の実績で並んでいる
-    basis: Math.max(...pcts) === Math.min(...pcts) ? "structural" : "equity",
+    // basis: structural=決済実績不足or成績差なしで初期優先度で並んでいる / equity=損益率の実績で並んでいる
+    basis: useEquity ? "equity" : "structural",
+    totalDecided,
+    minDecidedForEquity: MIN_DECIDED_FOR_EQUITY,
     rankedAt: nowIso,
     items: rankedCandidates.map((c, i) => ({ rank: i + 1, ...c }))
   };

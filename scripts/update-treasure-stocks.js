@@ -694,9 +694,12 @@ function signalFor(stock) {
   const rsi = num(stock.technical?.rsi, NaN);
   const overbought = Number.isFinite(rsi) && rsi > 65;
   const indexLinked = isIndexLinkedType(stock.type, stock.name);
+  // 統合買い候補の門番から winRate>=65 を撤去(2026-07-09)。予測winRateは trendOk/pullbackOk が
+  // 揃うと自動的に65以上になる冗長条件で、バックテストA/B(4271件)で有無の成績差が完全にゼロだった
+  // （較正表でも予測帯と実勝率は無相関＝2026-07-08監査）。実際に選別しているのは
+  // score/checks/chart.ok/RSI過熱の各条件。確認候補側の winRate>=58 は未検証のため現状維持。
   if (
     stock.score >= 78 &&
-    stock.winRate >= 65 &&
     checks.passed >= 3 &&
     checks.chart?.ok &&
     !overbought &&

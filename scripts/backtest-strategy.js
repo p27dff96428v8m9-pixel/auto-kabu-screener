@@ -242,8 +242,23 @@ function tierOf(technical, plan) {
   return "tierC(その他)";
 }
 
+// winRate退役の検証用: 現行tierAから winRate>=65 の条件だけを外した代替ゲート。
+// 較正表でwinRateスコアに予測力が無いと判明した(2026-07-08監査)ため、外しても成績が落ちないかをA/Bで測る。
+function altGateOf(technical) {
+  const overbought = technical.rsi != null && technical.rsi > 65;
+  return technical.trendOk && technical.pullbackOk && !overbought;
+}
+
+// ゆるめモードのしきい値（update-integrated-obs.js の到達判定と同一）:
+//   min(買い目標×1.02, 目標設定時の基準価格×0.999)
+// 基準価格 = 目標固定時のEOD終値 = 前日終値。
+const RELAX_FACTOR = 1.02;
+const RELAX_REF_CAP = 0.999;
+
 // ---- バックテスト本体 ----
-function simulate(codeBars, regimeByDate, { useRegimeFilter }) {
+// mode: "standard"=買い目標そのものに到達で約定 / "relax"=ゆるめしきい値で約定（本番のゆるめモード再現）。
+// どちらも利確/損切は買い目標基準の同じ tp/sl（本番と同じ＝ゆるめは浅い押し目で入る分、エントリー比のRRが悪くなる）。
+function simulate(codeBars, regimeByDate, { useRegimeFilter, mode = "standard" }) {
   const trades = [];
   for (const [code, bars] of Object.entries(codeBars)) {
     if (code === "1306" || code === "1321") continue; // 指数連動は地合い判定専用
@@ -261,9 +276,14 @@ function simulate(codeBars, regimeByDate, { useRegimeFilter }) {
         if (regime !== true) continue; // 25日線割れ・不明の日は新規エントリーなし
       }
       const day = bars[t];
-      if (!Number.isFinite(day.low) || day.low > plan.buy) continue; // 買い目標に未到達
+      let threshold = plan.buy;
+      if (mode === "relax") {
+        const refClose = bars[t - 1].close; // 目標設定時の基準価格（前日終値）
+        threshold = Math.min(plan.buy * RELAX_FACTOR, refClose * RELAX_REF_CAP);
+      }
+      if (!Number.isFinite(day.low) || day.low > threshold) continue; // しきい値に未到達
 
-      const entry = Math.min(Number.isFinite(day.open) ? day.open : plan.buy, plan.buy);
+      const entry = Math.min(Number.isFinite(day.open) ? day.open : threshold, threshold);
       let exit = null;
       let result = null;
       let exitIndex = t;
@@ -297,7 +317,8 @@ function simulate(codeBars, regimeByDate, { useRegimeFilter }) {
         pnlPct: Number(pnlPct.toFixed(2)),
         winRate: plan.winRate,
         rr: plan.rr,
-        tier: tierOf(technical, plan)
+        tier: tierOf(technical, plan),
+        altGate: altGateOf(technical)
       });
       openUntil = exitIndex;
     }
@@ -553,6 +574,8 @@ async function main() {
 
   const withFilter = simulate(codeBars, regimeByDate, { useRegimeFilter: true });
   const withoutFilter = simulate(codeBars, regimeByDate, { useRegimeFilter: false });
+  // ゆるめモード再現（本番同等＝地合いフィルタOFF）。標準との構造優劣を過去5年で直接比較する。
+  const relaxTrades = simulate(codeBars, regimeByDate, { useRegimeFilter: false, mode: "relax" });
 
   // 予測winRate→実勝率の較正表（update-treasure-stocks.js が winRateCalibrated の算出に使う）。
   // サンプルが少ない帯は全体実勝率へ寄せる（重み n/(n+50)）。実勝率は本番運用と同じ
@@ -585,7 +608,15 @@ async function main() {
       to: usable[0]?.[1].slice(-1)[0]?.date || null
     },
     regimeFilterOn: aggregate(withFilter),
-    regimeFilterOff: aggregate(withoutFilter)
+    regimeFilterOff: aggregate(withoutFilter),
+    // ゆるめモード（min(買い目標×1.02, 前日終値×0.999) 到達で約定・tp/slは標準と同一）の本番同等再現
+    relaxMode: aggregate(relaxTrades),
+    // winRate退役の検証: 現行tierA(winRate>=65込み) vs 代替ゲート(trendOk+pullbackOk+RSI≤65のみ)
+    gateComparison: {
+      note: "標準モード・地合いフィルタOFFの取引を対象。currentGate=現行tierA / altGate=winRate条件を外した版",
+      currentGate: aggregate(withoutFilter.filter((tr) => tr.tier === "tierA(買い候補相当)")),
+      altGate: aggregate(withoutFilter.filter((tr) => tr.altGate))
+    }
   };
   result.calibration = {
     basis: `backtest ${SLTP_MODE} / 地合いフィルタOFF(本番同等) / ${result.regimeFilterOff.overall.trades}件`,
@@ -596,12 +627,21 @@ async function main() {
   // コミット用はサマリー＋較正表のみ（軽量）。全トレード明細は分析用にローカルキャッシュへ。
   fs.writeFileSync(outputPath, JSON.stringify(result, null, 1));
   fs.writeFileSync(path.join(cacheDir, "backtest-trades.json"), JSON.stringify({ ranAt: result.ranAt, sltpMode: SLTP_MODE, trades: withFilter }, null, 1));
+  fs.writeFileSync(path.join(cacheDir, "backtest-trades-relax.json"), JSON.stringify({ ranAt: result.ranAt, sltpMode: SLTP_MODE, mode: "relax", trades: relaxTrades }, null, 1));
 
   const o = result.regimeFilterOn.overall;
   const off = result.regimeFilterOff.overall;
+  const rx = result.relaxMode.overall;
+  const gc = result.gateComparison;
   console.log("\n===== バックテスト結果 (SLTP_MODE=" + SLTP_MODE + ") =====");
   console.log(`地合いフィルタON : ${o.trades}件 勝率${o.winPct}% (利確${o.tp}/損切${o.sl}/時間切れ${o.timeout}) 平均損益${o.avgPnlPct}% 平均保有${o.avgHoldSessions}営業日`);
   console.log(`地合いフィルタOFF: ${off.trades}件 勝率${off.winPct}% (利確${off.tp}/損切${off.sl}/時間切れ${off.timeout}) 平均損益${off.avgPnlPct}%`);
+  console.log("\n-- 標準 vs ゆるめ（本番同等・フィルタOFF） --");
+  console.log(`標準  : ${off.trades}件 勝率${off.winPct}% 平均損益${off.avgPnlPct}% 合計${off.totalPnlPct}pt 平均保有${off.avgHoldSessions}営業日`);
+  console.log(`ゆるめ: ${rx.trades}件 勝率${rx.winPct}% 平均損益${rx.avgPnlPct}% 合計${rx.totalPnlPct}pt 平均保有${rx.avgHoldSessions}営業日`);
+  console.log("\n-- winRate門番のA/B（標準・フィルタOFF） --");
+  console.log(`現行tierA(winRate>=65込み): ${gc.currentGate.overall.trades}件 勝率${gc.currentGate.overall.winPct}% 平均損益${gc.currentGate.overall.avgPnlPct}%`);
+  console.log(`代替ゲート(winRate条件なし): ${gc.altGate.overall.trades}件 勝率${gc.altGate.overall.winPct}% 平均損益${gc.altGate.overall.avgPnlPct}%`);
   console.log("\n-- 予測winRate帯ごとの実績 (フィルタON) --");
   for (const [bucket, agg] of Object.entries(result.regimeFilterOn.byWinRateBucket).sort()) {
     console.log(`winRate ${bucket}: ${agg.trades}件 実勝率${agg.winPct}% 平均損益${agg.avgPnlPct}%`);

@@ -2923,10 +2923,11 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     // サマリー：利確/損切件数 + 履歴総数 + リセットボタン
     // 観測ベースの件数（fixed/unit合算）はツールチップに残しつつ、表示は方式別に分ける
     // （同じ到達でも資金不足で1単元だけトレード不成立になり得るため）。
-    let cTp = 0, cSl = 0;
+    let cTp = 0, cSl = 0, cTo = 0;
     for (const it of closed) {
       if (it.exitType === 'tp') cTp++;
       else if (it.exitType === 'sl') cSl++;
+      else if (it.exitType === 'timeout') cTo++;
     }
     const totalClosed = closed.length;
     if (sumEl) {
@@ -2939,11 +2940,13 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
       const unSl = Number(un.slCount) || 0;
       const rkTp = Number(rk.tpCount) || 0;
       const rkSl = Number(rk.slCount) || 0;
+      // 時間切れ手仕舞い(保有期限126日到達)は勝率の分母に入れず件数だけ添える
+      const toNote = cTo > 0 ? ` ｜ 期限手仕舞い${cTo}件` : '';
       const closedResetHtml = isLocalDevHost()
         ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
         : '';
       sumEl.innerHTML = `
-        <span class="obs-total" title="観測ベース(全方式合算) 利確${cTp}件 / 損切${cSl}件">100万固定 利確${fxTp}/損切${fxSl} ｜ 1単元 利確${unTp}/損切${unSl} ｜ リスク均等 利確${rkTp}/損切${rkSl}（履歴${totalClosed}件）</span>
+        <span class="obs-total" title="観測ベース(全方式合算) 利確${cTp}件 / 損切${cSl}件 / 期限手仕舞い${cTo}件">100万固定 利確${fxTp}/損切${fxSl} ｜ 1単元 利確${unTp}/損切${unSl} ｜ リスク均等 利確${rkTp}/損切${rkSl}（履歴${totalClosed}件）${toNote}</span>
         ${closedResetHtml}
       `;
     }
@@ -2962,7 +2965,8 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
 
     listEl.innerHTML = sorted.map((item) => {
       const isTp = item.exitType === 'tp';
-      const exitLabel = isTp ? '利確' : '損切';
+      const isTimeout = item.exitType === 'timeout';
+      const exitLabel = isTp ? '利確' : isTimeout ? '期限手仕舞い' : '損切';
       const exitCls = isTp ? 'tp' : 'sl';
       const exitD = item.exitAt ? new Date(item.exitAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '-';
       const hitD = item.hitAt ? new Date(item.hitAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '-';
