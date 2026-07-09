@@ -53,43 +53,50 @@ function costOf(variant, trade) {
 }
 
 // 1バケットの5年運用を再現。月末ごとの実現損益スナップショットと決済数を返す。
+// 日付ごとに 決済(前日以前の建玉)→購入→決済(当日建て・当日決済ぶん) の順で処理する。
+// 単純な「決済イベント→購入イベント」の時系列処理だと、エントリー当日に損切した取引が
+// 「決済イベントが購入より先に流れて空振り→永久保有」になり資金が漏れるため。
 function simulateBucket(trades, variant) {
-  const events = [];
+  const byEntryDate = new Map();
   for (const t of trades) {
-    events.push({ date: t.entryDate, kind: "entry", t });
-    events.push({ date: t.exitDate, kind: "exit", t });
+    if (!byEntryDate.has(t.entryDate)) byEntryDate.set(t.entryDate, []);
+    byEntryDate.get(t.entryDate).push(t);
   }
-  // 同日の決済→購入の順（ライブと同じく資金回転を許す）
-  events.sort((a, b) => a.date.localeCompare(b.date) || (a.kind === "exit" ? -1 : 1));
+  const dates = [...new Set(trades.flatMap((t) => [t.entryDate, t.exitDate]))].sort();
 
   let cash = INITIAL;
   let realized = 0;
   let tp = 0;
   let sl = 0;
   let skipped = 0;
-  const held = new Map(); // trade -> cost
+  let held = []; // { t, cost }
   const monthly = new Map(); // "YYYY-MM" -> { realizedPnl, decided }
-  for (const ev of events) {
-    if (ev.kind === "exit") {
-      const cost = held.get(ev.t);
-      if (cost == null) continue;
-      held.delete(ev.t);
-      const proceeds = cost * (1 + ev.t.pnlPct / 100);
+  const settle = (date) => {
+    const remain = [];
+    for (const pos of held) {
+      if (pos.t.exitDate > date) { remain.push(pos); continue; }
+      const proceeds = pos.cost * (1 + pos.t.pnlPct / 100);
       cash += proceeds;
-      realized += proceeds - cost;
-      if (ev.t.result === "tp") tp += 1;
-      else if (ev.t.result === "sl") sl += 1;
-    } else {
-      const cost = costOf(variant, ev.t);
+      realized += proceeds - pos.cost;
+      if (pos.t.result === "tp") tp += 1;
+      else if (pos.t.result === "sl") sl += 1;
+    }
+    held = remain;
+  };
+  for (const date of dates) {
+    settle(date);
+    for (const t of byEntryDate.get(date) || []) {
+      const cost = costOf(variant, t);
       if (cost == null) { skipped += 1; continue; }
       if (cash >= cost) {
         cash -= cost;
-        held.set(ev.t, cost);
+        held.push({ t, cost });
       } else {
         skipped += 1;
       }
     }
-    monthly.set(ev.date.slice(0, 7), { realizedPnl: realized, decided: tp + sl });
+    settle(date); // 当日建て・当日決済（エントリー日の損切/利確）ぶん
+    monthly.set(date.slice(0, 7), { realizedPnl: realized, decided: tp + sl });
   }
   return { monthly, realized, decided: tp + sl, tp, sl, skipped };
 }
