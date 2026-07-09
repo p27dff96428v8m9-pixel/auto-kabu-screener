@@ -398,12 +398,50 @@ function financialBaseUrl(auth) {
     : JQUANTS_PRO_BASE_URL;
 }
 
+// v2(fins/summary)の行をv1(fins/statements)のフィールド名へ変換する（2026-07-10）。
+// v1 APIは廃止(HTTP 410)、v2ではエンドポイント名(statements→summary)と全項目名が短縮された。
+// 下流の normalizeFinancialStatement / summarizeFinancialStatements はv1名を前提に書かれているため、
+// ここで変換して下流を無変更で生かす。v1形式の行(DisclosedDateあり)はそのまま通す。
+function adaptV2SummaryRow(row) {
+  if (!row || row.DiscDate == null) return row;
+  return {
+    DisclosedDate: row.DiscDate,
+    DisclosedTime: row.DiscTime,
+    DisclosureNumber: row.DiscNo,
+    LocalCode: row.Code,
+    TypeOfDocument: row.DocType,
+    TypeOfCurrentPeriod: row.CurPerType,
+    CurrentFiscalYearEndDate: row.CurFYEn,
+    CurrentPeriodEndDate: row.CurPerEn,
+    NetSales: row.Sales,
+    OperatingProfit: row.OP,
+    OrdinaryProfit: row.OdP,
+    Profit: row.NP,
+    EarningsPerShare: row.EPS,
+    ForecastNetSales: row.FSales,
+    ForecastOperatingProfit: row.FOP,
+    ForecastProfit: row.FNP,
+    ForecastEarningsPerShare: row.FEPS,
+    NonConsolidatedNetSales: row.NCSales,
+    NonConsolidatedOperatingProfit: row.NCOP,
+    NonConsolidatedOrdinaryProfit: row.NCOdP,
+    NonConsolidatedProfit: row.NCNP,
+    NonConsolidatedEarningsPerShare: row.NCEPS,
+    ForecastNonConsolidatedNetSales: row.FNCSales,
+    ForecastNonConsolidatedOperatingProfit: row.FNCOP,
+    ForecastNonConsolidatedOrdinaryProfit: row.FNCOdP,
+    ForecastNonConsolidatedProfit: row.FNCNP,
+    ForecastNonConsolidatedEarningsPerShare: row.FNCEPS
+  };
+}
+
 async function fetchFinancialStatements(code, auth) {
-  const url = `${financialBaseUrl(auth)}/fins/statements?code=${encodeURIComponent(normalizeJQuantsCode(code))}`;
+  // v2は fins/summary（fins/statements は「存在しないエンドポイント」の403になる）
+  const url = `${financialBaseUrl(auth)}/fins/summary?code=${encodeURIComponent(normalizeJQuantsCode(code))}`;
   const data = await fetchJson(url, {
     headers: financialAccessHeaders(auth)
   });
-  return data.statements || data.data || [];
+  return (data.data || data.statements || []).map(adaptV2SummaryRow);
 }
 
 function numericFinancial(value) {

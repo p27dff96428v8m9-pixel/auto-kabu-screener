@@ -48,11 +48,12 @@ async function fetchDisclosureDates(codes) {
   for (const code of codes) {
     const norm = /^\d{4}$/.test(code) ? `${code}0` : code;
     try {
-      const res = await fetch(`${JQUANTS_V2_BASE_URL}/fins/statements?code=${norm}`, { headers: { "x-api-key": apiKey } });
+      // v2では fins/statements → fins/summary に改名され、開示日は DiscDate（2026-07判明）
+      const res = await fetch(`${JQUANTS_V2_BASE_URL}/fins/summary?code=${norm}`, { headers: { "x-api-key": apiKey } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const rows = data.statements || data.data || [];
-      dates[code] = [...new Set(rows.map((r) => String(r.DisclosedDate || r.disclosedDate || "").slice(0, 10)).filter(Boolean))].sort();
+      const rows = data.data || data.statements || [];
+      dates[code] = [...new Set(rows.map((r) => String(r.DiscDate || r.DisclosedDate || "").slice(0, 10)).filter(Boolean))].sort();
       process.stdout.write(`${code}:${dates[code].length} `);
     } catch (e) {
       console.warn(`\n${code} 開示日取得失敗: ${e.message}`);

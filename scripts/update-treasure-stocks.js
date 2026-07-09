@@ -355,8 +355,8 @@ function marketRegime(quotes) {
     if (!sma25 || !Number.isFinite(current)) continue;
     const deviationPct = Number((((current - sma25) / sma25) * 100).toFixed(2));
     // 底値圏ブースト判定(2026-07-10): 25日線乖離≤-6% または 60日高値から-10%超の下落。
-    // 5年バックテストでこの地合いの押し目買いは勝率69.6%/平均+8.74%(通常時の約6倍)と突出しており、
-    // 該当日だけ実弾サイズを厚くする価値がある（42営業日/5年の希少シグナル）。
+    // 10年バックテスト(2016-2026)でこの地合いの押し目買いは平均+2.41%と通常日(+0.77%)の約3倍
+    // （153営業日/10年）。該当日だけ実弾サイズを厚くする価値がある希少シグナル。
     const high60 = Math.max(...last(closes, 60));
     const drawdown60Pct = high60 > 0 ? Number((((current - high60) / high60) * 100).toFixed(2)) : null;
     return {
