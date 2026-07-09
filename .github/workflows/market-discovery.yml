@@ -1,0 +1,66 @@
+name: Market universe discovery
+
+# 全市場スクリーニング（ユニバース拡大）。J-Quantsの日付指定・全銘柄日足で全上場銘柄を
+# 現行と同じ価格・出来高採点でスキャンし、発掘候補上位を market-discovery.json に出力する。
+# update-treasure-stocks.js（20分毎のワークフロー）が上位5銘柄を統合ランキングへ治験合流させる。
+# API呼び出しが約132回/実行と重いため1日1回・EOD確定後の夜に実行する。
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "40 10 * * 1-5" # 19:40 JST 平日 - J-QuantsのEOD公開(18時台)後
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Scan whole market
+        env:
+          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+          MARKET_DATA_INPUT_PATH: docs/fund-flow-ai-system/data/market-data.json
+          DISCOVERY_OUTPUT_PATH: docs/fund-flow-ai-system/data/market-discovery.json
+        run: node scripts/scan-market-universe.js
+
+      - name: Commit discovery data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          DATA_FILES="docs/fund-flow-ai-system/data/market-discovery.json"
+          git add $DATA_FILES
+
+          if git diff --cached --quiet; then
+            echo "No discovery changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Update market discovery"
+
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "Push succeeded on attempt $attempt"
+              exit 0
+            fi
+            git fetch origin main
+            git reset --mixed FETCH_HEAD
+            git add $DATA_FILES
+            if git diff --cached --quiet; then
+              echo "Remote already contains equivalent data"
+              exit 0
+            fi
+            git commit -m "Update market discovery"
+            sleep $((attempt * 3))
+          done
+          echo "All push attempts failed"
+          exit 1

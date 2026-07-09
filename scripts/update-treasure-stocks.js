@@ -790,6 +790,44 @@ function buildStock(ticker, instrument, quote, financial = null, marketData = nu
   return stock;
 }
 
+// 全市場発掘（scan-market-universe.js）の上位数銘柄を治験枠としてユニバースに合流させる。
+// 発掘銘柄は業績/材料ラベルを持たないため、既存の未知銘柄と同じ既定値でエントリーし、
+// あとは全銘柄共通の採点・シグナル判定・観測スペースの実測に委ねる（テーマ=「全市場発掘」で識別）。
+// 鮮度48時間超・ファイル無しは黙ってスキップ（従来のユニバースだけで動作継続）。
+const DISCOVERY_MERGE_COUNT = Math.max(0, Number(process.env.DISCOVERY_MERGE_COUNT ?? 5));
+function mergeDiscoveries(quotes, instruments) {
+  if (!DISCOVERY_MERGE_COUNT) return 0;
+  const discoveryPath = process.env.DISCOVERY_INPUT_PATH
+    ? path.resolve(process.cwd(), process.env.DISCOVERY_INPUT_PATH)
+    : resolveMarketDataDefaultPath().replace(/market-data\.json$/, "market-discovery.json");
+  const discovery = readJson(discoveryPath, null);
+  if (!discovery || !Array.isArray(discovery.candidates)) return 0;
+  const ageHours = (Date.now() - Date.parse(discovery.updatedAt || 0)) / 3600000;
+  if (!Number.isFinite(ageHours) || ageHours > 48) return 0;
+  let merged = 0;
+  for (const c of discovery.candidates) {
+    if (merged >= DISCOVERY_MERGE_COUNT) break;
+    const code = String(c.code || "");
+    if (!code || quotes[code] || !c.quote) continue;
+    quotes[code] = c.quote;
+    instruments.set(code, {
+      ticker: code,
+      name: c.name || code,
+      type: "日本株",
+      strength: 62,
+      warning: "",
+      quality: "全市場発掘候補",
+      newsRisk: "未確認",
+      themeId: null,
+      themeName: `全市場発掘${c.sector ? ` / ${c.sector}` : ""}`,
+      themeIds: []
+    });
+    merged += 1;
+  }
+  if (merged) console.log(`全市場発掘から${merged}銘柄を治験合流 (${discoveryPath})`);
+  return merged;
+}
+
 function main() {
   const marketPath = process.env.MARKET_DATA_INPUT_PATH
     ? path.resolve(process.cwd(), process.env.MARKET_DATA_INPUT_PATH)
@@ -801,6 +839,7 @@ function main() {
   const quotes = marketData.instrumentQuotes || {};
   const financials = marketData.financials || {};
   const instruments = collectInstrumentMap(marketData);
+  mergeDiscoveries(quotes, instruments);
 
   const stocks = [...instruments.entries()]
     .map(([ticker, instrument]) => {
@@ -825,7 +864,7 @@ function main() {
 
   writeJson(outputPath, {
     source: "fund-flow-treasure-kabukazidou",
-    logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime)",
+    logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime); 全市場発掘(market-discovery)上位5銘柄を治験合流",
     updatedAt: new Date().toISOString(),
     marketUpdatedAt: marketData.updatedAt || null,
     marketRegime: marketRegime(quotes),
