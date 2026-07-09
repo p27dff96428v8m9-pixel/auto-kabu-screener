@@ -90,3 +90,28 @@ jobs:
             sleep $((attempt * 3))
           done
           exit 1
+
+      - name: "4. 完了をLINE通知（Light戻し忘れ防止）"
+        if: always()
+        env:
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          node -e "
+          (async () => {
+            const token = process.env.LINE_ACCESS_TOKEN;
+            const userId = process.env.LINE_USER_ID;
+            if (!token || !userId) { console.log('LINE未設定のためスキップ'); return; }
+            const ok = process.env.JOB_STATUS === 'success';
+            const text = ok
+              ? '✅年1回のデータ更新が完了しました（10年較正・信用残・空売り比率）。\n⚠️最後の仕上げ: J-QuantsのプランをLightに戻してください（忘れると翌月も3,300円かかります）\nhttps://jpx-jquants.com/'
+              : '❌年1回のデータ更新が失敗しました。GitHubのActionsログを確認してください（原因はほぼ「Standardプラン未変更」か「JQUANTS_API_KEY未更新」のどちらか）。';
+            const res = await fetch('https://api.line.me/v2/bot/message/push', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+              body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] })
+            });
+            console.log('LINE通知:', res.status);
+          })();
+          "

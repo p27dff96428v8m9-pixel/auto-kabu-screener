@@ -974,6 +974,30 @@ async function main() {
       flagsChanged = true;
     }
   }
+  // 年次データ更新のリマインド: 毎年7月上旬に1回、Standard月の手順（ANNUAL_UPDATE.md）をLINEで案内する。
+  // 初回収穫が2026-07のため2027年から。OBS_FORCE_ANNUAL=1 は手動テスト用。
+  const curYear = Number(jst.dateKey.slice(0, 4));
+  if (process.env.OBS_FORCE_ANNUAL === "1" ||
+      (jst.monthKey.endsWith("-07") && jst.dayOfMonth <= 5 && jst.hour >= 9 && curYear >= 2027 && Number(obs.annualReminderYear || 0) < curYear)) {
+    const msg = [
+      "📅年1回のデータ更新の時期です（15分・年3,300円）",
+      "10年較正・信用残・空売り比率を最新化します。",
+      "──────────",
+      "1. J-QuantsをStandardプランに変更",
+      "   https://jpx-jquants.com/",
+      "2. キーが再発行されたらGitHubのSecret",
+      "   JQUANTS_API_KEY と .env の両方を更新",
+      "3. GitHubのActionsタブ→「年1回データ更新」→Run workflow",
+      "4. 全部緑になったらLightプランに戻す（忘れると翌月も課金！）",
+      "──────────",
+      "詳しい手順: https://github.com/p27dff96428v8m9-pixel/auto-kabu-screener/blob/main/ANNUAL_UPDATE.md"
+    ].join("\n");
+    if (!lineConfigured) console.log(`[年次更新リマインド]\n${msg}`);
+    if (!lineConfigured || await sendLine(msg)) {
+      obs.annualReminderYear = curYear;
+      flagsChanged = true;
+    }
+  }
   if (process.env.OBS_FORCE_MONTHLY === "1" || (jst.dayOfMonth <= 3 && jst.hour >= 9 && obs.monthlyReportMonth !== jst.monthKey)) {
     const [y, m] = jst.monthKey.split("-").map(Number);
     const prevMonthKey = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
