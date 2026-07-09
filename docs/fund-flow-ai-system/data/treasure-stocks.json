@@ -1,20 +1,20 @@
 {
   "source": "fund-flow-treasure-kabukazidou",
   "logic": "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime)",
-  "updatedAt": "2026-07-09T06:31:50.395Z",
-  "marketUpdatedAt": "2026-07-09T06:31:02.187Z",
+  "updatedAt": "2026-07-09T08:59:26.696Z",
+  "marketUpdatedAt": "2026-07-09T08:59:01.896Z",
   "marketRegime": {
     "index": "TOPIX連動(1306)",
-    "current": 426.5,
-    "sma25": 422.68,
-    "deviationPct": 0.9,
-    "bullish": true,
-    "date": "2026-07-08"
+    "current": 419.1,
+    "sma25": 422.7,
+    "deviationPct": -0.85,
+    "bullish": false,
+    "date": "2026-07-09"
   },
   "winRateCalibration": "backtest atr / 地合いフィルタOFF(本番同等) / 4288件",
   "investorFlows": {
     "section": "TSEPrime",
-    "updatedAt": "2026-07-09T06:30:00.283Z",
+    "updatedAt": "2026-07-09T08:58:11.437Z",
     "weeks": [
       {
         "stDate": "2026-04-06",
@@ -130,103 +130,30 @@
   },
   "stocks": [
     {
-      "code": "3099",
-      "name": "三越伊勢丹ホールディングス",
-      "score": 83,
-      "flowScore": 68,
-      "treasureScore": 81,
-      "kabuScore": 88,
-      "confirmationScore": 78,
-      "themeFlowBonus": 4,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 3807,
-      "date": "2026-07-08",
-      "theme": "インバウンド",
-      "themeIds": [
-        "jp-inbound"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 3750,
-      "tp": 4210,
-      "sl": 3487,
-      "rr": 1.75,
-      "winRate": 82,
-      "winRateCalibrated": 43,
-      "checks": {
-        "score": 78,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 62,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.11,
-          "volume7d": -7.67,
-          "volume30d": 51.5
-        },
-        "chart": {
-          "score": 100,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -0.4% / RSI 46.5"
-        }
-      },
-      "changes": {
-        "7d": -7.55,
-        "30d": 16.32,
-        "90d": 25.69,
-        "volume7d": -7.67,
-        "volume30d": 51.5
-      },
-      "technical": {
-        "deviation": -0.36,
-        "rsi": 46.5,
-        "volumeRatio": 1.11,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "9432",
-      "name": "NTT",
-      "score": 80,
-      "flowScore": 69,
-      "treasureScore": 69,
+      "code": "9983",
+      "name": "ファーストリテイリング",
+      "score": 84,
+      "flowScore": 66,
+      "treasureScore": 95,
       "kabuScore": 88,
       "confirmationScore": 79,
-      "themeFlowBonus": 2,
+      "themeFlowBonus": 3,
       "overheatPenalty": 0,
       "signal": "統合買い候補",
-      "price": 149.5,
-      "date": "2026-07-08",
-      "theme": "通信",
+      "price": 85170,
+      "date": "2026-07-09",
+      "theme": "小売",
       "themeIds": [
-        "jp-telecom"
+        "jp-retail"
       ],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 147,
-      "tp": 155,
-      "sl": 142,
-      "rr": 1.6,
+      "buy": 83892,
+      "tp": 92332,
+      "sl": 79069,
+      "rr": 1.75,
       "winRate": 82,
       "winRateCalibrated": 43,
       "checks": {
@@ -245,175 +172,31 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 68,
+          "score": 66,
           "ok": true,
           "label": "出来高確認OK",
-          "ratio": 1.2,
-          "volume7d": 53.05,
-          "volume30d": 17.58
+          "ratio": 1.21,
+          "volume7d": 48.17,
+          "volume30d": -24.7
         },
         "chart": {
           "score": 100,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 2.2% / RSI 54.3"
+          "reason": "25日乖離 3.1% / RSI 56.3"
         }
       },
       "changes": {
-        "7d": 3.1,
-        "30d": -0.4,
-        "90d": -1.71,
-        "volume7d": 53.05,
-        "volume30d": 17.58
+        "7d": 2.97,
+        "30d": 3.45,
+        "90d": 23.38,
+        "volume7d": 48.17,
+        "volume30d": -24.7
       },
       "technical": {
-        "deviation": 2.17,
-        "rsi": 54.3,
-        "volumeRatio": 1.2,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "6723",
-      "name": "ルネサスエレクトロニクス",
-      "score": 77,
-      "flowScore": 68,
-      "treasureScore": 76,
-      "kabuScore": 86,
-      "confirmationScore": 77,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 4662,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 4592,
-      "tp": 5826,
-      "sl": 3887,
-      "rr": 1.75,
-      "winRate": 82,
-      "winRateCalibrated": 43,
-      "checks": {
-        "score": 77,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 58,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 1.01,
-          "volume7d": 17.03,
-          "volume30d": -21.21
-        },
-        "chart": {
-          "score": 100,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 0.3% / RSI 53.0"
-        }
-      },
-      "changes": {
-        "7d": -3.02,
-        "30d": 8.27,
-        "90d": 60.4,
-        "volume7d": 17.03,
-        "volume30d": -21.21
-      },
-      "technical": {
-        "deviation": 0.25,
-        "rsi": 53,
-        "volumeRatio": 1.01,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "7532",
-      "name": "パン・パシフィック",
-      "score": 78,
-      "flowScore": 49,
-      "treasureScore": 87,
-      "kabuScore": 84,
-      "confirmationScore": 78,
-      "themeFlowBonus": 4,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 873.2,
-      "date": "2026-07-08",
-      "theme": "小売",
-      "themeIds": [
-        "jp-retail"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 847,
-      "tp": 936,
-      "sl": 796,
-      "rr": 1.75,
-      "winRate": 82,
-      "winRateCalibrated": 43,
-      "checks": {
-        "score": 78,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 71,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.37,
-          "volume7d": 21.2,
-          "volume30d": -8.86
-        },
-        "chart": {
-          "score": 92,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 4.8% / RSI 62.5"
-        }
-      },
-      "changes": {
-        "7d": 6.1,
-        "30d": 1.71,
-        "90d": -14.18,
-        "volume7d": 21.2,
-        "volume30d": -8.86
-      },
-      "technical": {
-        "deviation": 4.8,
-        "rsi": 62.5,
-        "volumeRatio": 1.37,
+        "deviation": 3.15,
+        "rsi": 56.3,
+        "volumeRatio": 1.21,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": true
@@ -422,14 +205,14 @@
     {
       "code": "9433",
       "name": "KDDI",
-      "score": 77,
+      "score": 78,
       "flowScore": 56,
       "treasureScore": 88,
       "kabuScore": 84,
       "confirmationScore": 76,
-      "themeFlowBonus": 2,
+      "themeFlowBonus": 3,
       "overheatPenalty": 0,
-      "signal": "確認候補",
+      "signal": "統合買い候補",
       "price": 2808,
       "date": "2026-07-08",
       "theme": "通信",
@@ -493,91 +276,91 @@
       }
     },
     {
-      "code": "8035",
-      "name": "東京エレクトロン",
-      "score": 75,
-      "flowScore": 71,
-      "treasureScore": 70,
-      "kabuScore": 82,
-      "confirmationScore": 59,
+      "code": "7532",
+      "name": "パン・パシフィック",
+      "score": 77,
+      "flowScore": 49,
+      "treasureScore": 87,
+      "kabuScore": 84,
+      "confirmationScore": 78,
       "themeFlowBonus": 3,
       "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 67350,
+      "signal": "確認候補",
+      "price": 873.2,
       "date": "2026-07-08",
-      "theme": "半導体",
+      "theme": "小売",
       "themeIds": [
-        "jp-semiconductor"
+        "jp-retail"
       ],
       "type": "大型株",
-      "quality": "注意あり",
-      "newsRisk": "悪材料確認あり",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 66340,
-      "tp": 82850,
-      "sl": 56906,
+      "buy": 847,
+      "tp": 936,
+      "sl": 796,
       "rr": 1.75,
       "winRate": 82,
       "winRateCalibrated": 43,
       "checks": {
-        "score": 59,
-        "passed": 1,
+        "score": 78,
+        "passed": 4,
         "earnings": {
-          "score": 48,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "注意あり"
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
         },
         "material": {
-          "score": 28,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "悪材料確認あり"
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 53,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.89,
-          "volume7d": -17.27,
-          "volume30d": 35.91
+          "score": 71,
+          "ok": true,
+          "label": "出来高確認OK",
+          "ratio": 1.37,
+          "volume7d": 21.2,
+          "volume30d": -8.86
         },
         "chart": {
-          "score": 100,
+          "score": 92,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -4.0% / RSI 38.1"
+          "reason": "25日乖離 4.8% / RSI 62.5"
         }
       },
       "changes": {
-        "7d": -12.7,
-        "30d": 28.73,
-        "90d": 48.64,
-        "volume7d": -17.27,
-        "volume30d": 35.91
+        "7d": 6.1,
+        "30d": 1.71,
+        "90d": -14.18,
+        "volume7d": 21.2,
+        "volume30d": -8.86
       },
       "technical": {
-        "deviation": -4,
-        "rsi": 38.1,
-        "volumeRatio": 0.89,
+        "deviation": 4.8,
+        "rsi": 62.5,
+        "volumeRatio": 1.37,
         "trendOk": true,
         "pullbackOk": true,
-        "volumeOk": false
+        "volumeOk": true
       }
     },
     {
       "code": "8725",
       "name": "MS&AD",
-      "score": 77,
-      "flowScore": 49,
-      "treasureScore": 97,
+      "score": 73,
+      "flowScore": 30,
+      "treasureScore": 100,
       "kabuScore": 77,
-      "confirmationScore": 75,
-      "themeFlowBonus": 5,
+      "confirmationScore": 74,
+      "themeFlowBonus": 6,
       "overheatPenalty": 0,
       "signal": "確認候補",
-      "price": 4520,
-      "date": "2026-07-08",
+      "price": 4505,
+      "date": "2026-07-09",
       "theme": "保険",
       "themeIds": [
         "jp-insurance"
@@ -586,14 +369,14 @@
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 4452,
-      "tp": 4819,
-      "sl": 4242,
+      "buy": 4437,
+      "tp": 4801,
+      "sl": 4229,
       "rr": 1.75,
       "winRate": 82,
       "winRateCalibrated": 43,
       "checks": {
-        "score": 75,
+        "score": 74,
         "passed": 3,
         "earnings": {
           "score": 80,
@@ -608,69 +391,142 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 53,
+          "score": 49,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.91,
-          "volume7d": -16.09,
-          "volume30d": 9.11
+          "ratio": 0.89,
+          "volume7d": -25.07,
+          "volume30d": -79.48
         },
         "chart": {
           "score": 100,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 1.2% / RSI 46.3"
+          "reason": "25日乖離 0.6% / RSI 47.4"
         }
       },
       "changes": {
-        "7d": 6.6,
-        "30d": 6.48,
-        "90d": 5.39,
-        "volume7d": -16.09,
-        "volume30d": 9.11
+        "7d": 5.23,
+        "30d": 5.09,
+        "90d": 2.95,
+        "volume7d": -25.07,
+        "volume30d": -79.48
       },
       "technical": {
-        "deviation": 1.18,
-        "rsi": 46.3,
-        "volumeRatio": 0.91,
+        "deviation": 0.61,
+        "rsi": 47.4,
+        "volumeRatio": 0.89,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": false
       }
     },
     {
-      "code": "7182",
-      "name": "ゆうちょ銀行",
-      "score": 73,
-      "flowScore": 56,
-      "treasureScore": 92,
+      "code": "8035",
+      "name": "東京エレクトロン",
+      "score": 72,
+      "flowScore": 66,
+      "treasureScore": 70,
       "kabuScore": 77,
-      "confirmationScore": 75,
-      "themeFlowBonus": 0,
+      "confirmationScore": 58,
+      "themeFlowBonus": 3,
       "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 3305,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
+      "signal": "監視継続",
+      "price": 71060,
+      "date": "2026-07-09",
+      "theme": "半導体",
+      "themeIds": [
+        "jp-semiconductor"
+      ],
       "type": "大型株",
-      "quality": "安定業績候補",
-      "newsRisk": "悪材料未検出",
+      "quality": "注意あり",
+      "newsRisk": "悪材料確認あり",
       "financial": null,
-      "buy": 3206,
-      "tp": 3510,
-      "sl": 3032,
+      "buy": 69994,
+      "tp": 86632,
+      "sl": 60487,
       "rr": 1.75,
       "winRate": 82,
       "winRateCalibrated": 43,
       "checks": {
-        "score": 75,
+        "score": 58,
+        "passed": 1,
+        "earnings": {
+          "score": 48,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "注意あり"
+        },
+        "material": {
+          "score": 28,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "悪材料確認あり"
+        },
+        "volume": {
+          "score": 47,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.78,
+          "volume7d": -33.96,
+          "volume30d": 3.93
+        },
+        "chart": {
+          "score": 100,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 0.9% / RSI 44.6"
+        }
+      },
+      "changes": {
+        "7d": -9.82,
+        "30d": 35.56,
+        "90d": 61.46,
+        "volume7d": -33.96,
+        "volume30d": 3.93
+      },
+      "technical": {
+        "deviation": 0.87,
+        "rsi": 44.6,
+        "volumeRatio": 0.78,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "6723",
+      "name": "ルネサスエレクトロニクス",
+      "score": 72,
+      "flowScore": 59,
+      "treasureScore": 76,
+      "kabuScore": 77,
+      "confirmationScore": 76,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "確認候補",
+      "price": 4817,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 4745,
+      "tp": 5974,
+      "sl": 4043,
+      "rr": 1.75,
+      "winRate": 82,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 76,
         "passed": 3,
         "earnings": {
           "score": 80,
           "ok": true,
           "label": "業績良好",
-          "reason": "安定業績候補"
+          "reason": "業績良好候補"
         },
         "material": {
           "score": 64,
@@ -679,69 +535,71 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 52,
+          "score": 54,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.85,
-          "volume7d": 8.98,
-          "volume30d": -15.44
+          "ratio": 0.95,
+          "volume7d": 3.26,
+          "volume30d": -32.65
         },
         "chart": {
           "score": 100,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 4.2% / RSI 50.6"
+          "reason": "25日乖離 3.6% / RSI 52.3"
         }
       },
       "changes": {
-        "7d": 7.9,
-        "30d": 11.64,
-        "90d": 9.11,
-        "volume7d": 8.98,
-        "volume30d": -15.44
+        "7d": -5.97,
+        "30d": 7.04,
+        "90d": 62.24,
+        "volume7d": 3.26,
+        "volume30d": -32.65
       },
       "technical": {
-        "deviation": 4.18,
-        "rsi": 50.6,
-        "volumeRatio": 0.85,
+        "deviation": 3.6,
+        "rsi": 52.3,
+        "volumeRatio": 0.95,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": false
       }
     },
     {
-      "code": "8795",
-      "name": "T&Dホールディングス",
+      "code": "3099",
+      "name": "三越伊勢丹ホールディングス",
       "score": 71,
-      "flowScore": 56,
-      "treasureScore": 87,
+      "flowScore": 37,
+      "treasureScore": 81,
       "kabuScore": 77,
-      "confirmationScore": 69,
-      "themeFlowBonus": 0,
+      "confirmationScore": 74,
+      "themeFlowBonus": 5,
       "overheatPenalty": 0,
       "signal": "確認候補",
-      "price": 4934,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
+      "price": 3843,
+      "date": "2026-07-09",
+      "theme": "インバウンド",
+      "themeIds": [
+        "jp-inbound"
+      ],
       "type": "大型株",
-      "quality": "金利恩恵候補",
+      "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 4860,
-      "tp": 5372,
-      "sl": 4567,
+      "buy": 3785,
+      "tp": 4224,
+      "sl": 3534,
       "rr": 1.75,
       "winRate": 82,
       "winRateCalibrated": 43,
       "checks": {
-        "score": 69,
-        "passed": 2,
+        "score": 74,
+        "passed": 3,
         "earnings": {
-          "score": 58,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "金利恩恵候補"
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
         },
         "material": {
           "score": 64,
@@ -750,31 +608,31 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 50,
+          "score": 45,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.84,
-          "volume7d": -24.28,
-          "volume30d": 10.84
+          "ratio": 0.74,
+          "volume7d": -36.85,
+          "volume30d": -32.98
         },
         "chart": {
           "score": 100,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 3.8% / RSI 50.2"
+          "reason": "25日乖離 0.2% / RSI 48.5"
         }
       },
       "changes": {
-        "7d": 2.64,
-        "30d": 20.49,
-        "90d": 19.5,
-        "volume7d": -24.28,
-        "volume30d": 10.84
+        "7d": -3.83,
+        "30d": 13.16,
+        "90d": 24.77,
+        "volume7d": -36.85,
+        "volume30d": -32.98
       },
       "technical": {
-        "deviation": 3.75,
-        "rsi": 50.2,
-        "volumeRatio": 0.84,
+        "deviation": 0.17,
+        "rsi": 48.5,
+        "volumeRatio": 0.74,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": false
@@ -783,14 +641,14 @@
     {
       "code": "6902",
       "name": "デンソー",
-      "score": 68,
+      "score": 67,
       "flowScore": 34,
       "treasureScore": 85,
       "kabuScore": 77,
       "confirmationScore": 74,
-      "themeFlowBonus": 2,
+      "themeFlowBonus": 1,
       "overheatPenalty": 0,
-      "signal": "確認候補",
+      "signal": "監視継続",
       "price": 1945,
       "date": "2026-07-08",
       "theme": "自動車",
@@ -854,27 +712,29 @@
       }
     },
     {
-      "code": "7270",
-      "name": "SUBARU",
-      "score": 66,
-      "flowScore": 33,
-      "treasureScore": 87,
+      "code": "7013",
+      "name": "IHI",
+      "score": 67,
+      "flowScore": 26,
+      "treasureScore": 95,
       "kabuScore": 77,
       "confirmationScore": 74,
-      "themeFlowBonus": 0,
+      "themeFlowBonus": 2,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 2525,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
+      "price": 2813,
+      "date": "2026-07-09",
+      "theme": "防衛",
+      "themeIds": [
+        "jp-defense"
+      ],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 2487,
-      "tp": 2721,
-      "sl": 2353,
+      "buy": 2771,
+      "tp": 3225,
+      "sl": 2512,
       "rr": 1.75,
       "winRate": 82,
       "winRateCalibrated": 43,
@@ -894,31 +754,244 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 48,
+          "score": 46,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.79,
-          "volume7d": -12.68,
-          "volume30d": -23.52
+          "ratio": 0.73,
+          "volume7d": -9.02,
+          "volume30d": -28.97
         },
         "chart": {
           "score": 100,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 1.7% / RSI 44.9"
+          "reason": "25日乖離 3.4% / RSI 49.8"
         }
       },
       "changes": {
-        "7d": 5.65,
-        "30d": 2.41,
-        "90d": -15.01,
-        "volume7d": -12.68,
-        "volume30d": -23.52
+        "7d": 5.22,
+        "30d": 1.68,
+        "90d": -34.63,
+        "volume7d": -9.02,
+        "volume30d": -28.97
       },
       "technical": {
-        "deviation": 1.71,
-        "rsi": 44.9,
-        "volumeRatio": 0.79,
+        "deviation": 3.36,
+        "rsi": 49.8,
+        "volumeRatio": 0.73,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "8795",
+      "name": "T&Dホールディングス",
+      "score": 66,
+      "flowScore": 40,
+      "treasureScore": 87,
+      "kabuScore": 77,
+      "confirmationScore": 67,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "監視継続",
+      "price": 4947,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "金利恩恵候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 4873,
+      "tp": 5385,
+      "sl": 4581,
+      "rr": 1.75,
+      "winRate": 82,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 67,
+        "passed": 2,
+        "earnings": {
+          "score": 58,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "金利恩恵候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 39,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.64,
+          "volume7d": -41.52,
+          "volume30d": -78.64
+        },
+        "chart": {
+          "score": 100,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 3.3% / RSI 52.6"
+        }
+      },
+      "changes": {
+        "7d": 2.74,
+        "30d": 17.95,
+        "90d": 17.39,
+        "volume7d": -41.52,
+        "volume30d": -78.64
+      },
+      "technical": {
+        "deviation": 3.31,
+        "rsi": 52.6,
+        "volumeRatio": 0.64,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "9506",
+      "name": "東北電力",
+      "score": 63,
+      "flowScore": 33,
+      "treasureScore": 88,
+      "kabuScore": 77,
+      "confirmationScore": 73,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 3,
+      "signal": "監視継続",
+      "price": 1095,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "改善候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 1062,
+      "tp": 1129,
+      "sl": 1024,
+      "rr": 1.76,
+      "winRate": 82,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 73,
+        "passed": 4,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "改善候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 61,
+          "ok": true,
+          "label": "出来高確認OK",
+          "ratio": 1.16,
+          "volume7d": 18.12,
+          "volume30d": -58.74
+        },
+        "chart": {
+          "score": 84,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 4.5% / RSI 70.0"
+        }
+      },
+      "changes": {
+        "7d": 3.11,
+        "30d": 8.79,
+        "90d": -15.48,
+        "volume7d": 18.12,
+        "volume30d": -58.74
+      },
+      "technical": {
+        "deviation": 4.55,
+        "rsi": 70,
+        "volumeRatio": 1.16,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": true
+      }
+    },
+    {
+      "code": "7270",
+      "name": "SUBARU",
+      "score": 63,
+      "flowScore": 22,
+      "treasureScore": 87,
+      "kabuScore": 77,
+      "confirmationScore": 73,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "監視継続",
+      "price": 2488.5,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 2451,
+      "tp": 2663,
+      "sl": 2330,
+      "rr": 1.75,
+      "winRate": 82,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 73,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 43,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.69,
+          "volume7d": -15.4,
+          "volume30d": -76.22
+        },
+        "chart": {
+          "score": 100,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 0.2% / RSI 55.9"
+        }
+      },
+      "changes": {
+        "7d": 3.43,
+        "30d": 1.9,
+        "90d": -16.11,
+        "volume7d": -15.4,
+        "volume30d": -76.22
+      },
+      "technical": {
+        "deviation": 0.21,
+        "rsi": 55.9,
+        "volumeRatio": 0.69,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": false
@@ -998,89 +1071,16 @@
       }
     },
     {
-      "code": "8306",
-      "name": "三菱UFJフィナンシャル・グループ",
-      "score": 83,
-      "flowScore": 66,
-      "treasureScore": 100,
-      "kabuScore": 76,
-      "confirmationScore": 71,
-      "themeFlowBonus": 7,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 3433,
-      "date": "2026-07-08",
-      "theme": "銀行",
-      "themeIds": [
-        "jp-banks"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 3330,
-      "tp": 3615,
-      "sl": 3167,
-      "rr": 1.75,
-      "winRate": 78,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 71,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 57,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.98,
-          "volume7d": 26.62,
-          "volume30d": -13.94
-        },
-        "chart": {
-          "score": 82,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 5.4% / RSI 54.8"
-        }
-      },
-      "changes": {
-        "7d": 7.05,
-        "30d": 15.12,
-        "90d": 17.37,
-        "volume7d": 26.62,
-        "volume30d": -13.94
-      },
-      "technical": {
-        "deviation": 5.38,
-        "rsi": 54.8,
-        "volumeRatio": 0.98,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
       "code": "4519",
       "name": "中外製薬",
-      "score": 78,
+      "score": 77,
       "flowScore": 70,
       "treasureScore": 69,
       "kabuScore": 75,
       "confirmationScore": 78,
-      "themeFlowBonus": 5,
+      "themeFlowBonus": 4,
       "overheatPenalty": 0,
-      "signal": "統合買い候補",
+      "signal": "確認候補",
       "price": 7345,
       "date": "2026-07-08",
       "theme": "製薬",
@@ -1146,12 +1146,12 @@
     {
       "code": "6503",
       "name": "三菱電機",
-      "score": 67,
+      "score": 66,
       "flowScore": 43,
       "treasureScore": 72,
       "kabuScore": 75,
       "confirmationScore": 74,
-      "themeFlowBonus": 2,
+      "themeFlowBonus": 1,
       "overheatPenalty": 0,
       "signal": "監視継続",
       "price": 5699,
@@ -1217,87 +1217,156 @@
       }
     },
     {
-      "code": "9501",
-      "name": "東京電力ホールディングス",
-      "score": 65,
-      "flowScore": 61,
-      "treasureScore": 61,
+      "code": "9504",
+      "name": "中国電力",
+      "score": 64,
+      "flowScore": 41,
+      "treasureScore": 85,
       "kabuScore": 75,
-      "confirmationScore": 58,
+      "confirmationScore": 72,
       "themeFlowBonus": 0,
-      "overheatPenalty": 0,
+      "overheatPenalty": 3,
       "signal": "監視継続",
-      "price": 479.9,
-      "date": "2026-07-08",
-      "theme": "電力",
-      "themeIds": [
-        "jp-electric-power"
-      ],
+      "price": 929,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
       "type": "大型株",
-      "quality": "注意あり",
-      "newsRisk": "悪材料確認あり",
+      "quality": "改善候補",
+      "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 473,
-      "tp": 546,
-      "sl": 431,
+      "buy": 915,
+      "tp": 976,
+      "sl": 880,
       "rr": 1.74,
-      "winRate": 67,
+      "winRate": 82,
       "winRateCalibrated": 43,
       "checks": {
-        "score": 58,
-        "passed": 2,
+        "score": 72,
+        "passed": 3,
         "earnings": {
-          "score": 48,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "注意あり"
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "改善候補"
         },
         "material": {
-          "score": 28,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "悪材料確認あり"
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 65,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.1,
-          "volume7d": 47.92,
-          "volume30d": 53.35
+          "score": 59,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 1.04,
+          "volume7d": 8.75,
+          "volume30d": -9.56
         },
         "chart": {
-          "score": 86,
+          "score": 84,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -2.3% / RSI 38.5"
+          "reason": "25日乖離 3.8% / RSI 69.8"
         }
       },
       "changes": {
-        "7d": 4.03,
-        "30d": -13.89,
-        "90d": -28.92,
-        "volume7d": 47.92,
-        "volume30d": 53.35
+        "7d": 3.44,
+        "30d": 6.1,
+        "90d": -14.65,
+        "volume7d": 8.75,
+        "volume30d": -9.56
       },
       "technical": {
-        "deviation": -2.35,
-        "rsi": 38.5,
-        "volumeRatio": 1.1,
-        "trendOk": false,
+        "deviation": 3.83,
+        "rsi": 69.8,
+        "volumeRatio": 1.04,
+        "trendOk": true,
         "pullbackOk": true,
+        "volumeOk": true
+      }
+    },
+    {
+      "code": "6981",
+      "name": "村田製作所",
+      "score": 71,
+      "flowScore": 67,
+      "treasureScore": 71,
+      "kabuScore": 73,
+      "confirmationScore": 71,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "確認候補",
+      "price": 9475,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "回復候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 9428,
+      "tp": 12968,
+      "sl": 7405,
+      "rr": 1.75,
+      "winRate": 72,
+      "winRateCalibrated": 40,
+      "checks": {
+        "score": 71,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "回復候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 54,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.96,
+          "volume7d": 7.27,
+          "volume30d": -61.02
+        },
+        "chart": {
+          "score": 82,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -8.9% / RSI 36.7"
+        }
+      },
+      "changes": {
+        "7d": -20.31,
+        "30d": -1.56,
+        "90d": 130.65,
+        "volume7d": 7.27,
+        "volume30d": -61.02
+      },
+      "technical": {
+        "deviation": -8.91,
+        "rsi": 36.7,
+        "volumeRatio": 0.96,
+        "trendOk": true,
+        "pullbackOk": false,
         "volumeOk": true
       }
     },
     {
       "code": "8058",
       "name": "三菱商事",
-      "score": 64,
+      "score": 63,
       "flowScore": 21,
       "treasureScore": 78,
       "kabuScore": 73,
       "confirmationScore": 72,
-      "themeFlowBonus": 5,
+      "themeFlowBonus": 4,
       "overheatPenalty": 0,
       "signal": "監視継続",
       "price": 4464,
@@ -1364,38 +1433,185 @@
       }
     },
     {
-      "code": "8053",
-      "name": "住友商事",
-      "score": 63,
-      "flowScore": 36,
-      "treasureScore": 74,
-      "kabuScore": 73,
-      "confirmationScore": 73,
+      "code": "8306",
+      "name": "三菱UFJフィナンシャル・グループ",
+      "score": 78,
+      "flowScore": 50,
+      "treasureScore": 100,
+      "kabuScore": 71,
+      "confirmationScore": 72,
+      "themeFlowBonus": 7,
+      "overheatPenalty": 0,
+      "signal": "統合買い候補",
+      "price": 3414,
+      "date": "2026-07-09",
+      "theme": "銀行",
+      "themeIds": [
+        "jp-banks"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 3312,
+      "tp": 3581,
+      "sl": 3158,
+      "rr": 1.75,
+      "winRate": 76,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 72,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 47,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.74,
+          "volume7d": 20.45,
+          "volume30d": -62.3
+        },
+        "chart": {
+          "score": 92,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 4.5% / RSI 62.8"
+        }
+      },
+      "changes": {
+        "7d": 5.14,
+        "30d": 13.84,
+        "90d": 15.01,
+        "volume7d": 20.45,
+        "volume30d": -62.3
+      },
+      "technical": {
+        "deviation": 4.48,
+        "rsi": 62.8,
+        "volumeRatio": 0.74,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "8411",
+      "name": "みずほフィナンシャルグループ",
+      "score": 77,
+      "flowScore": 47,
+      "treasureScore": 100,
+      "kabuScore": 71,
+      "confirmationScore": 72,
+      "themeFlowBonus": 7,
+      "overheatPenalty": 0,
+      "signal": "確認候補",
+      "price": 8214,
+      "date": "2026-07-09",
+      "theme": "銀行 / 低PBR",
+      "themeIds": [
+        "jp-banks",
+        "jp-low-pbr"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 7968,
+      "tp": 8711,
+      "sl": 7543,
+      "rr": 1.75,
+      "winRate": 76,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 72,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 46,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.72,
+          "volume7d": 11.15,
+          "volume30d": -60.11
+        },
+        "chart": {
+          "score": 92,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 4.5% / RSI 62.4"
+        }
+      },
+      "changes": {
+        "7d": 5.12,
+        "30d": 14.16,
+        "90d": 14.87,
+        "volume7d": 11.15,
+        "volume30d": -60.11
+      },
+      "technical": {
+        "deviation": 4.52,
+        "rsi": 62.4,
+        "volumeRatio": 0.72,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "7182",
+      "name": "ゆうちょ銀行",
+      "score": 66,
+      "flowScore": 38,
+      "treasureScore": 92,
+      "kabuScore": 71,
+      "confirmationScore": 71,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 1564.5,
-      "date": "2026-07-08",
+      "price": 3289,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "大型株",
-      "quality": "高配当候補",
+      "quality": "安定業績候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 1541,
-      "tp": 1704,
-      "sl": 1448,
+      "buy": 3240,
+      "tp": 3529,
+      "sl": 3075,
       "rr": 1.75,
-      "winRate": 67,
-      "winRateCalibrated": 43,
+      "winRate": 76,
+      "winRateCalibrated": 44,
       "checks": {
-        "score": 73,
-        "passed": 4,
+        "score": 71,
+        "passed": 3,
         "earnings": {
           "score": 80,
           "ok": true,
           "label": "業績良好",
-          "reason": "高配当候補"
+          "reason": "安定業績候補"
         },
         "material": {
           "score": 64,
@@ -1404,335 +1620,45 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 60,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.09,
-          "volume7d": 6.99,
-          "volume30d": -24.32
+          "score": 45,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.71,
+          "volume7d": 3.3,
+          "volume30d": -67.08
         },
         "chart": {
-          "score": 86,
+          "score": 92,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -2.2% / RSI 39.5"
+          "reason": "25日乖離 3.6% / RSI 58.2"
         }
       },
       "changes": {
-        "7d": 1,
-        "30d": -11.92,
-        "90d": -2.8,
-        "volume7d": 6.99,
-        "volume30d": -24.32
+        "7d": 6.54,
+        "30d": 7.17,
+        "90d": 7.45,
+        "volume7d": 3.3,
+        "volume30d": -67.08
       },
       "technical": {
-        "deviation": -2.17,
-        "rsi": 39.5,
-        "volumeRatio": 1.09,
-        "trendOk": false,
+        "deviation": 3.59,
+        "rsi": 58.2,
+        "volumeRatio": 0.71,
+        "trendOk": true,
         "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "8766",
-      "name": "東京海上HD",
-      "score": 82,
-      "flowScore": 74,
-      "treasureScore": 100,
-      "kabuScore": 72,
-      "confirmationScore": 69,
-      "themeFlowBonus": 5,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 7700,
-      "date": "2026-07-08",
-      "theme": "保険",
-      "themeIds": [
-        "jp-insurance"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 7469,
-      "tp": 8239,
-      "sl": 7029,
-      "rr": 1.75,
-      "winRate": 72,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 69,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 65,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.14,
-          "volume7d": 42.55,
-          "volume30d": 8.21
-        },
-        "chart": {
-          "score": 66,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 5.6% / RSI 59.3"
-        }
-      },
-      "changes": {
-        "7d": 6.91,
-        "30d": 7.11,
-        "90d": 18.81,
-        "volume7d": 42.55,
-        "volume30d": 8.21
-      },
-      "technical": {
-        "deviation": 5.62,
-        "rsi": 59.3,
-        "volumeRatio": 1.14,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "9983",
-      "name": "ファーストリテイリング",
-      "score": 81,
-      "flowScore": 76,
-      "treasureScore": 95,
-      "kabuScore": 72,
-      "confirmationScore": 70,
-      "themeFlowBonus": 4,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 87100,
-      "date": "2026-07-08",
-      "theme": "小売",
-      "themeIds": [
-        "jp-retail"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 84487,
-      "tp": 93005,
-      "sl": 79620,
-      "rr": 1.75,
-      "winRate": 72,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 70,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 72,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.36,
-          "volume7d": 18.64,
-          "volume30d": 31.79
-        },
-        "chart": {
-          "score": 66,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 5.8% / RSI 59.6"
-        }
-      },
-      "changes": {
-        "7d": 5.18,
-        "30d": 11.13,
-        "90d": 28.22,
-        "volume7d": 18.64,
-        "volume30d": 31.79
-      },
-      "technical": {
-        "deviation": 5.81,
-        "rsi": 59.6,
-        "volumeRatio": 1.36,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "6981",
-      "name": "村田製作所",
-      "score": 78,
-      "flowScore": 95,
-      "treasureScore": 71,
-      "kabuScore": 72,
-      "confirmationScore": 72,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 9027,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "大型株",
-      "quality": "回復候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 8982,
-      "tp": 12659,
-      "sl": 6881,
-      "rr": 1.75,
-      "winRate": 72,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 72,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "回復候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 73,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.32,
-          "volume7d": 88.24,
-          "volume30d": -10.29
-        },
-        "chart": {
-          "score": 70,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 -13.4% / RSI 33.2"
-        }
-      },
-      "changes": {
-        "7d": -20.78,
-        "30d": 5.73,
-        "90d": 120.82,
-        "volume7d": 88.24,
-        "volume30d": -10.29
-      },
-      "technical": {
-        "deviation": -13.36,
-        "rsi": 33.2,
-        "volumeRatio": 1.32,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "7011",
-      "name": "三菱重工業",
-      "score": 70,
-      "flowScore": 53,
-      "treasureScore": 85,
-      "kabuScore": 72,
-      "confirmationScore": 58,
-      "themeFlowBonus": 4,
-      "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 3821,
-      "date": "2026-07-08",
-      "theme": "防衛",
-      "themeIds": [
-        "jp-defense"
-      ],
-      "type": "大型株",
-      "quality": "注意あり",
-      "newsRisk": "悪材料確認あり",
-      "financial": null,
-      "buy": 3764,
-      "tp": 4331,
-      "sl": 3440,
-      "rr": 1.75,
-      "winRate": 73,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 58,
-        "passed": 2,
-        "earnings": {
-          "score": 48,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "注意あり"
-        },
-        "material": {
-          "score": 28,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "悪材料確認あり"
-        },
-        "volume": {
-          "score": 66,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.2,
-          "volume7d": 35.84,
-          "volume30d": 1.44
-        },
-        "chart": {
-          "score": 86,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 1.8% / RSI 44.0"
-        }
-      },
-      "changes": {
-        "7d": 4.23,
-        "30d": 0.45,
-        "90d": -22.04,
-        "volume7d": 35.84,
-        "volume30d": 1.44
-      },
-      "technical": {
-        "deviation": 1.84,
-        "rsi": 44,
-        "volumeRatio": 1.2,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": true
+        "volumeOk": false
       }
     },
     {
       "code": "9020",
       "name": "東日本旅客鉄道",
-      "score": 64,
+      "score": 65,
       "flowScore": 25,
       "treasureScore": 82,
       "kabuScore": 71,
       "confirmationScore": 72,
-      "themeFlowBonus": 4,
+      "themeFlowBonus": 5,
       "overheatPenalty": 0,
       "signal": "監視継続",
       "price": 3541,
@@ -1795,150 +1721,6 @@
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": false
-      }
-    },
-    {
-      "code": "8630",
-      "name": "SOMPO HD",
-      "score": 75,
-      "flowScore": 53,
-      "treasureScore": 98,
-      "kabuScore": 70,
-      "confirmationScore": 67,
-      "themeFlowBonus": 5,
-      "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 6714,
-      "date": "2026-07-08",
-      "theme": "保険",
-      "themeIds": [
-        "jp-insurance"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 6513,
-      "tp": 7119,
-      "sl": 6167,
-      "rr": 1.75,
-      "winRate": 72,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 67,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 58,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 1.03,
-          "volume7d": -5.41,
-          "volume30d": -10.25
-        },
-        "chart": {
-          "score": 66,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 7.0% / RSI 62.2"
-        }
-      },
-      "changes": {
-        "7d": 7.63,
-        "30d": 13.76,
-        "90d": 9.21,
-        "volume7d": -5.41,
-        "volume30d": -10.25
-      },
-      "technical": {
-        "deviation": 6.98,
-        "rsi": 62.2,
-        "volumeRatio": 1.03,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "8308",
-      "name": "りそなホールディングス",
-      "score": 74,
-      "flowScore": 83,
-      "treasureScore": 97,
-      "kabuScore": 70,
-      "confirmationScore": 68,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 4,
-      "signal": "確認候補",
-      "price": 2358,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 2287,
-      "tp": 2538,
-      "sl": 2143,
-      "rr": 1.74,
-      "winRate": 72,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 68,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 61,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.02,
-          "volume7d": 50.5,
-          "volume30d": 21.64
-        },
-        "chart": {
-          "score": 66,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 8.6% / RSI 60.7"
-        }
-      },
-      "changes": {
-        "7d": 11.97,
-        "30d": 15.82,
-        "90d": 24.66,
-        "volume7d": 50.5,
-        "volume30d": 21.64
-      },
-      "technical": {
-        "deviation": 8.62,
-        "rsi": 60.7,
-        "volumeRatio": 1.02,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
       }
     },
     {
@@ -2015,35 +1797,35 @@
       }
     },
     {
-      "code": "9503",
-      "name": "関西電力",
-      "score": 69,
-      "flowScore": 48,
-      "treasureScore": 96,
+      "code": "8630",
+      "name": "SOMPO HD",
+      "score": 70,
+      "flowScore": 35,
+      "treasureScore": 98,
       "kabuScore": 70,
-      "confirmationScore": 74,
-      "themeFlowBonus": 0,
+      "confirmationScore": 66,
+      "themeFlowBonus": 6,
       "overheatPenalty": 0,
       "signal": "確認候補",
-      "price": 2292.5,
-      "date": "2026-07-08",
-      "theme": "電力",
+      "price": 6645,
+      "date": "2026-07-09",
+      "theme": "保険",
       "themeIds": [
-        "jp-electric-power"
+        "jp-insurance"
       ],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 2258,
-      "tp": 2410,
-      "sl": 2171,
+      "buy": 6446,
+      "tp": 7065,
+      "sl": 6092,
       "rr": 1.75,
-      "winRate": 73,
+      "winRate": 72,
       "winRateCalibrated": 40,
       "checks": {
-        "score": 74,
-        "passed": 4,
+        "score": 66,
+        "passed": 3,
         "earnings": {
           "score": 80,
           "ok": true,
@@ -2057,33 +1839,33 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 62,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.1,
-          "volume7d": 19.95,
-          "volume30d": 5.71
+          "score": 53,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.97,
+          "volume7d": -7.23,
+          "volume30d": -76.73
         },
         "chart": {
-          "score": 86,
+          "score": 66,
           "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -0.7% / RSI 43.5"
+          "label": "確認OK",
+          "reason": "25日乖離 5.3% / RSI 60.8"
         }
       },
       "changes": {
-        "7d": 0.31,
-        "30d": 0.07,
-        "90d": -16.94,
-        "volume7d": 19.95,
-        "volume30d": 5.71
+        "7d": 6.32,
+        "30d": 11.53,
+        "90d": 6.41,
+        "volume7d": -7.23,
+        "volume30d": -76.73
       },
       "technical": {
-        "deviation": -0.66,
-        "rsi": 43.5,
-        "volumeRatio": 1.1,
-        "trendOk": false,
-        "pullbackOk": true,
+        "deviation": 5.3,
+        "rsi": 60.8,
+        "volumeRatio": 0.97,
+        "trendOk": true,
+        "pullbackOk": false,
         "volumeOk": true
       }
     },
@@ -2234,30 +2016,32 @@
       }
     },
     {
-      "code": "8015",
-      "name": "豊田通商",
-      "score": 60,
-      "flowScore": 29,
-      "treasureScore": 76,
+      "code": "1801",
+      "name": "大成建設",
+      "score": 66,
+      "flowScore": 43,
+      "treasureScore": 87,
       "kabuScore": 70,
       "confirmationScore": 73,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 6142,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
+      "price": 14050,
+      "date": "2026-07-09",
+      "theme": "建設",
+      "themeIds": [
+        "jp-construction"
+      ],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 6050,
-      "tp": 6696,
-      "sl": 5681,
+      "buy": 13839,
+      "tp": 15933,
+      "sl": 12643,
       "rr": 1.75,
-      "winRate": 67,
-      "winRateCalibrated": 43,
+      "winRate": 73,
+      "winRateCalibrated": 40,
       "checks": {
         "score": 73,
         "passed": 3,
@@ -2277,135 +2061,60 @@
           "score": 59,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 1.1,
-          "volume7d": -20.55,
-          "volume30d": -7.54
+          "ratio": 1,
+          "volume7d": 53.73,
+          "volume30d": -38.68
         },
         "chart": {
           "score": 86,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -0.5% / RSI 44.9"
+          "reason": "25日乖離 -1.0% / RSI 40.6"
         }
       },
       "changes": {
-        "7d": 2.74,
-        "30d": -8.72,
-        "90d": -12.47,
-        "volume7d": -20.55,
-        "volume30d": -7.54
+        "7d": -2.19,
+        "30d": 0.29,
+        "90d": -30.92,
+        "volume7d": 53.73,
+        "volume30d": -38.68
       },
       "technical": {
-        "deviation": -0.55,
-        "rsi": 44.9,
-        "volumeRatio": 1.1,
+        "deviation": -1,
+        "rsi": 40.6,
+        "volumeRatio": 1,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": true
       }
     },
     {
-      "code": "6208",
-      "name": "石川製作所",
-      "score": 68,
-      "flowScore": 68,
-      "treasureScore": 52,
-      "kabuScore": 69,
-      "confirmationScore": 62,
-      "themeFlowBonus": 4,
-      "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 1705,
-      "date": "2026-07-08",
-      "theme": "防衛",
-      "themeIds": [
-        "jp-defense"
-      ],
-      "type": "中小型株",
-      "quality": "注意あり",
-      "newsRisk": "悪材料確認あり",
-      "financial": null,
-      "buy": 1679,
-      "tp": 1922,
-      "sl": 1540,
-      "rr": 1.75,
-      "winRate": 61,
-      "winRateCalibrated": 46,
-      "checks": {
-        "score": 62,
-        "passed": 2,
-        "earnings": {
-          "score": 48,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "注意あり"
-        },
-        "material": {
-          "score": 28,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "悪材料確認あり"
-        },
-        "volume": {
-          "score": 95,
-          "ok": true,
-          "label": "出来高増加",
-          "ratio": 1.92,
-          "volume7d": 260.42,
-          "volume30d": 34.11
-        },
-        "chart": {
-          "score": 74,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 -3.4% / RSI 32.0"
-        }
-      },
-      "changes": {
-        "7d": -1.73,
-        "30d": -11.89,
-        "90d": -34.27,
-        "volume7d": 260.42,
-        "volume30d": 34.11
-      },
-      "technical": {
-        "deviation": -3.43,
-        "rsi": 32,
-        "volumeRatio": 1.92,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "8001",
-      "name": "伊藤忠商事",
-      "score": 62,
-      "flowScore": 29,
-      "treasureScore": 79,
+      "code": "6301",
+      "name": "小松製作所",
+      "score": 56,
+      "flowScore": 20,
+      "treasureScore": 74,
       "kabuScore": 68,
-      "confirmationScore": 72,
-      "themeFlowBonus": 2,
+      "confirmationScore": 71,
+      "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 1878,
-      "date": "2026-07-08",
-      "theme": "商社",
-      "themeIds": [
-        "jp-trading-houses"
-      ],
+      "price": 6395,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 1850,
-      "tp": 1963,
-      "sl": 1786,
-      "rr": 1.77,
+      "buy": 6299,
+      "tp": 6977,
+      "sl": 5911,
+      "rr": 1.75,
       "winRate": 67,
       "winRateCalibrated": 43,
       "checks": {
-        "score": 72,
+        "score": 71,
         "passed": 3,
         "earnings": {
           "score": 80,
@@ -2420,102 +2129,31 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 54,
+          "score": 52,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.96,
-          "volume7d": -20.9,
-          "volume30d": -9.93
+          "ratio": 0.97,
+          "volume7d": -23.27,
+          "volume30d": -75.72
         },
         "chart": {
           "score": 86,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 1.0% / RSI 52.0"
+          "reason": "25日乖離 -2.0% / RSI 46.4"
         }
       },
       "changes": {
-        "7d": 1.29,
-        "30d": -2.69,
-        "90d": -15.52,
-        "volume7d": -20.9,
-        "volume30d": -9.93
+        "7d": 2.17,
+        "30d": -2.77,
+        "90d": -15.11,
+        "volume7d": -23.27,
+        "volume30d": -75.72
       },
       "technical": {
-        "deviation": 1.03,
-        "rsi": 52,
-        "volumeRatio": 0.96,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "2768",
-      "name": "双日",
-      "score": 58,
-      "flowScore": 30,
-      "treasureScore": 69,
-      "kabuScore": 68,
-      "confirmationScore": 73,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 5199,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "中型株",
-      "quality": "割安見直し候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 5121,
-      "tp": 5556,
-      "sl": 4872,
-      "rr": 1.75,
-      "winRate": 67,
-      "winRateCalibrated": 43,
-      "checks": {
-        "score": 73,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "割安見直し候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 58,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 1.06,
-          "volume7d": 0.51,
-          "volume30d": -23.18
-        },
-        "chart": {
-          "score": 86,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -0.2% / RSI 38.7"
-        }
-      },
-      "changes": {
-        "7d": 0.54,
-        "30d": -4.2,
-        "90d": -23.86,
-        "volume7d": 0.51,
-        "volume30d": -23.18
-      },
-      "technical": {
-        "deviation": -0.18,
-        "rsi": 38.7,
-        "volumeRatio": 1.06,
+        "deviation": -1.99,
+        "rsi": 46.4,
+        "volumeRatio": 0.97,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": true
@@ -2595,236 +2233,16 @@
       }
     },
     {
-      "code": "8316",
-      "name": "三井住友フィナンシャルグループ",
-      "score": 79,
-      "flowScore": 65,
-      "treasureScore": 100,
-      "kabuScore": 64,
-      "confirmationScore": 71,
-      "themeFlowBonus": 7,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 6811,
-      "date": "2026-07-08",
-      "theme": "銀行",
-      "themeIds": [
-        "jp-banks"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 6607,
-      "tp": 7164,
-      "sl": 6289,
-      "rr": 1.75,
-      "winRate": 71,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 71,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 55,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.93,
-          "volume7d": 27.16,
-          "volume30d": -18.22
-        },
-        "chart": {
-          "score": 82,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 5.7% / RSI 53.2"
-        }
-      },
-      "changes": {
-        "7d": 7.33,
-        "30d": 16.45,
-        "90d": 15.64,
-        "volume7d": 27.16,
-        "volume30d": -18.22
-      },
-      "technical": {
-        "deviation": 5.73,
-        "rsi": 53.2,
-        "volumeRatio": 0.93,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": false
-      }
-    },
-    {
-      "code": "8411",
-      "name": "みずほフィナンシャルグループ",
-      "score": 75,
-      "flowScore": 50,
-      "treasureScore": 100,
-      "kabuScore": 64,
-      "confirmationScore": 70,
-      "themeFlowBonus": 7,
-      "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 8250,
-      "date": "2026-07-08",
-      "theme": "銀行 / 低PBR",
-      "themeIds": [
-        "jp-banks",
-        "jp-low-pbr"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 8003,
-      "tp": 8810,
-      "sl": 7542,
-      "rr": 1.75,
-      "winRate": 71,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 70,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 50,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.84,
-          "volume7d": 0.63,
-          "volume30d": -45.28
-        },
-        "chart": {
-          "score": 82,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 5.3% / RSI 50.0"
-        }
-      },
-      "changes": {
-        "7d": 6.55,
-        "30d": 16.77,
-        "90d": 18.14,
-        "volume7d": 0.63,
-        "volume30d": -45.28
-      },
-      "technical": {
-        "deviation": 5.28,
-        "rsi": 50,
-        "volumeRatio": 0.84,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": false
-      }
-    },
-    {
-      "code": "7013",
-      "name": "IHI",
-      "score": 71,
-      "flowScore": 50,
-      "treasureScore": 95,
-      "kabuScore": 64,
-      "confirmationScore": 71,
-      "themeFlowBonus": 4,
-      "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 2892,
-      "date": "2026-07-08",
-      "theme": "防衛",
-      "themeIds": [
-        "jp-defense"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 2805,
-      "tp": 3283,
-      "sl": 2532,
-      "rr": 1.75,
-      "winRate": 71,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 71,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 57,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.95,
-          "volume7d": 30.7,
-          "volume30d": -3.89
-        },
-        "chart": {
-          "score": 82,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 6.7% / RSI 51.3"
-        }
-      },
-      "changes": {
-        "7d": 6.66,
-        "30d": 5.93,
-        "90d": -30.48,
-        "volume7d": 30.7,
-        "volume30d": -3.89
-      },
-      "technical": {
-        "deviation": 6.69,
-        "rsi": 51.3,
-        "volumeRatio": 0.95,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": false
-      }
-    },
-    {
       "code": "4568",
       "name": "第一三共",
-      "score": 68,
+      "score": 67,
       "flowScore": 42,
       "treasureScore": 86,
       "kabuScore": 64,
       "confirmationScore": 70,
-      "themeFlowBonus": 5,
+      "themeFlowBonus": 4,
       "overheatPenalty": 0,
-      "signal": "確認候補",
+      "signal": "監視継続",
       "price": 2717,
       "date": "2026-07-08",
       "theme": "製薬",
@@ -2888,32 +2306,32 @@
       }
     },
     {
-      "code": "8750",
-      "name": "第一生命ホールディングス",
-      "score": 65,
-      "flowScore": 43,
+      "code": "9508",
+      "name": "九州電力",
+      "score": 61,
+      "flowScore": 41,
       "treasureScore": 95,
       "kabuScore": 64,
-      "confirmationScore": 68,
+      "confirmationScore": 71,
       "themeFlowBonus": 0,
-      "overheatPenalty": 0,
+      "overheatPenalty": 3,
       "signal": "監視継続",
-      "price": 1864,
-      "date": "2026-07-08",
+      "price": 1726,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 1808,
-      "tp": 1982,
-      "sl": 1709,
+      "buy": 1700,
+      "tp": 1857,
+      "sl": 1611,
       "rr": 1.76,
-      "winRate": 71,
-      "winRateCalibrated": 40,
+      "winRate": 76,
+      "winRateCalibrated": 44,
       "checks": {
-        "score": 68,
+        "score": 71,
         "passed": 3,
         "earnings": {
           "score": 80,
@@ -2928,45 +2346,45 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 45,
+          "score": 55,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.73,
-          "volume7d": -40.21,
-          "volume30d": -8.68
+          "ratio": 0.93,
+          "volume7d": 29.39,
+          "volume30d": -40.55
         },
         "chart": {
-          "score": 82,
+          "score": 84,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 5.3% / RSI 56.3"
+          "reason": "25日乖離 3.8% / RSI 66.8"
         }
       },
       "changes": {
-        "7d": 4.81,
-        "30d": 14.53,
-        "90d": 17.83,
-        "volume7d": -40.21,
-        "volume30d": -8.68
+        "7d": 5.08,
+        "30d": 5.31,
+        "90d": -14.3,
+        "volume7d": 29.39,
+        "volume30d": -40.55
       },
       "technical": {
-        "deviation": 5.25,
-        "rsi": 56.3,
-        "volumeRatio": 0.73,
+        "deviation": 3.81,
+        "rsi": 66.8,
+        "volumeRatio": 0.93,
         "trendOk": true,
-        "pullbackOk": false,
+        "pullbackOk": true,
         "volumeOk": false
       }
     },
     {
       "code": "7267",
       "name": "ホンダ",
-      "score": 61,
+      "score": 60,
       "flowScore": 37,
       "treasureScore": 88,
       "kabuScore": 64,
       "confirmationScore": 70,
-      "themeFlowBonus": 2,
+      "themeFlowBonus": 1,
       "overheatPenalty": 3,
       "signal": "監視継続",
       "price": 1525,
@@ -3033,319 +2451,30 @@
       }
     },
     {
-      "code": "9504",
-      "name": "中国電力",
-      "score": 58,
-      "flowScore": 37,
-      "treasureScore": 85,
-      "kabuScore": 64,
-      "confirmationScore": 70,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 3,
-      "signal": "監視継続",
-      "price": 929.3,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "大型株",
-      "quality": "改善候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 901,
-      "tp": 962,
-      "sl": 866,
-      "rr": 1.74,
-      "winRate": 76,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 70,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "改善候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 50,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.82,
-          "volume7d": -3.52,
-          "volume30d": -13.68
-        },
-        "chart": {
-          "score": 84,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 4.2% / RSI 68.1"
-        }
-      },
-      "changes": {
-        "7d": 4.57,
-        "30d": 5.75,
-        "90d": -12.41,
-        "volume7d": -3.52,
-        "volume30d": -13.68
-      },
-      "technical": {
-        "deviation": 4.21,
-        "rsi": 68.1,
-        "volumeRatio": 0.82,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": false
-      }
-    },
-    {
-      "code": "9506",
-      "name": "東北電力",
-      "score": 55,
-      "flowScore": 22,
-      "treasureScore": 88,
-      "kabuScore": 64,
-      "confirmationScore": 70,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 3,
-      "signal": "見送り",
-      "price": 1093,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "大型株",
-      "quality": "改善候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 1060,
-      "tp": 1126,
-      "sl": 1022,
-      "rr": 1.74,
-      "winRate": 76,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 70,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "改善候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 49,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.88,
-          "volume7d": -33.36,
-          "volume30d": -39.27
-        },
-        "chart": {
-          "score": 84,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 4.8% / RSI 68.9"
-        }
-      },
-      "changes": {
-        "7d": 2.68,
-        "30d": 9.66,
-        "90d": -14.07,
-        "volume7d": -33.36,
-        "volume30d": -39.27
-      },
-      "technical": {
-        "deviation": 4.77,
-        "rsi": 68.9,
-        "volumeRatio": 0.88,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": false
-      }
-    },
-    {
-      "code": "9508",
-      "name": "九州電力",
-      "score": 68,
-      "flowScore": 77,
-      "treasureScore": 95,
-      "kabuScore": 62,
-      "confirmationScore": 71,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 6,
-      "signal": "監視継続",
-      "price": 1749.5,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 1697,
-      "tp": 1847,
-      "sl": 1611,
-      "rr": 1.74,
-      "winRate": 64,
-      "winRateCalibrated": 46,
-      "checks": {
-        "score": 71,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 82,
-          "ok": true,
-          "label": "出来高増加",
-          "ratio": 1.54,
-          "volume7d": 44.51,
-          "volume30d": 86.69
-        },
-        "chart": {
-          "score": 58,
-          "ok": false,
-          "label": "押し目待ち",
-          "reason": "25日乖離 5.5% / RSI 73.3"
-        }
-      },
-      "changes": {
-        "7d": 6.51,
-        "30d": 6.09,
-        "90d": -9.26,
-        "volume7d": 44.51,
-        "volume30d": 86.69
-      },
-      "technical": {
-        "deviation": 5.52,
-        "rsi": 73.3,
-        "volumeRatio": 1.54,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "7203",
-      "name": "トヨタ自動車",
-      "score": 61,
-      "flowScore": 36,
-      "treasureScore": 80,
-      "kabuScore": 62,
-      "confirmationScore": 68,
-      "themeFlowBonus": 2,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 2889,
-      "date": "2026-07-08",
-      "theme": "円安恩恵 / 自動車",
-      "themeIds": [
-        "jpy-exporters",
-        "jp-auto"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 2846,
-      "tp": 3063,
-      "sl": 2722,
-      "rr": 1.75,
-      "winRate": 61,
-      "winRateCalibrated": 46,
-      "checks": {
-        "score": 68,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 58,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 1.04,
-          "volume7d": -13.63,
-          "volume30d": 12.46
-        },
-        "chart": {
-          "score": 70,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 3.2% / RSI 59.2"
-        }
-      },
-      "changes": {
-        "7d": 6.02,
-        "30d": -4.65,
-        "90d": -23.49,
-        "volume7d": -13.63,
-        "volume30d": 12.46
-      },
-      "technical": {
-        "deviation": 3.16,
-        "rsi": 59.2,
-        "volumeRatio": 1.04,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "9502",
-      "name": "中部電力",
-      "score": 59,
-      "flowScore": 49,
-      "treasureScore": 95,
+      "code": "8308",
+      "name": "りそなホールディングス",
+      "score": 64,
+      "flowScore": 68,
+      "treasureScore": 97,
       "kabuScore": 62,
       "confirmationScore": 66,
       "themeFlowBonus": 0,
-      "overheatPenalty": 6,
+      "overheatPenalty": 7,
       "signal": "監視継続",
-      "price": 3226,
-      "date": "2026-07-08",
-      "theme": "電力",
-      "themeIds": [
-        "jp-electric-power"
-      ],
+      "price": 2364.5,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 3129,
-      "tp": 3459,
-      "sl": 2940,
+      "buy": 2294,
+      "tp": 2536,
+      "sl": 2156,
       "rr": 1.75,
-      "winRate": 64,
-      "winRateCalibrated": 46,
+      "winRate": 72,
+      "winRateCalibrated": 40,
       "checks": {
         "score": 66,
         "passed": 3,
@@ -3362,31 +2491,31 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 62,
+          "score": 61,
           "ok": true,
           "label": "出来高確認OK",
-          "ratio": 1.15,
-          "volume7d": -5.49,
-          "volume30d": -2.03
+          "ratio": 1.05,
+          "volume7d": 33.12,
+          "volume30d": 2.61
         },
         "chart": {
           "score": 58,
           "ok": false,
           "label": "押し目待ち",
-          "reason": "25日乖離 9.9% / RSI 87.3"
+          "reason": "25日乖離 8.4% / RSI 69.8"
         }
       },
       "changes": {
-        "7d": 5.42,
-        "30d": 9.32,
-        "90d": 24.44,
-        "volume7d": -5.49,
-        "volume30d": -2.03
+        "7d": 11.82,
+        "30d": 15.94,
+        "90d": 23.76,
+        "volume7d": 33.12,
+        "volume30d": 2.61
       },
       "technical": {
-        "deviation": 9.9,
-        "rsi": 87.3,
-        "volumeRatio": 1.15,
+        "deviation": 8.38,
+        "rsi": 69.8,
+        "volumeRatio": 1.05,
         "trendOk": true,
         "pullbackOk": false,
         "volumeOk": true
@@ -3395,30 +2524,30 @@
     {
       "code": "7167",
       "name": "めぶきフィナンシャルグループ",
-      "score": 52,
-      "flowScore": 53,
+      "score": 58,
+      "flowScore": 55,
       "treasureScore": 85,
       "kabuScore": 62,
-      "confirmationScore": 57,
+      "confirmationScore": 61,
       "themeFlowBonus": 0,
-      "overheatPenalty": 10,
-      "signal": "見送り",
-      "price": 1565.5,
-      "date": "2026-07-08",
+      "overheatPenalty": 6,
+      "signal": "監視継続",
+      "price": 1556,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "中型株",
       "quality": "地銀見直し候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 1519,
-      "tp": 1653,
-      "sl": 1443,
-      "rr": 1.76,
+      "buy": 1509,
+      "tp": 1640,
+      "sl": 1434,
+      "rr": 1.75,
       "winRate": 64,
       "winRateCalibrated": 46,
       "checks": {
-        "score": 57,
+        "score": 61,
         "passed": 2,
         "earnings": {
           "score": 58,
@@ -3433,31 +2562,31 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 63,
+          "score": 64,
           "ok": true,
           "label": "出来高確認OK",
-          "ratio": 1.16,
-          "volume7d": 10.22,
-          "volume30d": -3.25
+          "ratio": 1.18,
+          "volume7d": 20.01,
+          "volume30d": -21.09
         },
         "chart": {
-          "score": 46,
+          "score": 58,
           "ok": false,
-          "label": "位置悪い",
-          "reason": "25日乖離 10.2% / RSI 72.7"
+          "label": "押し目待ち",
+          "reason": "25日乖離 8.9% / RSI 78.1"
         }
       },
       "changes": {
-        "7d": 10.87,
-        "30d": 15.71,
-        "90d": 20.05,
-        "volume7d": 10.22,
-        "volume30d": -3.25
+        "7d": 8.7,
+        "30d": 17.04,
+        "90d": 15.86,
+        "volume7d": 20.01,
+        "volume30d": -21.09
       },
       "technical": {
-        "deviation": 10.18,
-        "rsi": 72.7,
-        "volumeRatio": 1.16,
+        "deviation": 8.85,
+        "rsi": 78.1,
+        "volumeRatio": 1.18,
         "trendOk": true,
         "pullbackOk": false,
         "volumeOk": true
@@ -3466,12 +2595,12 @@
     {
       "code": "7012",
       "name": "川崎重工業",
-      "score": 67,
+      "score": 65,
       "flowScore": 45,
       "treasureScore": 84,
       "kabuScore": 61,
       "confirmationScore": 71,
-      "themeFlowBonus": 4,
+      "themeFlowBonus": 2,
       "overheatPenalty": 0,
       "signal": "監視継続",
       "price": 2826.5,
@@ -3537,73 +2666,146 @@
       }
     },
     {
-      "code": "4063",
-      "name": "信越化学工業",
-      "score": 64,
+      "code": "6208",
+      "name": "石川製作所",
+      "score": 58,
       "flowScore": 52,
-      "treasureScore": 78,
+      "treasureScore": 52,
       "kabuScore": 61,
-      "confirmationScore": 72,
-      "themeFlowBonus": 0,
+      "confirmationScore": 54,
+      "themeFlowBonus": 2,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 6920,
-      "date": "2026-07-08",
-      "theme": "化学",
+      "price": 1715,
+      "date": "2026-07-09",
+      "theme": "防衛",
       "themeIds": [
-        "jp-chemical"
+        "jp-defense"
       ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
+      "type": "中小型株",
+      "quality": "注意あり",
+      "newsRisk": "悪材料確認あり",
       "financial": null,
-      "buy": 6816,
-      "tp": 7747,
-      "sl": 6284,
-      "rr": 1.75,
+      "buy": 1689,
+      "tp": 1907,
+      "sl": 1565,
+      "rr": 1.76,
       "winRate": 60,
       "winRateCalibrated": 46,
       "checks": {
-        "score": 72,
-        "passed": 3,
+        "score": 54,
+        "passed": 1,
         "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
+          "score": 48,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "注意あり"
         },
         "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
+          "score": 28,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "悪材料確認あり"
         },
         "volume": {
-          "score": 54,
+          "score": 49,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.89,
-          "volume7d": 22.07,
-          "volume30d": -13.86
+          "ratio": 0.63,
+          "volume7d": 116.99,
+          "volume30d": -67.23
         },
         "chart": {
           "score": 86,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -3.4% / RSI 38.8"
+          "reason": "25日乖離 -2.8% / RSI 41.4"
         }
       },
       "changes": {
-        "7d": -1.26,
-        "30d": -5.77,
-        "90d": 15.76,
-        "volume7d": 22.07,
-        "volume30d": -13.86
+        "7d": -1.49,
+        "30d": -10.26,
+        "90d": -36.25,
+        "volume7d": 116.99,
+        "volume30d": -67.23
       },
       "technical": {
-        "deviation": -3.43,
-        "rsi": 38.8,
-        "volumeRatio": 0.89,
+        "deviation": -2.78,
+        "rsi": 41.4,
+        "volumeRatio": 0.63,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "9501",
+      "name": "東京電力ホールディングス",
+      "score": 53,
+      "flowScore": 35,
+      "treasureScore": 61,
+      "kabuScore": 61,
+      "confirmationScore": 56,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 479.1,
+      "date": "2026-07-09",
+      "theme": "電力",
+      "themeIds": [
+        "jp-electric-power"
+      ],
+      "type": "大型株",
+      "quality": "注意あり",
+      "newsRisk": "悪材料確認あり",
+      "financial": null,
+      "buy": 472,
+      "tp": 545,
+      "sl": 431,
+      "rr": 1.78,
+      "winRate": 60,
+      "winRateCalibrated": 46,
+      "checks": {
+        "score": 56,
+        "passed": 1,
+        "earnings": {
+          "score": 48,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "注意あり"
+        },
+        "material": {
+          "score": 28,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "悪材料確認あり"
+        },
+        "volume": {
+          "score": 55,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.93,
+          "volume7d": -7.41,
+          "volume30d": 29.56
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -2.0% / RSI 36.5"
+        }
+      },
+      "changes": {
+        "7d": 5.27,
+        "30d": -15.16,
+        "90d": -31.6,
+        "volume7d": -7.41,
+        "volume30d": 29.56
+      },
+      "technical": {
+        "deviation": -2.02,
+        "rsi": 36.5,
+        "volumeRatio": 0.93,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
@@ -3685,12 +2887,12 @@
     {
       "code": "4661",
       "name": "オリエンタルランド",
-      "score": 58,
+      "score": 59,
       "flowScore": 40,
       "treasureScore": 85,
       "kabuScore": 59,
       "confirmationScore": 65,
-      "themeFlowBonus": 4,
+      "themeFlowBonus": 5,
       "overheatPenalty": 6,
       "signal": "監視継続",
       "price": 2602,
@@ -3756,105 +2958,32 @@
       }
     },
     {
-      "code": "4502",
-      "name": "武田薬品工業",
-      "score": 56,
-      "flowScore": 34,
-      "treasureScore": 82,
-      "kabuScore": 59,
-      "confirmationScore": 64,
-      "themeFlowBonus": 5,
-      "overheatPenalty": 6,
-      "signal": "監視継続",
-      "price": 5451,
-      "date": "2026-07-08",
-      "theme": "製薬",
-      "themeIds": [
-        "jp-pharma"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 5287,
-      "tp": 5674,
-      "sl": 5066,
-      "rr": 1.75,
-      "winRate": 64,
-      "winRateCalibrated": 46,
-      "checks": {
-        "score": 64,
-        "passed": 2,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 54,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.96,
-          "volume7d": -15.25,
-          "volume30d": -3.39
-        },
-        "chart": {
-          "score": 58,
-          "ok": false,
-          "label": "押し目待ち",
-          "reason": "25日乖離 6.7% / RSI 72.7"
-        }
-      },
-      "changes": {
-        "7d": 5.74,
-        "30d": 6.46,
-        "90d": -4.89,
-        "volume7d": -15.25,
-        "volume30d": -3.39
-      },
-      "technical": {
-        "deviation": 6.66,
-        "rsi": 72.7,
-        "volumeRatio": 0.96,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "6301",
-      "name": "小松製作所",
-      "score": 56,
-      "flowScore": 23,
-      "treasureScore": 89,
-      "kabuScore": 59,
-      "confirmationScore": 69,
+      "code": "8750",
+      "name": "第一生命ホールディングス",
+      "score": 60,
+      "flowScore": 39,
+      "treasureScore": 95,
+      "kabuScore": 58,
+      "confirmationScore": 63,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 6525,
-      "date": "2026-07-08",
+      "price": 1877,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 6427,
-      "tp": 7105,
-      "sl": 6040,
+      "buy": 1821,
+      "tp": 1994,
+      "sl": 1722,
       "rr": 1.75,
-      "winRate": 66,
+      "winRate": 65,
       "winRateCalibrated": 43,
       "checks": {
-        "score": 69,
+        "score": 63,
         "passed": 3,
         "earnings": {
           "score": 80,
@@ -3872,42 +3001,42 @@
           "score": 41,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.65,
-          "volume7d": -41.22,
-          "volume30d": -32.92
+          "ratio": 0.66,
+          "volume7d": -30.71,
+          "volume30d": -57.81
         },
         "chart": {
-          "score": 86,
+          "score": 66,
           "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -0.3% / RSI 45.4"
+          "label": "確認OK",
+          "reason": "25日乖離 5.4% / RSI 58.9"
         }
       },
       "changes": {
-        "7d": 3.87,
-        "30d": 1.6,
-        "90d": -13.36,
-        "volume7d": -41.22,
-        "volume30d": -32.92
+        "7d": 4.8,
+        "30d": 14.73,
+        "90d": 16.51,
+        "volume7d": -30.71,
+        "volume30d": -57.81
       },
       "technical": {
-        "deviation": -0.34,
-        "rsi": 45.4,
-        "volumeRatio": 0.65,
-        "trendOk": false,
-        "pullbackOk": true,
+        "deviation": 5.44,
+        "rsi": 58.9,
+        "volumeRatio": 0.66,
+        "trendOk": true,
+        "pullbackOk": false,
         "volumeOk": false
       }
     },
     {
       "code": "6954",
       "name": "ファナック",
-      "score": 62,
+      "score": 61,
       "flowScore": 49,
       "treasureScore": 70,
       "kabuScore": 57,
       "confirmationScore": 69,
-      "themeFlowBonus": 2,
+      "themeFlowBonus": 1,
       "overheatPenalty": 0,
       "signal": "監視継続",
       "price": 6700,
@@ -3975,12 +3104,12 @@
     {
       "code": "9434",
       "name": "ソフトバンク",
-      "score": 58,
+      "score": 59,
       "flowScore": 38,
       "treasureScore": 66,
       "kabuScore": 56,
       "confirmationScore": 71,
-      "themeFlowBonus": 2,
+      "themeFlowBonus": 3,
       "overheatPenalty": 0,
       "signal": "監視継続",
       "price": 213.1,
@@ -4046,30 +3175,31 @@
       }
     },
     {
-      "code": "1801",
-      "name": "大成建設",
+      "code": "7203",
+      "name": "トヨタ自動車",
       "score": 57,
-      "flowScore": 39,
-      "treasureScore": 72,
+      "flowScore": 30,
+      "treasureScore": 80,
       "kabuScore": 56,
       "confirmationScore": 72,
-      "themeFlowBonus": 0,
+      "themeFlowBonus": 1,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 14050,
-      "date": "2026-07-08",
-      "theme": "建設",
+      "price": 2824,
+      "date": "2026-07-09",
+      "theme": "円安恩恵 / 自動車",
       "themeIds": [
-        "jp-construction"
+        "jpy-exporters",
+        "jp-auto"
       ],
       "type": "大型株",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 13839,
-      "tp": 15937,
-      "sl": 12640,
-      "rr": 1.75,
+      "buy": 2782,
+      "tp": 3007,
+      "sl": 2653,
+      "rr": 1.74,
       "winRate": 60,
       "winRateCalibrated": 46,
       "checks": {
@@ -4088,63 +3218,136 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 53,
+          "score": 54,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.86,
-          "volume7d": 1.69,
-          "volume30d": 16.34
+          "ratio": 0.92,
+          "volume7d": 14.02,
+          "volume30d": -37.34
         },
         "chart": {
           "score": 86,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -0.7% / RSI 39.8"
+          "reason": "25日乖離 0.9% / RSI 54.2"
         }
       },
       "changes": {
-        "7d": -1.4,
-        "30d": -1.89,
-        "90d": -26.56,
-        "volume7d": 1.69,
-        "volume30d": 16.34
+        "7d": 3.65,
+        "30d": -7.17,
+        "90d": -26.17,
+        "volume7d": 14.02,
+        "volume30d": -37.34
       },
       "technical": {
-        "deviation": -0.72,
-        "rsi": 39.8,
-        "volumeRatio": 0.86,
+        "deviation": 0.86,
+        "rsi": 54.2,
+        "volumeRatio": 0.92,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
       }
     },
     {
-      "code": "6501",
-      "name": "日立製作所",
-      "score": 56,
-      "flowScore": 30,
-      "treasureScore": 82,
+      "code": "2768",
+      "name": "双日",
+      "score": 54,
+      "flowScore": 29,
+      "treasureScore": 69,
       "kabuScore": 56,
       "confirmationScore": 71,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 4778,
-      "date": "2026-07-08",
+      "signal": "見送り",
+      "price": 5147,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
-      "type": "大型株",
-      "quality": "業績良好候補",
+      "type": "中型株",
+      "quality": "割安見直し候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 4706,
-      "tp": 5241,
-      "sl": 4400,
+      "buy": 5070,
+      "tp": 5494,
+      "sl": 4828,
       "rr": 1.75,
       "winRate": 60,
       "winRateCalibrated": 46,
       "checks": {
         "score": 71,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "割安見直し候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 51,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.85,
+          "volume7d": 15.65,
+          "volume30d": -42.54
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -1.2% / RSI 38.9"
+        }
+      },
+      "changes": {
+        "7d": -0.23,
+        "30d": -4.53,
+        "90d": -27.3,
+        "volume7d": 15.65,
+        "volume30d": -42.54
+      },
+      "technical": {
+        "deviation": -1.17,
+        "rsi": 38.9,
+        "volumeRatio": 0.85,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "4063",
+      "name": "信越化学工業",
+      "score": 54,
+      "flowScore": 24,
+      "treasureScore": 78,
+      "kabuScore": 56,
+      "confirmationScore": 70,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 7010,
+      "date": "2026-07-09",
+      "theme": "化学",
+      "themeIds": [
+        "jp-chemical"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 6905,
+      "tp": 7807,
+      "sl": 6390,
+      "rr": 1.75,
+      "winRate": 60,
+      "winRateCalibrated": 46,
+      "checks": {
+        "score": 70,
         "passed": 3,
         "earnings": {
           "score": 80,
@@ -4159,31 +3362,175 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 50,
+          "score": 47,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.85,
-          "volume7d": -8.33,
-          "volume30d": -37.17
+          "ratio": 0.84,
+          "volume7d": -33.77,
+          "volume30d": -61.6
         },
         "chart": {
           "score": 86,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 0.5% / RSI 49.1"
+          "reason": "25日乖離 -1.8% / RSI 43.6"
         }
       },
       "changes": {
-        "7d": 6.87,
-        "30d": -7.65,
-        "90d": -7.19,
-        "volume7d": -8.33,
-        "volume30d": -37.17
+        "7d": -3.43,
+        "30d": -9.64,
+        "90d": 13.65,
+        "volume7d": -33.77,
+        "volume30d": -61.6
       },
       "technical": {
-        "deviation": 0.51,
-        "rsi": 49.1,
-        "volumeRatio": 0.85,
+        "deviation": -1.83,
+        "rsi": 43.6,
+        "volumeRatio": 0.84,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "6501",
+      "name": "日立製作所",
+      "score": 53,
+      "flowScore": 21,
+      "treasureScore": 82,
+      "kabuScore": 56,
+      "confirmationScore": 68,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 4758,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 4687,
+      "tp": 5208,
+      "sl": 4389,
+      "rr": 1.75,
+      "winRate": 60,
+      "winRateCalibrated": 46,
+      "checks": {
+        "score": 68,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 37,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.56,
+          "volume7d": -35.01,
+          "volume30d": -73.55
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 0.5% / RSI 49.8"
+        }
+      },
+      "changes": {
+        "7d": 5.83,
+        "30d": -7.9,
+        "90d": -8.96,
+        "volume7d": -35.01,
+        "volume30d": -73.55
+      },
+      "technical": {
+        "deviation": 0.45,
+        "rsi": 49.8,
+        "volumeRatio": 0.56,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "9503",
+      "name": "関西電力",
+      "score": 53,
+      "flowScore": 18,
+      "treasureScore": 81,
+      "kabuScore": 56,
+      "confirmationScore": 70,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 2290,
+      "date": "2026-07-09",
+      "theme": "電力",
+      "themeIds": [
+        "jp-electric-power"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 2256,
+      "tp": 2414,
+      "sl": 2166,
+      "rr": 1.76,
+      "winRate": 60,
+      "winRateCalibrated": 46,
+      "checks": {
+        "score": 70,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 47,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.8,
+          "volume7d": -10.32,
+          "volume30d": -73.08
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -0.7% / RSI 43.5"
+        }
+      },
+      "changes": {
+        "7d": 0.88,
+        "30d": -1.95,
+        "90d": -18.88,
+        "volume7d": -10.32,
+        "volume30d": -73.08
+      },
+      "technical": {
+        "deviation": -0.7,
+        "rsi": 43.5,
+        "volumeRatio": 0.8,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
@@ -4263,73 +3610,363 @@
       }
     },
     {
-      "code": "7201",
-      "name": "日産自動車",
-      "score": 42,
-      "flowScore": 17,
-      "treasureScore": 42,
-      "kabuScore": 55,
-      "confirmationScore": 56,
+      "code": "8053",
+      "name": "住友商事",
+      "score": 51,
+      "flowScore": 18,
+      "treasureScore": 74,
+      "kabuScore": 56,
+      "confirmationScore": 68,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "見送り",
-      "price": 313.1,
-      "date": "2026-07-08",
+      "price": 1565.5,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "大型株",
-      "quality": "再建候補",
-      "newsRisk": "材料確認",
+      "quality": "高配当候補",
+      "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 308,
-      "tp": 345,
-      "sl": 287,
-      "rr": 1.76,
-      "winRate": 54,
-      "winRateCalibrated": 45,
+      "buy": 1542,
+      "tp": 1696,
+      "sl": 1454,
+      "rr": 1.75,
+      "winRate": 60,
+      "winRateCalibrated": 46,
       "checks": {
-        "score": 56,
+        "score": 68,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "高配当候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 40,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.63,
+          "volume7d": -22.23,
+          "volume30d": -82.24
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -1.8% / RSI 42.3"
+        }
+      },
+      "changes": {
+        "7d": 0,
+        "30d": -11.79,
+        "90d": -6.02,
+        "volume7d": -22.23,
+        "volume30d": -82.24
+      },
+      "technical": {
+        "deviation": -1.79,
+        "rsi": 42.3,
+        "volumeRatio": 0.63,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "8015",
+      "name": "豊田通商",
+      "score": 51,
+      "flowScore": 16,
+      "treasureScore": 76,
+      "kabuScore": 56,
+      "confirmationScore": 70,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 6110,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 6018,
+      "tp": 6659,
+      "sl": 5652,
+      "rr": 1.75,
+      "winRate": 60,
+      "winRateCalibrated": 46,
+      "checks": {
+        "score": 70,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 48,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.82,
+          "volume7d": -7.08,
+          "volume30d": -78.27
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -0.9% / RSI 44.5"
+        }
+      },
+      "changes": {
+        "7d": 1.58,
+        "30d": -11.83,
+        "90d": -12.56,
+        "volume7d": -7.08,
+        "volume30d": -78.27
+      },
+      "technical": {
+        "deviation": -0.86,
+        "rsi": 44.5,
+        "volumeRatio": 0.82,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "7011",
+      "name": "三菱重工業",
+      "score": 49,
+      "flowScore": 18,
+      "treasureScore": 70,
+      "kabuScore": 56,
+      "confirmationScore": 53,
+      "themeFlowBonus": 2,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 3805,
+      "date": "2026-07-09",
+      "theme": "防衛",
+      "themeIds": [
+        "jp-defense"
+      ],
+      "type": "大型株",
+      "quality": "注意あり",
+      "newsRisk": "悪材料確認あり",
+      "financial": null,
+      "buy": 3748,
+      "tp": 4285,
+      "sl": 3441,
+      "rr": 1.75,
+      "winRate": 60,
+      "winRateCalibrated": 46,
+      "checks": {
+        "score": 53,
         "passed": 1,
         "earnings": {
           "score": 48,
           "ok": false,
           "label": "決算確認待ち",
-          "reason": "再建候補"
+          "reason": "注意あり"
         },
         "material": {
-          "score": 54,
+          "score": 28,
           "ok": false,
           "label": "材料確認待ち",
-          "reason": "材料確認"
+          "reason": "悪材料確認あり"
         },
         "volume": {
           "score": 45,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.72,
-          "volume7d": -11.11,
-          "volume30d": -30.83
+          "ratio": 0.75,
+          "volume7d": -18.29,
+          "volume30d": -52.72
         },
         "chart": {
-          "score": 74,
+          "score": 86,
           "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 -3.5% / RSI 31.1"
+          "label": "好位置",
+          "reason": "25日乖離 1.3% / RSI 45.3"
         }
       },
       "changes": {
-        "7d": 4.37,
-        "30d": -21.53,
-        "90d": -26.54,
-        "volume7d": -11.11,
-        "volume30d": -30.83
+        "7d": 1.85,
+        "30d": -0.03,
+        "90d": -24.11,
+        "volume7d": -18.29,
+        "volume30d": -52.72
       },
       "technical": {
-        "deviation": -3.51,
-        "rsi": 31.1,
-        "volumeRatio": 0.72,
+        "deviation": 1.3,
+        "rsi": 45.3,
+        "volumeRatio": 0.75,
         "trendOk": false,
         "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "8316",
+      "name": "三井住友フィナンシャルグループ",
+      "score": 63,
+      "flowScore": 40,
+      "treasureScore": 100,
+      "kabuScore": 51,
+      "confirmationScore": 61,
+      "themeFlowBonus": 7,
+      "overheatPenalty": 3,
+      "signal": "監視継続",
+      "price": 6816,
+      "date": "2026-07-09",
+      "theme": "銀行",
+      "themeIds": [
+        "jp-banks"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 6612,
+      "tp": 7133,
+      "sl": 6314,
+      "rr": 1.75,
+      "winRate": 65,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 61,
+        "passed": 2,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 42,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.64,
+          "volume7d": -5.76,
+          "volume30d": -53.09
+        },
+        "chart": {
+          "score": 58,
+          "ok": false,
+          "label": "押し目待ち",
+          "reason": "25日乖離 5.4% / RSI 66.1"
+        }
+      },
+      "changes": {
+        "7d": 5.95,
+        "30d": 17.13,
+        "90d": 13.66,
+        "volume7d": -5.76,
+        "volume30d": -53.09
+      },
+      "technical": {
+        "deviation": 5.36,
+        "rsi": 66.1,
+        "volumeRatio": 0.64,
+        "trendOk": true,
+        "pullbackOk": false,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "8766",
+      "name": "東京海上HD",
+      "score": 59,
+      "flowScore": 43,
+      "treasureScore": 100,
+      "kabuScore": 51,
+      "confirmationScore": 64,
+      "themeFlowBonus": 6,
+      "overheatPenalty": 7,
+      "signal": "監視継続",
+      "price": 7870,
+      "date": "2026-07-09",
+      "theme": "保険",
+      "themeIds": [
+        "jp-insurance"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 7634,
+      "tp": 8425,
+      "sl": 7182,
+      "rr": 1.75,
+      "winRate": 65,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 64,
+        "passed": 2,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 54,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.95,
+          "volume7d": 8.08,
+          "volume30d": -47.42
+        },
+        "chart": {
+          "score": 58,
+          "ok": false,
+          "label": "押し目待ち",
+          "reason": "25日乖離 7.4% / RSI 66.4"
+        }
+      },
+      "changes": {
+        "7d": 10.66,
+        "30d": 10.67,
+        "90d": 20.58,
+        "volume7d": 8.08,
+        "volume30d": -47.42
+      },
+      "technical": {
+        "deviation": 7.4,
+        "rsi": 66.4,
+        "volumeRatio": 0.95,
+        "trendOk": true,
+        "pullbackOk": false,
         "volumeOk": false
       }
     },
@@ -4407,14 +4044,160 @@
       }
     },
     {
+      "code": "9432",
+      "name": "NTT",
+      "score": 53,
+      "flowScore": 26,
+      "treasureScore": 69,
+      "kabuScore": 50,
+      "confirmationScore": 65,
+      "themeFlowBonus": 3,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 149,
+      "date": "2026-07-09",
+      "theme": "通信",
+      "themeIds": [
+        "jp-telecom"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 147,
+      "tp": 154,
+      "sl": 143,
+      "rr": 1.75,
+      "winRate": 54,
+      "winRateCalibrated": 45,
+      "checks": {
+        "score": 65,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 44,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.74,
+          "volume7d": -42.75,
+          "volume30d": -44.65
+        },
+        "chart": {
+          "score": 70,
+          "ok": true,
+          "label": "確認OK",
+          "reason": "25日乖離 1.8% / RSI 64.9"
+        }
+      },
+      "changes": {
+        "7d": 4.34,
+        "30d": -0.33,
+        "90d": -2.8,
+        "volume7d": -42.75,
+        "volume30d": -44.65
+      },
+      "technical": {
+        "deviation": 1.77,
+        "rsi": 64.9,
+        "volumeRatio": 0.74,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "8001",
+      "name": "伊藤忠商事",
+      "score": 52,
+      "flowScore": 19,
+      "treasureScore": 79,
+      "kabuScore": 50,
+      "confirmationScore": 66,
+      "themeFlowBonus": 2,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 1891.5,
+      "date": "2026-07-09",
+      "theme": "商社",
+      "themeIds": [
+        "jp-trading-houses"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 1863,
+      "tp": 1979,
+      "sl": 1797,
+      "rr": 1.76,
+      "winRate": 54,
+      "winRateCalibrated": 45,
+      "checks": {
+        "score": 66,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 50,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.9,
+          "volume7d": -15.11,
+          "volume30d": -70.5
+        },
+        "chart": {
+          "score": 70,
+          "ok": true,
+          "label": "確認OK",
+          "reason": "25日乖離 1.7% / RSI 63.2"
+        }
+      },
+      "changes": {
+        "7d": 2.13,
+        "30d": -2.27,
+        "90d": -16.67,
+        "volume7d": -15.11,
+        "volume30d": -70.5
+      },
+      "technical": {
+        "deviation": 1.67,
+        "rsi": 63.2,
+        "volumeRatio": 0.9,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
       "code": "9201",
       "name": "日本航空",
-      "score": 53,
+      "score": 54,
       "flowScore": 37,
       "treasureScore": 87,
       "kabuScore": 48,
       "confirmationScore": 63,
-      "themeFlowBonus": 4,
+      "themeFlowBonus": 5,
       "overheatPenalty": 6,
       "signal": "見送り",
       "price": 3044,
@@ -4474,6 +4257,152 @@
         "deviation": 8.2,
         "rsi": 73,
         "volumeRatio": 0.8,
+        "trendOk": true,
+        "pullbackOk": false,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "9502",
+      "name": "中部電力",
+      "score": 48,
+      "flowScore": 31,
+      "treasureScore": 95,
+      "kabuScore": 48,
+      "confirmationScore": 58,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 6,
+      "signal": "見送り",
+      "price": 3250,
+      "date": "2026-07-09",
+      "theme": "電力",
+      "themeIds": [
+        "jp-electric-power"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 3153,
+      "tp": 3501,
+      "sl": 2954,
+      "rr": 1.75,
+      "winRate": 57,
+      "winRateCalibrated": 42,
+      "checks": {
+        "score": 58,
+        "passed": 2,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 43,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.76,
+          "volume7d": -67.76,
+          "volume30d": -39.68
+        },
+        "chart": {
+          "score": 46,
+          "ok": false,
+          "label": "位置悪い",
+          "reason": "25日乖離 10.0% / RSI 89.7"
+        }
+      },
+      "changes": {
+        "7d": 4.23,
+        "30d": 11.11,
+        "90d": 23.22,
+        "volume7d": -67.76,
+        "volume30d": -39.68
+      },
+      "technical": {
+        "deviation": 10.03,
+        "rsi": 89.7,
+        "volumeRatio": 0.76,
+        "trendOk": true,
+        "pullbackOk": false,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "4502",
+      "name": "武田薬品工業",
+      "score": 46,
+      "flowScore": 19,
+      "treasureScore": 82,
+      "kabuScore": 48,
+      "confirmationScore": 61,
+      "themeFlowBonus": 4,
+      "overheatPenalty": 6,
+      "signal": "見送り",
+      "price": 5398,
+      "date": "2026-07-09",
+      "theme": "製薬",
+      "themeIds": [
+        "jp-pharma"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 5236,
+      "tp": 5612,
+      "sl": 5021,
+      "rr": 1.75,
+      "winRate": 57,
+      "winRateCalibrated": 42,
+      "checks": {
+        "score": 61,
+        "passed": 2,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 43,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.72,
+          "volume7d": -33.6,
+          "volume30d": -64.03
+        },
+        "chart": {
+          "score": 58,
+          "ok": false,
+          "label": "押し目待ち",
+          "reason": "25日乖離 5.2% / RSI 77.0"
+        }
+      },
+      "changes": {
+        "7d": 4.82,
+        "30d": 5.47,
+        "90d": -7.23,
+        "volume7d": -33.6,
+        "volume30d": -64.03
+      },
+      "technical": {
+        "deviation": 5.17,
+        "rsi": 77,
+        "volumeRatio": 0.72,
         "trendOk": true,
         "pullbackOk": false,
         "volumeOk": false
@@ -4553,16 +4482,87 @@
       }
     },
     {
+      "code": "6146",
+      "name": "ディスコ",
+      "score": 49,
+      "flowScore": 26,
+      "treasureScore": 81,
+      "kabuScore": 46,
+      "confirmationScore": 56,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 71510,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "材料確認",
+      "financial": null,
+      "buy": 71152,
+      "tp": 91015,
+      "sl": 59802,
+      "rr": 1.75,
+      "winRate": 55,
+      "winRateCalibrated": 42,
+      "checks": {
+        "score": 56,
+        "passed": 1,
+        "earnings": {
+          "score": 70,
+          "ok": true,
+          "label": "業績確認OK",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 46,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "材料確認"
+        },
+        "volume": {
+          "score": 46,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.74,
+          "volume7d": -19.11,
+          "volume30d": -33.11
+        },
+        "chart": {
+          "score": 60,
+          "ok": false,
+          "label": "押し目待ち",
+          "reason": "25日乖離 -8.6% / RSI 37.7"
+        }
+      },
+      "changes": {
+        "7d": -15.39,
+        "30d": 9.86,
+        "90d": -5.28,
+        "volume7d": -19.11,
+        "volume30d": -33.11
+      },
+      "technical": {
+        "deviation": -8.6,
+        "rsi": 37.7,
+        "volumeRatio": 0.74,
+        "trendOk": false,
+        "pullbackOk": false,
+        "volumeOk": false
+      }
+    },
+    {
       "code": "8267",
       "name": "イオン",
-      "score": 56,
+      "score": 55,
       "flowScore": 47,
       "treasureScore": 82,
       "kabuScore": 44,
       "confirmationScore": 59,
-      "themeFlowBonus": 4,
+      "themeFlowBonus": 3,
       "overheatPenalty": 3,
-      "signal": "監視継続",
+      "signal": "見送り",
       "price": 1455,
       "date": "2026-07-08",
       "theme": "小売",
@@ -4628,12 +4628,12 @@
     {
       "code": "5713",
       "name": "住友金属鉱山",
-      "score": 47,
+      "score": 46,
       "flowScore": 27,
       "treasureScore": 68,
       "kabuScore": 41,
       "confirmationScore": 63,
-      "themeFlowBonus": 1,
+      "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "見送り",
       "price": 7305,
@@ -4696,77 +4696,6 @@
         "trendOk": false,
         "pullbackOk": false,
         "volumeOk": true
-      }
-    },
-    {
-      "code": "6146",
-      "name": "ディスコ",
-      "score": 53,
-      "flowScore": 51,
-      "treasureScore": 81,
-      "kabuScore": 40,
-      "confirmationScore": 55,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "見送り",
-      "price": 68230,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "材料確認",
-      "financial": null,
-      "buy": 67889,
-      "tp": 87799,
-      "sl": 56512,
-      "rr": 1.75,
-      "winRate": 49,
-      "winRateCalibrated": 36,
-      "checks": {
-        "score": 55,
-        "passed": 1,
-        "earnings": {
-          "score": 70,
-          "ok": true,
-          "label": "業績確認OK",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 46,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "材料確認"
-        },
-        "volume": {
-          "score": 56,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.9,
-          "volume7d": 32.45,
-          "volume30d": 19.28
-        },
-        "chart": {
-          "score": 48,
-          "ok": false,
-          "label": "位置悪い",
-          "reason": "25日乖離 -12.8% / RSI 33.6"
-        }
-      },
-      "changes": {
-        "7d": -16.03,
-        "30d": 2.83,
-        "90d": -13.71,
-        "volume7d": 32.45,
-        "volume30d": 19.28
-      },
-      "technical": {
-        "deviation": -12.82,
-        "rsi": 33.6,
-        "volumeRatio": 0.9,
-        "trendOk": false,
-        "pullbackOk": false,
-        "volumeOk": false
       }
     },
     {
@@ -4845,30 +4774,30 @@
     {
       "code": "6920",
       "name": "レーザーテック",
-      "score": 47,
-      "flowScore": 55,
+      "score": 46,
+      "flowScore": 51,
       "treasureScore": 60,
       "kabuScore": 32,
-      "confirmationScore": 51,
+      "confirmationScore": 50,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "見送り",
-      "price": 42000,
-      "date": "2026-07-08",
+      "price": 43020,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "大型株",
       "quality": "高成長候補",
       "newsRisk": "過熱確認",
       "financial": null,
-      "buy": 41790,
-      "tp": 54500,
-      "sl": 34527,
+      "buy": 42805,
+      "tp": 54845,
+      "sl": 35925,
       "rr": 1.75,
       "winRate": 49,
       "winRateCalibrated": 36,
       "checks": {
-        "score": 51,
+        "score": 50,
         "passed": 1,
         "earnings": {
           "score": 70,
@@ -4883,34 +4812,108 @@
           "reason": "過熱確認"
         },
         "volume": {
-          "score": 50,
+          "score": 47,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.77,
-          "volume7d": 16.74,
-          "volume30d": -0.46
+          "ratio": 0.72,
+          "volume7d": -12.35,
+          "volume30d": 19.44
         },
         "chart": {
           "score": 48,
           "ok": false,
           "label": "位置悪い",
-          "reason": "25日乖離 -11.8% / RSI 23.8"
+          "reason": "25日乖離 -9.6% / RSI 27.8"
         }
       },
       "changes": {
-        "7d": -15.49,
-        "30d": 4.71,
-        "90d": 25.41,
-        "volume7d": 16.74,
-        "volume30d": -0.46
+        "7d": -15.3,
+        "30d": 7.2,
+        "90d": 27.81,
+        "volume7d": -12.35,
+        "volume30d": 19.44
       },
       "technical": {
-        "deviation": -11.76,
-        "rsi": 23.8,
-        "volumeRatio": 0.77,
+        "deviation": -9.64,
+        "rsi": 27.8,
+        "volumeRatio": 0.72,
         "trendOk": false,
         "pullbackOk": false,
         "volumeOk": false
+      }
+    },
+    {
+      "code": "1306",
+      "name": "TOPIX連動型上場投信",
+      "score": 83,
+      "flowScore": 85,
+      "treasureScore": 72,
+      "kabuScore": 88,
+      "confirmationScore": 81,
+      "themeFlowBonus": 4,
+      "overheatPenalty": 0,
+      "signal": "監視継続",
+      "price": 419.1,
+      "date": "2026-07-09",
+      "theme": "商社 / 低PBR",
+      "themeIds": [
+        "jp-trading-houses",
+        "jp-low-pbr"
+      ],
+      "type": "東証ETF",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 413,
+      "tp": 439,
+      "sl": 398,
+      "rr": 1.73,
+      "winRate": 82,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 81,
+        "passed": 4,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 76,
+          "ok": true,
+          "label": "出来高増加",
+          "ratio": 1.27,
+          "volume7d": 133.22,
+          "volume30d": 60.43
+        },
+        "chart": {
+          "score": 100,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -0.9% / RSI 41.5"
+        }
+      },
+      "changes": {
+        "7d": -1.57,
+        "30d": 0.29,
+        "90d": 1.45,
+        "volume7d": 133.22,
+        "volume30d": 60.43
+      },
+      "technical": {
+        "deviation": -0.85,
+        "rsi": 41.5,
+        "volumeRatio": 1.27,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": true
       }
     },
     {
@@ -4987,153 +4990,6 @@
       }
     },
     {
-      "code": "1306",
-      "name": "TOPIX連動型上場投信",
-      "score": 77,
-      "flowScore": 65,
-      "treasureScore": 92,
-      "kabuScore": 77,
-      "confirmationScore": 75,
-      "themeFlowBonus": 5,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 426.5,
-      "date": "2026-07-08",
-      "theme": "商社 / 低PBR",
-      "themeIds": [
-        "jp-trading-houses",
-        "jp-low-pbr"
-      ],
-      "type": "東証ETF",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 420,
-      "tp": 446,
-      "sl": 405,
-      "rr": 1.73,
-      "winRate": 82,
-      "winRateCalibrated": 43,
-      "checks": {
-        "score": 75,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 50,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.73,
-          "volume7d": 17.97,
-          "volume30d": 40.48
-        },
-        "chart": {
-          "score": 100,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 0.9% / RSI 44.9"
-        }
-      },
-      "changes": {
-        "7d": 0.68,
-        "30d": 3.14,
-        "90d": 4.59,
-        "volume7d": 17.97,
-        "volume30d": 40.48
-      },
-      "technical": {
-        "deviation": 0.9,
-        "rsi": 44.9,
-        "volumeRatio": 0.73,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": false
-      }
-    },
-    {
-      "code": "1615",
-      "name": "東証銀行業株価指数連動型ETF",
-      "score": 86,
-      "flowScore": 95,
-      "treasureScore": 100,
-      "kabuScore": 72,
-      "confirmationScore": 72,
-      "themeFlowBonus": 7,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 755.1,
-      "date": "2026-07-08",
-      "theme": "銀行",
-      "themeIds": [
-        "jp-banks"
-      ],
-      "type": "東証ETF",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 732,
-      "tp": 790,
-      "sl": 699,
-      "rr": 1.76,
-      "winRate": 72,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 72,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 79,
-          "ok": true,
-          "label": "出来高増加",
-          "ratio": 1.14,
-          "volume7d": 128.76,
-          "volume30d": 278.4
-        },
-        "chart": {
-          "score": 66,
-          "ok": true,
-          "label": "確認OK",
-          "reason": "25日乖離 6.2% / RSI 59.6"
-        }
-      },
-      "changes": {
-        "7d": 7.72,
-        "30d": 15.28,
-        "90d": 18.75,
-        "volume7d": 128.76,
-        "volume30d": 278.4
-      },
-      "technical": {
-        "deviation": 6.22,
-        "rsi": 59.6,
-        "volumeRatio": 1.14,
-        "trendOk": true,
-        "pullbackOk": false,
-        "volumeOk": true
-      }
-    },
-    {
       "code": "3283",
       "name": "日本プロロジスリート投資法人",
       "score": 64,
@@ -5207,35 +5063,106 @@
       }
     },
     {
-      "code": "1343",
-      "name": "NEXT FUNDS 東証REIT指数連動型上場投信",
-      "score": 62,
-      "flowScore": 43,
-      "treasureScore": 90,
-      "kabuScore": 64,
-      "confirmationScore": 70,
-      "themeFlowBonus": 8,
-      "overheatPenalty": 6,
+      "code": "8953",
+      "name": "日本都市ファンド投資法人",
+      "score": 54,
+      "flowScore": 25,
+      "treasureScore": 79,
+      "kabuScore": 71,
+      "confirmationScore": 63,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 114000,
+      "date": "2026-07-09",
+      "theme": null,
+      "themeIds": [],
+      "type": "J-REIT",
+      "quality": "分散型候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 112290,
+      "tp": 117990,
+      "sl": 109033,
+      "rr": 1.75,
+      "winRate": 76,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 63,
+        "passed": 2,
+        "earnings": {
+          "score": 58,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "分散型候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 34,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.48,
+          "volume7d": -44.05,
+          "volume30d": -71.15
+        },
+        "chart": {
+          "score": 92,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 2.1% / RSI 63.7"
+        }
+      },
+      "changes": {
+        "7d": 2.61,
+        "30d": 1.33,
+        "90d": -6.33,
+        "volume7d": -44.05,
+        "volume30d": -71.15
+      },
+      "technical": {
+        "deviation": 2.14,
+        "rsi": 63.7,
+        "volumeRatio": 0.48,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "1540",
+      "name": "純金上場信託",
+      "score": 72,
+      "flowScore": 77,
+      "treasureScore": 84,
+      "kabuScore": 70,
+      "confirmationScore": 77,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 1981,
-      "date": "2026-07-08",
-      "theme": "REIT",
+      "price": 19965,
+      "date": "2026-07-09",
+      "theme": "金",
       "themeIds": [
-        "jp-reits"
+        "jp-gold"
       ],
       "type": "東証ETF",
       "quality": "業績良好候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 1951,
-      "tp": 2030,
-      "sl": 1906,
-      "rr": 1.76,
-      "winRate": 76,
-      "winRateCalibrated": 44,
+      "buy": 19666,
+      "tp": 20969,
+      "sl": 18922,
+      "rr": 1.75,
+      "winRate": 67,
+      "winRateCalibrated": 43,
       "checks": {
-        "score": 70,
-        "passed": 3,
+        "score": 77,
+        "passed": 4,
         "earnings": {
           "score": 80,
           "ok": true,
@@ -5249,34 +5176,34 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 49,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.73,
-          "volume7d": 7.72,
-          "volume30d": 18.94
+          "score": 75,
+          "ok": true,
+          "label": "出来高増加",
+          "ratio": 1.25,
+          "volume7d": 153.61,
+          "volume30d": -12.11
         },
         "chart": {
-          "score": 84,
+          "score": 86,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 2.4% / RSI 70.9"
+          "reason": "25日乖離 -0.7% / RSI 49.6"
         }
       },
       "changes": {
-        "7d": 0.99,
-        "30d": 2.59,
-        "90d": -9.73,
-        "volume7d": 7.72,
-        "volume30d": 18.94
+        "7d": 3.02,
+        "30d": -6.86,
+        "90d": -18.87,
+        "volume7d": 153.61,
+        "volume30d": -12.11
       },
       "technical": {
-        "deviation": 2.45,
-        "rsi": 70.9,
-        "volumeRatio": 0.73,
-        "trendOk": true,
+        "deviation": -0.7,
+        "rsi": 49.6,
+        "volumeRatio": 1.25,
+        "trendOk": false,
         "pullbackOk": true,
-        "volumeOk": false
+        "volumeOk": true
       }
     },
     {
@@ -5353,27 +5280,100 @@
       }
     },
     {
+      "code": "1343",
+      "name": "NEXT FUNDS 東証REIT指数連動型上場投信",
+      "score": 58,
+      "flowScore": 20,
+      "treasureScore": 90,
+      "kabuScore": 64,
+      "confirmationScore": 66,
+      "themeFlowBonus": 8,
+      "overheatPenalty": 3,
+      "signal": "監視継続",
+      "price": 1977,
+      "date": "2026-07-09",
+      "theme": "REIT",
+      "themeIds": [
+        "jp-reits"
+      ],
+      "type": "東証ETF",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 1947,
+      "tp": 2025,
+      "sl": 1903,
+      "rr": 1.77,
+      "winRate": 76,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 66,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 31,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.44,
+          "volume7d": -67.17,
+          "volume30d": -55
+        },
+        "chart": {
+          "score": 84,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 2.1% / RSI 67.9"
+        }
+      },
+      "changes": {
+        "7d": 2.07,
+        "30d": 1.59,
+        "90d": -8.77,
+        "volume7d": -67.17,
+        "volume30d": -55
+      },
+      "technical": {
+        "deviation": 2.05,
+        "rsi": 67.9,
+        "volumeRatio": 0.44,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
       "code": "8952",
       "name": "ジャパンリアルエステイト投資法人",
-      "score": 48,
-      "flowScore": 21,
+      "score": 44,
+      "flowScore": 18,
       "treasureScore": 82,
       "kabuScore": 64,
       "confirmationScore": 62,
       "themeFlowBonus": 0,
-      "overheatPenalty": 3,
+      "overheatPenalty": 6,
       "signal": "見送り",
-      "price": 118600,
-      "date": "2026-07-08",
+      "price": 119800,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "J-REIT",
       "quality": "安定利回り候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 116821,
-      "tp": 123846,
-      "sl": 112807,
+      "buy": 118003,
+      "tp": 125103,
+      "sl": 113946,
       "rr": 1.75,
       "winRate": 76,
       "winRateCalibrated": 44,
@@ -5393,176 +5393,32 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 40,
+          "score": 38,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.61,
-          "volume7d": -36.69,
-          "volume30d": -26.25
+          "ratio": 0.57,
+          "volume7d": -32.87,
+          "volume30d": -63.59
         },
         "chart": {
           "score": 84,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 2.9% / RSI 66.0"
+          "reason": "25日乖離 3.7% / RSI 70.6"
         }
       },
       "changes": {
-        "7d": 2.42,
-        "30d": 4.77,
-        "90d": -10.36,
-        "volume7d": -36.69,
-        "volume30d": -26.25
+        "7d": 4.17,
+        "30d": 4.81,
+        "90d": -7.92,
+        "volume7d": -32.87,
+        "volume30d": -63.59
       },
       "technical": {
-        "deviation": 2.94,
-        "rsi": 66,
-        "volumeRatio": 0.61,
+        "deviation": 3.69,
+        "rsi": 70.6,
+        "volumeRatio": 0.57,
         "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": false
-      }
-    },
-    {
-      "code": "8953",
-      "name": "日本都市ファンド投資法人",
-      "score": 47,
-      "flowScore": 21,
-      "treasureScore": 79,
-      "kabuScore": 64,
-      "confirmationScore": 62,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 3,
-      "signal": "見送り",
-      "price": 114300,
-      "date": "2026-07-08",
-      "theme": null,
-      "themeIds": [],
-      "type": "J-REIT",
-      "quality": "分散型候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 112586,
-      "tp": 118611,
-      "sl": 109143,
-      "rr": 1.75,
-      "winRate": 76,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 62,
-        "passed": 2,
-        "earnings": {
-          "score": 58,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "分散型候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 39,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.61,
-          "volume7d": -38.85,
-          "volume30d": -55.62
-        },
-        "chart": {
-          "score": 84,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 2.6% / RSI 68.9"
-        }
-      },
-      "changes": {
-        "7d": 1.96,
-        "30d": 3.72,
-        "90d": -7.75,
-        "volume7d": -38.85,
-        "volume30d": -55.62
-      },
-      "technical": {
-        "deviation": 2.61,
-        "rsi": 68.9,
-        "volumeRatio": 0.61,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": false
-      }
-    },
-    {
-      "code": "1540",
-      "name": "純金上場信託",
-      "score": 50,
-      "flowScore": 18,
-      "treasureScore": 84,
-      "kabuScore": 56,
-      "confirmationScore": 67,
-      "themeFlowBonus": 1,
-      "overheatPenalty": 0,
-      "signal": "見送り",
-      "price": 20055,
-      "date": "2026-07-08",
-      "theme": "金",
-      "themeIds": [
-        "jp-gold"
-      ],
-      "type": "東証ETF",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 19754,
-      "tp": 21180,
-      "sl": 18939,
-      "rr": 1.75,
-      "winRate": 60,
-      "winRateCalibrated": 46,
-      "checks": {
-        "score": 67,
-        "passed": 3,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 34,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.5,
-          "volume7d": -58.18,
-          "volume30d": -63.01
-        },
-        "chart": {
-          "score": 86,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -0.5% / RSI 41.7"
-        }
-      },
-      "changes": {
-        "7d": 2.69,
-        "30d": -3.88,
-        "90d": -18.67,
-        "volume7d": -58.18,
-        "volume30d": -63.01
-      },
-      "technical": {
-        "deviation": -0.52,
-        "rsi": 41.7,
-        "volumeRatio": 0.5,
-        "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
       }
@@ -5570,12 +5426,12 @@
     {
       "code": "1328",
       "name": "金価格連動型上場投信",
-      "score": 49,
+      "score": 48,
       "flowScore": 19,
       "treasureScore": 78,
       "kabuScore": 56,
       "confirmationScore": 67,
-      "themeFlowBonus": 1,
+      "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "見送り",
       "price": 15840,
@@ -5643,16 +5499,16 @@
     {
       "code": "2516",
       "name": "東証グロース250 ETF",
-      "score": 42,
-      "flowScore": 25,
+      "score": 40,
+      "flowScore": 19,
       "treasureScore": 51,
       "kabuScore": 56,
-      "confirmationScore": 53,
+      "confirmationScore": 51,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "見送り",
-      "price": 562,
-      "date": "2026-07-08",
+      "price": 567,
+      "date": "2026-07-09",
       "theme": "グロース",
       "themeIds": [
         "jp-small-growth"
@@ -5661,14 +5517,14 @@
       "quality": "注意あり",
       "newsRisk": "悪材料確認あり",
       "financial": null,
-      "buy": 554,
-      "tp": 609,
-      "sl": 523,
+      "buy": 558,
+      "tp": 611,
+      "sl": 528,
       "rr": 1.77,
       "winRate": 60,
       "winRateCalibrated": 46,
       "checks": {
-        "score": 53,
+        "score": 51,
         "passed": 1,
         "earnings": {
           "score": 48,
@@ -5683,61 +5539,134 @@
           "reason": "悪材料確認あり"
         },
         "volume": {
-          "score": 44,
+          "score": 37,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.67,
-          "volume7d": 4.27,
-          "volume30d": -53.44
+          "ratio": 0.53,
+          "volume7d": -29.44,
+          "volume30d": -51.33
         },
         "chart": {
           "score": 86,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -1.4% / RSI 48.9"
+          "reason": "25日乖離 -0.4% / RSI 55.0"
         }
       },
       "changes": {
-        "7d": 0.09,
-        "30d": -14.33,
-        "90d": -4.54,
-        "volume7d": 4.27,
-        "volume30d": -53.44
+        "7d": 2.68,
+        "30d": -12.51,
+        "90d": -6.64,
+        "volume7d": -29.44,
+        "volume30d": -51.33
       },
       "technical": {
-        "deviation": -1.39,
-        "rsi": 48.9,
-        "volumeRatio": 0.67,
+        "deviation": -0.35,
+        "rsi": 55,
+        "volumeRatio": 0.53,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
       }
     },
     {
+      "code": "1615",
+      "name": "東証銀行業株価指数連動型ETF",
+      "score": 74,
+      "flowScore": 91,
+      "treasureScore": 100,
+      "kabuScore": 51,
+      "confirmationScore": 65,
+      "themeFlowBonus": 7,
+      "overheatPenalty": 3,
+      "signal": "監視継続",
+      "price": 749.3,
+      "date": "2026-07-09",
+      "theme": "銀行",
+      "themeIds": [
+        "jp-banks"
+      ],
+      "type": "東証ETF",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 727,
+      "tp": 781,
+      "sl": 696,
+      "rr": 1.74,
+      "winRate": 65,
+      "winRateCalibrated": 43,
+      "checks": {
+        "score": 65,
+        "passed": 2,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 58,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.82,
+          "volume7d": 21.33,
+          "volume30d": 163.77
+        },
+        "chart": {
+          "score": 58,
+          "ok": false,
+          "label": "押し目待ち",
+          "reason": "25日乖離 5.0% / RSI 67.7"
+        }
+      },
+      "changes": {
+        "7d": 5.52,
+        "30d": 14.21,
+        "90d": 15.65,
+        "volume7d": 21.33,
+        "volume30d": 163.77
+      },
+      "technical": {
+        "deviation": 5.02,
+        "rsi": 67.7,
+        "volumeRatio": 0.82,
+        "trendOk": true,
+        "pullbackOk": false,
+        "volumeOk": false
+      }
+    },
+    {
       "code": "3462",
       "name": "野村不動産マスターファンド投資法人",
-      "score": 46,
-      "flowScore": 22,
-      "treasureScore": 78,
-      "kabuScore": 53,
+      "score": 43,
+      "flowScore": 23,
+      "treasureScore": 63,
+      "kabuScore": 50,
       "confirmationScore": 59,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "見送り",
-      "price": 152800,
-      "date": "2026-07-08",
+      "price": 152600,
+      "date": "2026-07-09",
       "theme": null,
       "themeIds": [],
       "type": "J-REIT",
       "quality": "安定利回り候補",
       "newsRisk": "悪材料未検出",
       "financial": null,
-      "buy": 150508,
-      "tp": 157558,
-      "sl": 146479,
+      "buy": 150311,
+      "tp": 157136,
+      "sl": 146411,
       "rr": 1.75,
-      "winRate": 60,
-      "winRateCalibrated": 46,
+      "winRate": 54,
+      "winRateCalibrated": 45,
       "checks": {
         "score": 59,
         "passed": 2,
@@ -5754,31 +5683,31 @@
           "reason": "悪材料未検出"
         },
         "volume": {
-          "score": 41,
+          "score": 42,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.7,
-          "volume7d": -51.61,
-          "volume30d": -68.85
+          "ratio": 0.67,
+          "volume7d": -31.02,
+          "volume30d": -52.23
         },
         "chart": {
           "score": 70,
           "ok": true,
           "label": "確認OK",
-          "reason": "25日乖離 1.5% / RSI 63.1"
+          "reason": "25日乖離 1.2% / RSI 59.3"
         }
       },
       "changes": {
-        "7d": 0.66,
-        "30d": 0.73,
-        "90d": -9.43,
-        "volume7d": -51.61,
-        "volume30d": -68.85
+        "7d": 1.33,
+        "30d": 0,
+        "90d": -8.57,
+        "volume7d": -31.02,
+        "volume30d": -52.23
       },
       "technical": {
-        "deviation": 1.45,
-        "rsi": 63.1,
-        "volumeRatio": 0.7,
+        "deviation": 1.21,
+        "rsi": 59.3,
+        "volumeRatio": 0.67,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
