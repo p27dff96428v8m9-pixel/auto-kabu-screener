@@ -128,6 +128,16 @@ function jstDateKey(date = new Date()) {
   return new Date(date.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+function jstNow(date = new Date()) {
+  const jst = new Date(date.getTime() + 9 * 3600 * 1000);
+  return {
+    dateKey: jst.toISOString().slice(0, 10),
+    monthKey: jst.toISOString().slice(0, 7),
+    hour: jst.getUTCHours(),
+    dayOfMonth: jst.getUTCDate()
+  };
+}
+
 // 東証の取引時間（JST 平日 9:00〜15:30）かどうか。新規到達判定はこの間のみ行う。
 // 祝日は判定してしまうが、価格が前日終値のまま動かないため到達は発生しない
 // （標準は buy < 基準価格、ゆるめも基準価格×0.999 上限のため）。
@@ -561,6 +571,80 @@ function buildSettleMessage(ev, rankMap) {
   return lines.join("\n");
 }
 
+// 前夜ダイジェスト: 統合ランキング上位の買い目標一覧をJST21時以降の最初の実行で1日1回LINEする。
+// 買い目標は日付切替後の最初の実行で固定されるため、夜のEODで再計算された値＝「明日の目標の予告」。
+// S株実弾の資金準備（1銘柄=資金の10%目安）と心構えのための通知。
+function buildDigestMessage(ranked, regime) {
+  const yen = (n) => (n == null ? "—" : `${Math.round(n).toLocaleString()}円`);
+  const lines = ["📋明日の買い目標予告（統合ランキング上位）"];
+  if (regime && regime.bottomZone) {
+    lines.push(`🔥底値圏ブースト中（25日線${regime.deviationPct}%・60日高値${regime.drawdown60Pct}%）実弾は通常の2〜3倍サイズの好機`);
+  }
+  let i = 0;
+  for (const s of ranked) {
+    if (i >= 10) break;
+    i += 1;
+    lines.push(`${i}. ${s.name} (${s.code}) ${s.signal || ""}`);
+    lines.push(`　買い${yen(s.buy)}／利確${yen(s.tp)}／損切${yen(s.sl)}`);
+  }
+  lines.push(`詳細: ${PAGE_URL}`);
+  return lines.join("\n");
+}
+
+// 決済スリッページの実測: 決済価格が理論ライン(tp/sl)からどれだけ乖離したかを決済履歴から集計する。
+// tpのプラス=ラインより上で約定（ボーナス）/ slのマイナス=ラインより下で約定（滑り）。
+// EOD判定時代は損切-1.3〜-2.2%の滑りがあり、Yahoo遅延判定化(2026-07-08)の効果測定に使う。
+function computeSlippage(obs, nowIso) {
+  const out = { computedAt: nowIso };
+  for (const mode of ["standard", "relax"]) {
+    const tpSlips = [];
+    const slSlips = [];
+    for (const c of obs[mode].closed) {
+      const exit = Number(c.exitPrice);
+      if (!Number.isFinite(exit)) continue;
+      if (c.exitType === "tp" && Number(c.tp) > 0) tpSlips.push(((exit - Number(c.tp)) / Number(c.tp)) * 100);
+      else if (c.exitType === "sl" && Number(c.sl) > 0) slSlips.push(((exit - Number(c.sl)) / Number(c.sl)) * 100);
+    }
+    const avg = (a) => (a.length ? Number((a.reduce((s, v) => s + v, 0) / a.length).toFixed(2)) : null);
+    out[mode] = { tpAvgPct: avg(tpSlips), tpSamples: tpSlips.length, slAvgPct: avg(slSlips), slSamples: slSlips.length };
+  }
+  return out;
+}
+
+// 月次答え合わせ: 前月に決済された買い対象区分の実測（勝率・平均損益）をバックテスト理論値と
+// 並べてLINEする。理論と実測の乖離が実弾判断の信頼度そのもの、という思想の定点観測。
+const BT_REFERENCE = { standard: { winPct: 43.3, avgPnlPct: 1.63 }, relax: { winPct: 53.4, avgPnlPct: 1.51 } };
+function buildMonthlyReport(obs, monthKey) {
+  const lines = [`📊観測スペース 月次答え合わせ（${monthKey}）`];
+  for (const mode of ["standard", "relax"]) {
+    const closed = obs[mode].closed.filter((c) => String(c.exitAt || "").startsWith(monthKey) && BUY_CATEGORIES.has(getCategoryLabel(c.signal)));
+    const tp = closed.filter((c) => c.exitType === "tp").length;
+    const sl = closed.filter((c) => c.exitType === "sl").length;
+    const to = closed.filter((c) => c.exitType === "timeout").length;
+    const pnls = closed
+      .filter((c) => Number(c.hitPrice) > 0 && Number.isFinite(Number(c.exitPrice)))
+      .map((c) => ((Number(c.exitPrice) - Number(c.hitPrice)) / Number(c.hitPrice)) * 100);
+    const winPct = tp + sl ? ((tp / (tp + sl)) * 100).toFixed(1) : null;
+    const avgPnl = pnls.length ? (pnls.reduce((s, v) => s + v, 0) / pnls.length).toFixed(2) : null;
+    const ref = BT_REFERENCE[mode];
+    lines.push(`${MODE_EMOJI[mode]}${MODE_LABELS[mode]}: ${closed.length}件決済 利確${tp}/損切${sl}${to ? `/期限${to}` : ""}`);
+    lines.push(`　勝率${winPct != null ? `${winPct}%` : "—"}（理論${ref.winPct}%）平均${avgPnl != null ? `${avgPnl}%` : "—"}（理論+${ref.avgPnlPct}%）`);
+  }
+  const top = obs.candidateRanking && obs.candidateRanking.items && obs.candidateRanking.items[0];
+  if (top) lines.push(`第1候補: ${MODE_LABELS[top.mode] || top.mode}×${VARIANT_LABELS[top.variant] || top.variant}（損益率${top.pnlPct}%・決済${top.decided}件）`);
+  const slip = obs.slippage;
+  if (slip) {
+    for (const mode of ["standard", "relax"]) {
+      const s = slip[mode];
+      if (s && (s.tpSamples || s.slSamples)) {
+        lines.push(`${MODE_LABELS[mode]}スリッページ: 利確${s.tpAvgPct != null ? `${s.tpAvgPct > 0 ? "+" : ""}${s.tpAvgPct}%` : "—"}(${s.tpSamples}件) 損切${s.slAvgPct != null ? `${s.slAvgPct > 0 ? "+" : ""}${s.slAvgPct}%` : "—"}(${s.slSamples}件)`);
+      }
+    }
+  }
+  lines.push(`詳細: ${PAGE_URL}`);
+  return lines.join("\n");
+}
+
 // 公開ページの selectIntegratedRankingStocks / シートの selectSheetStocks と同じ選択ロジック
 function selectRankedStocks(stocks, limit) {
   const picked = [];
@@ -850,6 +934,9 @@ async function main() {
     items: rankedCandidates.map((c, i) => ({ rank: i + 1, ...c }))
   };
 
+  // 決済スリッページの実測を公開（観測スペースの表示・月次レポートで使用）
+  obs.slippage = computeSlippage(obs, nowIso);
+
   obs.source = "github-actions-integrated-obs";
   obs.updatedAt = nowIso;
   obs.marketUpdatedAt = treasure.marketUpdatedAt || treasure.updatedAt || null;
@@ -870,6 +957,33 @@ async function main() {
   for (const key of Object.keys(settleEvents)) {
     if (await sendLine(buildSettleMessage(settleEvents[key], rankMap))) settleNotified += 1;
   }
+
+  // 前夜ダイジェスト（JST21時以降の最初の実行で1日1回）と月次答え合わせ（毎月1〜3日9時以降に前月分を1回）。
+  // LINE未設定環境では送信済み扱いにして毎回の再試行を避ける。送信できたらフラグを保存し直す。
+  const lineConfigured = Boolean(process.env.LINE_ACCESS_TOKEN && process.env.LINE_USER_ID);
+  const jst = jstNow();
+  let flagsChanged = false;
+  // OBS_FORCE_DIGEST=1 / OBS_FORCE_MONTHLY=1 は手動テスト用（時刻条件を無視して本文を組み立てる。
+  // LINE未設定ならコンソールに本文を出力するだけ）。
+  if (process.env.OBS_FORCE_DIGEST === "1" || (jst.hour >= 21 && obs.digestSentDate !== jst.dateKey)) {
+    const msg = buildDigestMessage(ranked, regime);
+    if (!lineConfigured) console.log(`[前夜ダイジェスト]\n${msg}`);
+    if (!lineConfigured || await sendLine(msg)) {
+      obs.digestSentDate = jst.dateKey;
+      flagsChanged = true;
+    }
+  }
+  if (process.env.OBS_FORCE_MONTHLY === "1" || (jst.dayOfMonth <= 3 && jst.hour >= 9 && obs.monthlyReportMonth !== jst.monthKey)) {
+    const [y, m] = jst.monthKey.split("-").map(Number);
+    const prevMonthKey = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+    const msg = buildMonthlyReport(obs, prevMonthKey);
+    if (!lineConfigured) console.log(`[月次答え合わせ]\n${msg}`);
+    if (!lineConfigured || await sendLine(msg)) {
+      obs.monthlyReportMonth = jst.monthKey;
+      flagsChanged = true;
+    }
+  }
+  if (flagsChanged) writeJson(obsPath, obs);
 
   console.log(JSON.stringify({
     ...summary,
