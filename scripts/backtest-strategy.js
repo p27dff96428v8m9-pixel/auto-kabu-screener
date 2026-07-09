@@ -317,6 +317,9 @@ function simulate(codeBars, regimeByDate, { useRegimeFilter, mode = "standard" }
         pnlPct: Number(pnlPct.toFixed(2)),
         winRate: plan.winRate,
         rr: plan.rr,
+        buy: plan.buy,
+        sl: plan.sl,
+        tp: plan.tp,
         tier: tierOf(technical, plan),
         altGate: altGateOf(technical)
       });
@@ -628,6 +631,8 @@ async function main() {
   fs.writeFileSync(outputPath, JSON.stringify(result, null, 1));
   fs.writeFileSync(path.join(cacheDir, "backtest-trades.json"), JSON.stringify({ ranAt: result.ranAt, sltpMode: SLTP_MODE, trades: withFilter }, null, 1));
   fs.writeFileSync(path.join(cacheDir, "backtest-trades-relax.json"), JSON.stringify({ ranAt: result.ranAt, sltpMode: SLTP_MODE, mode: "relax", trades: relaxTrades }, null, 1));
+  // 標準モードの本番同等(フィルタOFF)側も保存する（candidateRankingの6バケット検証 analyze-candidate-ranking.js 用）
+  fs.writeFileSync(path.join(cacheDir, "backtest-trades-standard.json"), JSON.stringify({ ranAt: result.ranAt, sltpMode: SLTP_MODE, mode: "standard", trades: withoutFilter }, null, 1));
 
   const o = result.regimeFilterOn.overall;
   const off = result.regimeFilterOff.overall;

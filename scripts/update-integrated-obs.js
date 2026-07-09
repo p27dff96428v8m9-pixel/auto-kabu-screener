@@ -81,16 +81,18 @@ const BUY_CATEGORIES = new Set(["統合買い候補", "確認候補"]);
 //     ゆるめが勝率+10pt・総益でも優位、ライブ観測でも ゆるめ70% vs 標準40% と同方向だったため入替。
 //     深い押し目待ちは「悪材料で下げた銘柄だけ約定する」逆選択が起きているとみられる
 //     （平均損益/件のみ標準+1.63% vs ゆるめ+1.51%で僅差逆転＝深押しの生存者は伸びるが勝率が低い）。
-//   100万固定 > 1単元 … 全銘柄同額＝戦略の期待値がそのまま資金曲線に出る。1単元は株価で重みが偏る
+//   100万固定 > リスク均等 > 1単元 … 6バケットの5年運用再現(scripts/analyze-candidate-ranking.js)の
+//     実現損益順そのまま: relax/fixed +2,493万 > standard/fixed +1,656万 > relax/risk +1,391万 >
+//     standard/risk +644万 > relax/unit +316万 > standard/unit +72万。
+//     1単元は安い銘柄で数万円しか張れず資金が遊ぶため、同じ5,000万でも利益が伸びない。
 // 損益率に差が出た後は評価額ベースで自動的に順位が入れ替わる（candidateRanking）。
-// リスク均等（risk）は2026-07-03追加の新参で実績が浅いため、既存4バケットの後ろ（第5・6候補）から開始する。
 const STRUCTURAL_PRIORITY = [
   { mode: "relax", variant: "fixed" },
-  { mode: "relax", variant: "unit" },
   { mode: "standard", variant: "fixed" },
-  { mode: "standard", variant: "unit" },
   { mode: "relax", variant: "risk" },
-  { mode: "standard", variant: "risk" }
+  { mode: "standard", variant: "risk" },
+  { mode: "relax", variant: "unit" },
+  { mode: "standard", variant: "unit" }
 ];
 
 // LINE通知（買い目標到達＝仮想購入時、および利確/損切＝決済時）。標準/ゆるめ × 方式（100万固定/1単元/リスク均等）の
