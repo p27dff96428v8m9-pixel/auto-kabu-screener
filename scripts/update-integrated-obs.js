@@ -448,7 +448,8 @@ async function sendLine(message) {
 
 // 1銘柄×1モードの買い目標到達イベント（100万固定/1単元の両方式の結果込み）をLINE本文に整形する。
 // rankMap: "mode:variant" -> 実戦候補順位（candidateRanking）。どの通知を実弾にするかの目安を本文に併記する。
-function buildBuyMessage(ev, rankMap) {
+// regime: treasure.marketRegime。bottomZone（底値圏ブースト日）なら本文冒頭で強調する。
+function buildBuyMessage(ev, rankMap, regime) {
   const yen = (n) => `${Math.round(n).toLocaleString()}円`;
   const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
   const emoji = MODE_EMOJI[ev.mode] || "🎯";
@@ -458,6 +459,12 @@ function buildBuyMessage(ev, rankMap) {
     `区分: ${ev.category || "—"}`,
     `現在値 ${yen(ev.price)} ≤ ${modeLabel}基準 ${yen(ev.threshold)}`
   ];
+  // 底値圏ブースト日: 25日線乖離≤-6% or 60日高値比≤-10%（前日終値ベース）。
+  // 5年バックテストでこの地合いの押し目買いは勝率69.6%・平均+8.74%と通常時(勝率53%/+1.3%)より突出。
+  if (regime && regime.bottomZone) {
+    lines.splice(1, 0, `🔥底値圏ブースト日（${regime.index} 25日線${regime.deviationPct}%・60日高値${regime.drawdown60Pct}%）`,
+      `過去5年この地合いの押し目買いは勝率70%/平均+8.7%。実弾は通常の2〜3倍サイズの好機`);
+  }
   // ゆるめは min(買い目標×1.02, 基準価格×0.999) がしきい値なので、根拠を明示（標準は買い目標そのものなので省略）。
   if (ev.factor !== 1) lines.push(`(買い目標 ${yen(ev.buy)} ×${ev.factor}・基準値×0.999 の低い方)`);
   lines.push(`利確 ${ev.tp != null ? yen(ev.tp) : "—"} ／ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`);
@@ -854,7 +861,7 @@ async function main() {
   const notifyCodes = Object.keys(buyEvents);
   let notified = 0;
   for (const code of notifyCodes) {
-    if (await sendLine(buildBuyMessage(buyEvents[code], rankMap))) notified += 1;
+    if (await sendLine(buildBuyMessage(buyEvents[code], rankMap, regime))) notified += 1;
   }
 
   // 利確/損切した銘柄も 1銘柄×モード=1通 でLINE通知（方式ごとの実現損益を本文に併記）。
