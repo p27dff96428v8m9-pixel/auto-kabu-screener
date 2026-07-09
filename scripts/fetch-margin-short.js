@@ -9,12 +9,16 @@
 //
 // 使い方: node scripts/fetch-margin-short.js
 // 出力: data-cache/margin-interest.json / data-cache/short-ratio.json
+//   （GitHub Actionsの年次更新ではMARGIN_SHORT_OUTPUT_DIR=research-dataでリポジトリにコミットして永続化。
+//     data-cacheはgitignoreのためActionsランナー上では実行後に消えるので）
 
 const fs = require("fs");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
-const cacheDir = path.join(repoRoot, "data-cache");
+const cacheDir = process.env.MARGIN_SHORT_OUTPUT_DIR
+  ? path.resolve(process.cwd(), process.env.MARGIN_SHORT_OUTPUT_DIR)
+  : path.join(repoRoot, "data-cache");
 const JQUANTS_V2_BASE_URL = process.env.JQUANTS_V2_BASE_URL || "https://api.jquants.com/v2";
 
 function loadDotEnv() {
@@ -56,7 +60,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, 300));
   }
   fs.writeFileSync(path.join(cacheDir, "margin-interest.json"), JSON.stringify({ fetchedAt: new Date().toISOString(), codes: codes.length, data: margin }));
-  console.log(`\n信用残: ${codes.length}銘柄 → data-cache/margin-interest.json`);
+  console.log(`\n信用残: ${codes.length}銘柄 → ${path.join(cacheDir, "margin-interest.json")}`);
 
   // 2) 33業種別 空売り比率（日次）。ユニバースの所属業種ぶんだけ取得
   const sectors = new Set();
@@ -83,7 +87,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, 300));
   }
   fs.writeFileSync(path.join(cacheDir, "short-ratio.json"), JSON.stringify({ fetchedAt: new Date().toISOString(), sectors: [...sectors], data: shortRatio }));
-  console.log(`\n空売り比率: ${sectors.size}業種 → data-cache/short-ratio.json`);
+  console.log(`\n空売り比率: ${sectors.size}業種 → ${path.join(cacheDir, "short-ratio.json")}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
