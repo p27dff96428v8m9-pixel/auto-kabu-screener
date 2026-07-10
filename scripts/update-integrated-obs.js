@@ -430,6 +430,37 @@ async function refreshJudgePrices(priceMap, obs) {
   return { source: usedSource, refreshed, total: codeList.length, latestQuoteAt: latestAt };
 }
 
+// ── 権利落ち日の偽押し目対策 ──────────────────────────────────────
+// 権利落ち日（権利確定日=月末最終営業日の1営業日前）は配当分だけ株価が機械的に下がるため、
+// 「押し目到達」に見えても反発の根拠がない。10年検証で落ち日エントリーは勝率25.9%/平均-1.45%
+// （基準51%/+0.91%）と大幅に悪い（scripts/analyze-ex-dividend.js）。配当月の銘柄は落ち日の
+// 新規エントリーを見送る。配当月データは docs/.../dividend-months.json（年次更新で再生成）。
+// 落ち日の特定は J-Quants markets/calendar（祝日込み・Lightで取得可）を月1回だけ引いて
+// obs.exDivCalendar にキャッシュする。カレンダーが取れない場合は見送りせず従来動作（フェイルオープン）。
+async function resolveExDivDate(obs, monthKey) {
+  const cached = obs.exDivCalendar;
+  if (cached && cached.month === monthKey && cached.exDate !== undefined) return cached.exDate;
+  const key = process.env.JQUANTS_API_KEY || process.env.JQUANTS_REFRESH_TOKEN;
+  if (!key) return null;
+  try {
+    const from = `${monthKey.replace("-", "")}01`;
+    const to = `${monthKey.replace("-", "")}31`;
+    const res = await fetch(`https://api.jquants.com/v2/markets/calendar?from=${from}&to=${to}`, {
+      headers: { "x-api-key": key }
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()).data || [];
+    // HolDiv: 1=営業日, 2=半日営業日（大発会/大納会）も営業日として数える
+    const tradingDays = rows.filter((r) => r.HolDiv === "1" || r.HolDiv === "2").map((r) => String(r.Date)).sort();
+    const exDate = tradingDays.length >= 2 ? tradingDays[tradingDays.length - 2] : null;
+    obs.exDivCalendar = { month: monthKey, exDate, fetchedAt: new Date().toISOString() };
+    if (exDate) console.log(`権利落ち日カレンダー更新: ${monthKey} の落ち日 = ${exDate}`);
+    return exDate;
+  } catch {
+    return null;
+  }
+}
+
 // LINE Messaging API でテキストを push 送信する（auto_trader.py / gas_code.gs と同じ方式）。
 async function sendLine(message) {
   const token = process.env.LINE_ACCESS_TOKEN;
@@ -791,14 +822,32 @@ async function main() {
   const regime = treasure.marketRegime || null;
   const entryAllowed = marketOpen;
   if (!marketOpen) console.log("市場時間外（JST平日9:00〜15:30以外）のため新規到達判定をスキップ");
+
+  // 権利落ち日チェック: 今日が落ち日なら、当月が配当月の銘柄は新規エントリーを見送る（偽押し目対策）
+  const divMonthsPath = resolvePath("DIVIDEND_MONTHS_PATH", path.join("docs", "fund-flow-ai-system", "data", "dividend-months.json"));
+  const divMonthsMap = (readJson(divMonthsPath, {}) || {}).months || {};
+  let exDivToday = false;
+  if (marketOpen) {
+    const exDate = await resolveExDivDate(obs, today.slice(0, 7));
+    exDivToday = exDate != null && exDate === today;
+    if (exDivToday) console.log(`本日は権利落ち日（${today}）: 配当月銘柄の新規エントリーを見送ります`);
+  }
+  const exDivSkipped = new Set();
+  const curMonth = Number(today.slice(5, 7));
+
   // UI表示用に判定状態を公開データへ保存
-  obs.entryGuard = { marketOpen, regime, entryAllowed, checkedAt: nowIso };
+  obs.entryGuard = { marketOpen, regime, entryAllowed, exDivToday, checkedAt: nowIso };
   for (const def of modeDefs) {
     if (!entryAllowed) break;
     const data = obs[def.key];
     const activeCodes = new Set(data.active.map((it) => it.code));
     for (const [code, target] of Object.entries(obs.targets)) {
       if (activeCodes.has(code)) continue;
+      // 権利落ち日×配当月の銘柄は見送り（10年検証: 勝率25.9%/平均-1.45%の偽押し目）
+      if (exDivToday && Array.isArray(divMonthsMap[code]) && divMonthsMap[code].includes(curMonth)) {
+        exDivSkipped.add(code);
+        continue;
+      }
       const curPrice = priceMap[code];
       if (!Number.isFinite(curPrice)) continue;
       const buy = Number(target.buy);
@@ -856,6 +905,11 @@ async function main() {
         }
       }
     }
+  }
+
+  if (exDivSkipped.size) {
+    obs.entryGuard.exDivSkippedCodes = [...exDivSkipped];
+    console.log(`権利落ち日見送り: ${[...exDivSkipped].join(", ")}`);
   }
 
   // 3) 目標の更新: 統合ランキング上位の個別株について、JST日付が変わった最初の実行で buy/tp/sl を固定
@@ -1015,6 +1069,7 @@ async function main() {
     marketOpen,
     regime: regime ? { index: regime.index, bullish: regime.bullish, deviationPct: regime.deviationPct } : null,
     entryAllowed,
+    exDivToday,
     notified,
     settleNotified,
     targets: Object.keys(obs.targets).length,

@@ -62,12 +62,17 @@ jobs:
           MARGIN_SHORT_OUTPUT_DIR: research-data
         run: node scripts/fetch-margin-short.js
 
+      - name: "2b. 配当月データの更新（権利落ち日スキップ用）"
+        env:
+          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+        run: node scripts/fetch-dividend-months.js
+
       - name: "3. 結果をコミット"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          DATA_FILES="docs/fund-flow-ai-system/data/backtest.json research-data"
+          DATA_FILES="docs/fund-flow-ai-system/data/backtest.json docs/fund-flow-ai-system/data/dividend-months.json research-data"
           git add $DATA_FILES
 
           if git diff --cached --quiet; then
