@@ -1022,10 +1022,18 @@ async function main() {
   // LINE未設定ならコンソールに本文を出力するだけ）。
   if (process.env.OBS_FORCE_DIGEST === "1" || (jst.hour >= 21 && obs.digestSentDate !== jst.dateKey)) {
     const msg = buildDigestMessage(ranked, regime);
-    if (!lineConfigured) console.log(`[前夜ダイジェスト]\n${msg}`);
-    if (!lineConfigured || await sendLine(msg)) {
+    // 土日祝はEODデータが更新されず前夜と同一内容の再送になるため、前回送信した本文と
+    // 完全一致ならLINEしない（送信済み扱いだけ記録）。内容が変わった夜だけ通知する。
+    if (process.env.OBS_FORCE_DIGEST !== "1" && msg === obs.digestLastMsg) {
       obs.digestSentDate = jst.dateKey;
       flagsChanged = true;
+    } else {
+      if (!lineConfigured) console.log(`[前夜ダイジェスト]\n${msg}`);
+      if (!lineConfigured || await sendLine(msg)) {
+        obs.digestSentDate = jst.dateKey;
+        obs.digestLastMsg = msg;
+        flagsChanged = true;
+      }
     }
   }
   // 年次データ更新のリマインド: 毎年7月上旬に1回、Standard月の手順（ANNUAL_UPDATE.md）をLINEで案内する。
