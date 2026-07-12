@@ -794,7 +794,22 @@ function buildStock(ticker, instrument, quote, financial = null, marketData = nu
 // 発掘銘柄は業績/材料ラベルを持たないため、既存の未知銘柄と同じ既定値でエントリーし、
 // あとは全銘柄共通の採点・シグナル判定・観測スペースの実測に委ねる（テーマ=「全市場発掘」で識別）。
 // 鮮度48時間超・ファイル無しは黙ってスキップ（従来のユニバースだけで動作継続）。
+// ただし土日はスキャン(平日19:40のみ)が走らないため経過時間に数えない。固定48時間だと
+// 金曜夜のデータが月曜未明(買い目標の固定時点)に必ず失効し、治験銘柄の月曜の押し目を
+// 全部取りこぼしていた（2026-07-12判明）。
 const DISCOVERY_MERGE_COUNT = Math.max(0, Number(process.env.DISCOVERY_MERGE_COUNT ?? 5));
+function weekendHoursBetween(fromMs, toMs) {
+  let weekend = 0;
+  // JSTの暦日単位で土日に重なる時間を合算（14日で打ち切り＝どのみち鮮度切れ）
+  for (let t = fromMs; t < toMs && t < fromMs + 14 * 86400000;) {
+    const jst = new Date(t + 9 * 3600000);
+    const dayEndUtc = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + 1) - 9 * 3600000;
+    const segEnd = Math.min(dayEndUtc, toMs);
+    if (jst.getUTCDay() === 0 || jst.getUTCDay() === 6) weekend += (segEnd - t) / 3600000;
+    t = segEnd;
+  }
+  return weekend;
+}
 function mergeDiscoveries(quotes, instruments) {
   if (!DISCOVERY_MERGE_COUNT) return 0;
   const discoveryPath = process.env.DISCOVERY_INPUT_PATH
@@ -802,8 +817,10 @@ function mergeDiscoveries(quotes, instruments) {
     : resolveMarketDataDefaultPath().replace(/market-data\.json$/, "market-discovery.json");
   const discovery = readJson(discoveryPath, null);
   if (!discovery || !Array.isArray(discovery.candidates)) return 0;
-  const ageHours = (Date.now() - Date.parse(discovery.updatedAt || 0)) / 3600000;
-  if (!Number.isFinite(ageHours) || ageHours > 48) return 0;
+  const updatedAtMs = Date.parse(discovery.updatedAt || 0);
+  const ageHours = (Date.now() - updatedAtMs) / 3600000;
+  if (!Number.isFinite(ageHours)) return 0;
+  if (ageHours - weekendHoursBetween(updatedAtMs, Date.now()) > 48) return 0;
   let merged = 0;
   for (const c of discovery.candidates) {
     if (merged >= DISCOVERY_MERGE_COUNT) break;

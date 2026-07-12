@@ -48,8 +48,17 @@ function apiKey() {
   return key;
 }
 
-async function fetchJson(url) {
+// 429/5xx は待って再試行する。20分毎の市場データ更新ワークフローと同じAPIキーを共有しており、
+// 実行時間帯が重なると流量制限(429)が返る（2026-07-10 金曜スキャン失敗の真因）。
+async function fetchJson(url, attempt = 1) {
   const res = await fetch(url, { headers: { "x-api-key": apiKey() } });
+  if (res.status === 429 || res.status >= 500) {
+    if (attempt > 5) throw new Error(`HTTP ${res.status} ${url} (リトライ5回でも解消せず)`);
+    const waitSec = Math.min(90, 15 * attempt);
+    console.log(`HTTP ${res.status} → ${waitSec}秒待って再試行 (${attempt}/5)`);
+    await new Promise((r) => setTimeout(r, waitSec * 1000));
+    return fetchJson(url, attempt + 1);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
   return res.json();
 }
