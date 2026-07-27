@@ -1,85 +1,80 @@
 {
-  "source": "gemini",
-  "updatedAt": "2026-07-27T01:11:26.755Z",
+  "source": "rule-fallback",
+  "updatedAt": "2026-07-27T01:21:48.365Z",
   "period": "90d",
-  "model": "gemini-2.5-flash",
-  "marketUpdatedAt": "2026-07-27T01:10:55.946Z",
-  "summary": "現在の日本株市場では、J-REITや医薬品・ヘルスケアといったテーマに短期的な資金流入が集中し、市場の広がりも大きい状況です。特に医薬品は価格・出来高の勢いも強いですが、過熱感も高まっています。円安が進行しており、輸出関連株への影響も注視すべきです。中小型成長株はスコアが高いものの、資金流入の持続性には注意が必要です。",
+  "model": null,
+  "message": "gemini-2.5-flash#1:429 Too Many Requests: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 56.917330194s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.5-flash\"\n            },\n            \"quotaValue\": \"20\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"56s\"\n      }\n    ]\n  }\n}\n / gemini-2.5-flash#2:429 Too Many Requests: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 41.793267866s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"model\": \"gemini-2.5-flash\",\n              \"location\": \"global\"\n            },\n            \"quotaValue\": \"20\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"41s\"\n      }\n    ]\n  }\n}\n / gemini-2.5-flash#3:429 Too Many Requests: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 11.658209426s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-2.5-flash\"\n            },\n            \"quotaValue\": \"20\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"11s\"\n      }\n    ]\n  }\n}\n",
+  "summary": "Gemini未接続のため、株価・出来高から計算した暫定候補です。Gemini APIキー登録後はニュース・金利・為替材料を含めてAI調査に切り替わります。",
   "candidates": [
     {
       "id": "jp-reits",
       "name": "J-REIT・利回り資産",
       "score": 94,
-      "decision": "注目",
-      "reason": "7日間の資金量が99、広がりが95と非常に高く、出来高も活発です。利回り資産として安定的な資金流入が見られます。",
+      "decision": "優先確認",
+      "reason": "90日の資金量44、7日の資金量99、広がり35。価格・出来高だけで見る暫定判定です。",
       "evidence": [
-        "価格・出来高: 7日間の出来高100、モメンタム52",
-        "資金量: 7日間の資金量99、30日間の資金量78",
-        "広がり: 7日間の広がり95、30日間の広がり95",
-        "過熱度: 7日間の過熱度53"
+        "資金量 90日:44 / 30日:78 / 7日:99",
+        "加速度:0",
+        "過熱度:42"
       ],
-      "nextCheck": "金利・為替材料: 国内金利動向、ニュース見出し: 不動産市況関連ニュース",
-      "risk": "金利上昇局面でのパフォーマンス悪化"
+      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
+      "risk": "ニュース未確認のため、材料の裏取り前提。"
     },
     {
       "id": "jp-small-growth",
       "name": "グロース250・中小型成長",
       "score": 92,
-      "decision": "要確認",
-      "reason": "スコアは高いものの、資金流入の勢いや市場の広がりは限定的です。短期的な出来高増加は見られますが、モメンタムは弱い状況です。",
+      "decision": "優先確認",
+      "reason": "90日の資金量5、7日の資金量49、広がり35。価格・出来高だけで見る暫定判定です。",
       "evidence": [
-        "価格・出来高: 7日間の出来高76、モメンタム21",
-        "資金量: 7日間の資金量49、30日間の資金量14",
-        "広がり: 7日間の広がり35、30日間の広がり35",
-        "過熱度: 7日間の過熱度45"
+        "資金量 90日:5 / 30日:14 / 7日:49",
+        "加速度:0",
+        "過熱度:40"
       ],
-      "nextCheck": "ニュース見出し: 個別銘柄の決算発表、成長期待ニュース、価格・出来高: モメンタムの改善",
-      "risk": "資金流入の持続性、市場全体のセンチメント悪化"
+      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
+      "risk": "ニュース未確認のため、材料の裏取り前提。"
     },
     {
       "id": "jp-pharma",
       "name": "医薬品・ヘルスケア",
       "score": 91,
-      "decision": "注目、ただし追いかけ買い注意",
-      "reason": "資金流入が極めて活発で、広がりも大きく、価格・出来高の勢いも非常に強いです。しかし、過熱度も高まっています。",
+      "decision": "優先確認",
+      "reason": "90日の資金量39、7日の資金量100、広がり35。価格・出来高だけで見る暫定判定です。",
       "evidence": [
-        "価格・出来高: 7日間のモメンタム77、30日間のモメンタム95、7日間の出来高86",
-        "資金量: 7日間の資金量100、30日間の資金量83",
-        "広がり: 7日間の広がり95、30日間の広がり95",
-        "過熱度: 7日間の過熱度64、30日間の過熱度67"
+        "資金量 90日:39 / 30日:83 / 7日:100",
+        "加速度:0",
+        "過熱度:40"
       ],
-      "nextCheck": "ニュース見出し: 新薬開発ニュース、政府の医療政策、高齢化関連ニュース",
-      "risk": "高値警戒感、利益確定売り、追いかけ買い注意"
+      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
+      "risk": "ニュース未確認のため、材料の裏取り前提。"
     },
     {
       "id": "jp-gold",
       "name": "金・インフレヘッジ",
       "score": 87,
-      "decision": "動向注視",
-      "reason": "短期的に資金流入と広がりが見られますが、出来高やモメンタムはまだ限定的です。銅価格の急騰など、インフレ懸念が再燃する可能性に注目です。",
+      "decision": "優先確認",
+      "reason": "90日の資金量0、7日の資金量54、広がり35。価格・出来高だけで見る暫定判定です。",
       "evidence": [
-        "価格・出来高: 7日間のモメンタム55、出来高22",
-        "資金量: 7日間の資金量54",
-        "広がり: 7日間の広がり95",
-        "金利・為替材料: 銅価格の急騰（7日間+25.34%）"
+        "資金量 90日:0 / 30日:26 / 7日:54",
+        "加速度:0",
+        "過熱度:40"
       ],
-      "nextCheck": "金利・為替材料: 世界的なインフレ動向、金利動向、為替変動、ニュース見出し: 地政学的リスク",
-      "risk": "金利上昇による魅力低下、ドル高進行"
+      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
+      "risk": "ニュース未確認のため、材料の裏取り前提。"
     },
     {
       "id": "jp-electric-power",
       "name": "電力・原子力再稼働",
       "score": 72,
-      "decision": "監視継続",
-      "reason": "資金流入と市場の広がりが見られますが、価格・出来高の勢いは中程度です。テーマ性から今後の動向に注目です。",
+      "decision": "優先確認",
+      "reason": "90日の資金量0、7日の資金量69、広がり35。価格・出来高だけで見る暫定判定です。",
       "evidence": [
-        "価格・出来高: 7日間のモメンタム56、出来高48",
-        "資金量: 7日間の資金量69、30日間の資金量59",
-        "広がり: 7日間の広がり95、30日間の広がり95",
-        "過熱度: 7日間の過熱度44"
+        "資金量 90日:0 / 30日:59 / 7日:69",
+        "加速度:0",
+        "過熱度:40"
       ],
-      "nextCheck": "ニュース見出し: 政府のエネルギー政策、原子力発電所の再稼働状況、電力需給関連ニュース",
-      "risk": "政策変更リスク、燃料価格変動"
+      "nextCheck": "Gemini APIキー登録後、ニュース・金利・為替の材料確認を行う。",
+      "risk": "ニュース未確認のため、材料の裏取り前提。"
     }
   ]
 }
