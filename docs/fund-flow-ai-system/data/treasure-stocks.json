@@ -1,8 +1,8 @@
 {
   "source": "fund-flow-treasure-kabukazidou",
   "logic": "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime); 全市場発掘(market-discovery)上位5銘柄を治験合流",
-  "updatedAt": "2026-08-03T18:24:35.632Z",
-  "marketUpdatedAt": "2026-08-03T18:24:04.725Z",
+  "updatedAt": "2026-08-03T20:18:31.052Z",
+  "marketUpdatedAt": "2026-08-03T20:17:46.874Z",
   "marketRegime": {
     "index": "TOPIX連動(1306)",
     "current": 411.8,
@@ -16,7 +16,7 @@
   "winRateCalibration": "backtest atr / 地合いフィルタOFF(本番同等) / 4277件",
   "investorFlows": {
     "section": "TSEPrime",
-    "updatedAt": "2026-08-03T18:23:15.638Z",
+    "updatedAt": "2026-08-03T20:16:59.156Z",
     "weeks": [
       {
         "stDate": "2026-05-07",
@@ -1111,7 +1111,7 @@
       "flowScore": 97,
       "treasureScore": 92,
       "kabuScore": 88,
-      "confirmationScore": 78,
+      "confirmationScore": 74,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "統合買い候補",
@@ -1127,31 +1127,31 @@
       "financial": {
         "ticker": "9201",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-03T07:52:20.332Z",
+        "updatedAt": "2026-08-03T20:17:45.951Z",
         "latestStatement": {
-          "disclosedDate": "2026-04-30",
+          "disclosedDate": "2026-08-03",
           "disclosedTime": "12:00:00",
           "localCode": "92010",
-          "documentType": "FYFinancialStatements_Consolidated_IFRS",
-          "period": "FY",
-          "fiscalYearEnd": "2026-03-31",
-          "periodEnd": "2026-03-31",
-          "netSales": 2012515000000,
-          "operatingProfit": 207349000000,
-          "ordinaryProfit": 154347000000,
-          "profit": 137604000000,
-          "eps": 306.96,
-          "forecastNetSales": null,
+          "documentType": "1QFinancialStatements_Consolidated_IFRS",
+          "period": "1Q",
+          "fiscalYearEnd": "2027-03-31",
+          "periodEnd": "2026-06-30",
+          "netSales": 523737000000,
+          "operatingProfit": 10843000000,
+          "ordinaryProfit": null,
+          "profit": 5353000000,
+          "eps": 9.09,
+          "forecastNetSales": 2095000000000,
           "forecastOperatingProfit": null,
-          "forecastProfit": null,
+          "forecastProfit": 110000000000,
           "forecastEps": null,
-          "expectedProgressPct": 100,
-          "profitProgressPct": null,
+          "expectedProgressPct": 25,
+          "profitProgressPct": 4.9,
           "epsProgressPct": null,
-          "netSalesProgressPct": null,
+          "netSalesProgressPct": 25,
           "operatingProfitProgressPct": null,
-          "progressBasis": null,
-          "progressVsExpectedPct": null
+          "progressBasis": 4.9,
+          "progressVsExpectedPct": -20.1
         }
       },
       "buy": 2935,
@@ -1161,37 +1161,37 @@
       "winRate": 82,
       "winRateCalibrated": 44,
       "checks": {
-        "score": 78,
-        "passed": 4,
+        "score": 74,
+        "passed": 3,
         "earnings": {
-          "score": 72,
-          "ok": true,
-          "label": "実決算確認OK",
-          "reason": "決算日 2026-04-30 / EPS 306.96",
+          "score": 54,
+          "ok": false,
+          "label": "実決算弱い",
+          "reason": "決算日 2026-08-03 / EPS 9.09 / 進捗 4.9% / 期待比 -20.1pt",
           "actual": {
-            "disclosedDate": "2026-04-30",
+            "disclosedDate": "2026-08-03",
             "disclosedTime": "12:00:00",
             "localCode": "92010",
-            "documentType": "FYFinancialStatements_Consolidated_IFRS",
-            "period": "FY",
-            "fiscalYearEnd": "2026-03-31",
-            "periodEnd": "2026-03-31",
-            "netSales": 2012515000000,
-            "operatingProfit": 207349000000,
-            "ordinaryProfit": 154347000000,
-            "profit": 137604000000,
-            "eps": 306.96,
-            "forecastNetSales": null,
+            "documentType": "1QFinancialStatements_Consolidated_IFRS",
+            "period": "1Q",
+            "fiscalYearEnd": "2027-03-31",
+            "periodEnd": "2026-06-30",
+            "netSales": 523737000000,
+            "operatingProfit": 10843000000,
+            "ordinaryProfit": null,
+            "profit": 5353000000,
+            "eps": 9.09,
+            "forecastNetSales": 2095000000000,
             "forecastOperatingProfit": null,
-            "forecastProfit": null,
+            "forecastProfit": 110000000000,
             "forecastEps": null,
-            "expectedProgressPct": 100,
-            "profitProgressPct": null,
+            "expectedProgressPct": 25,
+            "profitProgressPct": 4.9,
             "epsProgressPct": null,
-            "netSalesProgressPct": null,
+            "netSalesProgressPct": 25,
             "operatingProfitProgressPct": null,
-            "progressBasis": null,
-            "progressVsExpectedPct": null
+            "progressBasis": 4.9,
+            "progressVsExpectedPct": -20.1
           }
         },
         "material": {
@@ -1633,7 +1633,7 @@
       "financial": {
         "ticker": "9432",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-03T07:52:20.517Z",
+        "updatedAt": "2026-08-03T20:17:46.142Z",
         "latestStatement": {
           "disclosedDate": "2026-05-08",
           "disclosedTime": "13:00:00",
@@ -1888,7 +1888,7 @@
       "financial": {
         "ticker": "8766",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-02T20:17:45.855Z",
+        "updatedAt": "2026-08-03T20:17:44.850Z",
         "latestStatement": {
           "disclosedDate": "2026-06-26",
           "disclosedTime": "15:30:00",
@@ -2650,7 +2650,7 @@
       "financial": {
         "ticker": "9433",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-03T07:52:20.711Z",
+        "updatedAt": "2026-08-03T20:17:46.322Z",
         "latestStatement": {
           "disclosedDate": "2026-05-12",
           "disclosedTime": "15:45:00",
@@ -3027,7 +3027,7 @@
       "financial": {
         "ticker": "9434",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-03T07:52:20.892Z",
+        "updatedAt": "2026-08-03T20:17:46.514Z",
         "latestStatement": {
           "disclosedDate": "2026-05-11",
           "disclosedTime": "15:30:00",
@@ -3281,7 +3281,7 @@
       "financial": {
         "ticker": "9020",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-02T20:17:46.759Z",
+        "updatedAt": "2026-08-03T20:17:45.760Z",
         "latestStatement": {
           "disclosedDate": "2026-07-31",
           "disclosedTime": "15:30:00",
@@ -4304,7 +4304,7 @@
       "financial": {
         "ticker": "8795",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-02T20:17:46.034Z",
+        "updatedAt": "2026-08-03T20:17:45.039Z",
         "latestStatement": {
           "disclosedDate": "2026-05-15",
           "disclosedTime": "14:00:00",
@@ -5568,7 +5568,7 @@
       "financial": {
         "ticker": "9501",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-03T07:52:21.088Z",
+        "updatedAt": "2026-08-03T20:17:46.698Z",
         "latestStatement": {
           "disclosedDate": "2026-07-29",
           "disclosedTime": "16:30:00",
@@ -8095,7 +8095,7 @@
       "financial": {
         "ticker": "9502",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-03T07:52:21.288Z",
+        "updatedAt": "2026-08-03T20:17:46.874Z",
         "latestStatement": {
           "disclosedDate": "2026-07-29",
           "disclosedTime": "16:00:00",
@@ -8930,7 +8930,7 @@
       "financial": {
         "ticker": "8951",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-02T20:17:46.207Z",
+        "updatedAt": "2026-08-03T20:17:45.213Z",
         "latestStatement": {
           "disclosedDate": "2026-02-16",
           "disclosedTime": "15:30:00",
@@ -9055,7 +9055,7 @@
       "financial": {
         "ticker": "8952",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-02T20:17:46.381Z",
+        "updatedAt": "2026-08-03T20:17:45.388Z",
         "latestStatement": {
           "disclosedDate": "2026-05-15",
           "disclosedTime": "16:00:00",
@@ -9180,7 +9180,7 @@
       "financial": {
         "ticker": "8953",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-02T20:17:46.558Z",
+        "updatedAt": "2026-08-03T20:17:45.568Z",
         "latestStatement": {
           "disclosedDate": "2026-04-21",
           "disclosedTime": "15:30:00",
