@@ -56,8 +56,8 @@ const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 
 // 仮想資金シミュレーション: 観測スペースへの追加を「購入」とみなし、利確/損切で資金を増減させる。
 // 4種類の購入ルールを並行運用して比較できるようにする:
-//   practice: Grok推奨の少資金実践。初期100万円・評価額の10%を1銘柄に（ミニ株/S株想定）・同時保有3件。
-//             資金が増えると1銘柄の投入額も自動で増える（%ベース）。OBS_PRACTICE_CAPITAL / OBS_PRACTICE_PCT で調整可。
+//   practice: Grok推奨の少資金実践（バランスB）。初期100万円・評価額の15%を1銘柄に（ミニ株/S株想定）・同時保有4件。
+//             最大稼働≈60%。資金が増えると1銘柄の投入額も自動で増える。OBS_PRACTICE_CAPITAL / OBS_PRACTICE_PCT で調整可。
 //   fixed: 1銘柄100万円固定（端株可・S株/ミニ株想定）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る
 //   unit : 1単元（100株）購入。実際の発注（単元株取引）の再現。銘柄ごとに投入額が変わる
 //   risk : リスク均等（auto_trader.py の calc_lot_size と同じ考え方）。損切までの値幅から株数を逆算し、
@@ -68,7 +68,7 @@ const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 //   - 標準: 確認候補 WR25% / 監視継続 WR8% が期待値を破壊（全体 WR23.6%, sumR -24.7）
 //   - ゆるめ: 全体は勝率~49%でも円ベース微マイナス。統合買い候補のみ WR67% / E≈+0.83R / +49万 と明確にプラス
 //   - 確認候補・監視継続・見送りは対照群として観測のみ（仮想購入・LINE買い通知なし）
-// 同時保有上限: fixed/unit/risk は MAX_POSITIONS（既定10）、practice は PRACTICE_MAX_POSITIONS（既定3）。
+// 同時保有上限: fixed/unit/risk は MAX_POSITIONS（既定10）、practice は PRACTICE_MAX_POSITIONS（既定4）。
 // 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
 const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
@@ -76,10 +76,10 @@ const UNIT_SHARES = 100;
 const RISK_BUDGET = Number(process.env.OBS_RISK_BUDGET || 50000);
 const RISK_MAX_COST = Number(process.env.OBS_RISK_MAX_COST || 5000000);
 const MAX_POSITIONS = Math.max(1, Number(process.env.OBS_MAX_POSITIONS || 10));
-// Grok推奨・少資金実践プロファイル（資金100万スタート、増資は OBS_PRACTICE_CAPITAL を上げるだけで追従）
+// Grok推奨・少資金実践プロファイル（バランスB: 15%×4本≈60%稼働。増資は OBS_PRACTICE_CAPITAL で追従）
 const PRACTICE_INITIAL_CAPITAL = Math.max(10000, Number(process.env.OBS_PRACTICE_CAPITAL || 1000000));
-const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.10)));
-const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 3));
+const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.15)));
+const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 4));
 const PRACTICE_MIN_BUDGET = Math.max(1000, Number(process.env.OBS_PRACTICE_MIN_BUDGET || 10000));
 const PF_VARIANTS = ["practice", "fixed", "unit", "risk"];
 const PF_HISTORY_LIMIT = 200;
@@ -87,7 +87,7 @@ const PF_SKIPPED_LIMIT = 40;
 const BUY_CATEGORIES = new Set(["統合買い候補"]);
 
 // 実戦候補の初期優先度。成績（損益率）に差が付くまでの同率時の並び順:
-//   practice（Grok推奨）を最上位 … 少資金の実運用に一番近い（100万・%定額・同時3本・統合買い候補のみ）
+//   practice（Grok推奨）を最上位 … 少資金の実運用に一番近い（100万・15%定額・同時4本・統合買い候補のみ）
 //   ゆるめ > 標準 (2026-07-09入替)
 //   100万固定 > リスク均等 > 1単元
 // 損益率に差が出た後は評価額ベースで自動的に順位が入れ替わる（candidateRanking）。
@@ -217,7 +217,7 @@ function makeEmptyPortfolio(variant = "fixed") {
           label: "実践(Grok推奨)",
           positionPct: PRACTICE_POSITION_PCT,
           maxPositions: PRACTICE_MAX_POSITIONS,
-          note: "評価額×10%を1銘柄（ミニ株想定）・同時最大3本・統合買い候補のみ。資金増加はOBS_PRACTICE_CAPITALまたは評価額の増加で自動反映。"
+          note: "評価額×15%を1銘柄（ミニ株想定）・同時最大4本・統合買い候補のみ。資金増加はOBS_PRACTICE_CAPITALまたは評価額の増加で自動反映。"
         }
       : null
   };
@@ -269,7 +269,7 @@ function normalizeObs(obs) {
           label: "実践(Grok推奨)",
           positionPct: PRACTICE_POSITION_PCT,
           maxPositions: PRACTICE_MAX_POSITIONS,
-          note: "評価額×10%を1銘柄（ミニ株想定）・同時最大3本・統合買い候補のみ。"
+          note: "評価額×15%を1銘柄（ミニ株想定）・同時最大4本・統合買い候補のみ。"
         };
       }
     }
@@ -315,7 +315,7 @@ function tryBuy(pf, variant, code, name, signal, price, nowIso, sl) {
       cost = Math.round(shares * price);
     }
   } else if (variant === "practice") {
-    // 少資金実践: 評価額の PRACTICE_POSITION_PCT（既定10%）を1銘柄に投入。資金が増えれば自動で大きくなる。
+    // 少資金実践: 評価額の PRACTICE_POSITION_PCT（既定15%）を1銘柄に投入。資金が増えれば自動で大きくなる。
     const equity = portfolioEquityApprox(pf);
     let budget = Math.floor(equity * PRACTICE_POSITION_PCT);
     if (budget < PRACTICE_MIN_BUDGET) {
@@ -929,7 +929,7 @@ async function main() {
       minBudget: PRACTICE_MIN_BUDGET,
       label: "実践(Grok推奨)"
     },
-    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。実践プロファイルは資金100万・評価額10%・同時3本。",
+    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。実践プロファイルは資金100万・評価額15%・同時4本（最大稼働≈60%）。",
     since: "2026-08-12"
   };
   for (const def of modeDefs) {
