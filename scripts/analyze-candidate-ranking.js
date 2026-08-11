@@ -7,7 +7,8 @@
 //   - 順位が「5年後の真の成績順」にどれだけ早く・安定して収束するか
 //   - 第1候補がどれくらいの頻度で入れ替わるか（ノイズ度）
 // を測る。ライブとの差異: ライブの equity は含み損益込みだが、ここでは実現損益のみで近似。
-// ライブの購入対象(統合買い候補+確認候補)は tierA+tierB で近似（tierCは対照群相当なので除外）。
+// ライブの購入対象は 2026-08-12 以降「統合買い候補」のみ（tierA 近似）。
+// 確認候補(tierB)は対照群。旧分析互換で tierA+tierB を見る場合はコメントを参照。
 //
 // 使い方: node scripts/backtest-strategy.js を先に実行してから node scripts/analyze-candidate-ranking.js
 
@@ -35,8 +36,8 @@ const STRUCTURAL_PRIORITY = [
 function loadTrades(mode) {
   const p = path.join(cacheDir, `backtest-trades-${mode}.json`);
   const data = JSON.parse(fs.readFileSync(p, "utf8"));
-  // ライブが仮想購入する区分（統合買い候補+確認候補）を tierA+tierB で近似
-  return data.trades.filter((t) => t.tier !== "tierC(その他)");
+  // ライブが仮想購入する区分（統合買い候補）を tierA で近似（2026-08-12〜）
+  return data.trades.filter((t) => String(t.tier || "").startsWith("tierA"));
 }
 
 // 方式ごとの購入コスト。買えない条件（リスク計算不能）は null。

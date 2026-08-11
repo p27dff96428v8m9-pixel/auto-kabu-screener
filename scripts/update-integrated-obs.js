@@ -61,19 +61,23 @@ const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 //   risk : リスク均等（auto_trader.py の calc_lot_size と同じ考え方）。損切までの値幅から株数を逆算し、
 //          どの銘柄も損切時の損失が RISK_BUDGET 円で揃う。損切幅が極端に狭い銘柄への過大集中を防ぐため
 //          投入額は RISK_MAX_COST 円で頭打ち。損切ラインが無い銘柄は計算不能としてスキップ記録
-// 購入するのは BUY_CATEGORIES のシグナル区分のみ。「見送り」は実運用で買わないため対象外。
-// 「監視継続」は観測実績が利確0回/損切11回（2026-07-02時点、標準5+ゆるめ6）と一方的に悪いため対象外。
-// どちらも観測・カウントには従来通り残す（対照群として引き続き検証する）。
+// 購入するのは BUY_CATEGORIES のシグナル区分のみ。観測・カウント（到達/利確/損切）は全シグナル残す。
+// 2026-08-12: ライブ観測の期待値検証で購入対象を「統合買い候補」のみに絞った。
+//   - 標準: 確認候補 WR25% / 監視継続 WR8% が期待値を破壊（全体 WR23.6%, sumR -24.7）
+//   - ゆるめ: 全体は勝率~49%でも円ベース微マイナス。統合買い候補のみ WR67% / E≈+0.83R / +49万 と明確にプラス
+//   - 確認候補・監視継続・見送りは対照群として観測のみ（仮想購入・LINE買い通知なし）
+// 同時保有上限 MAX_POSITIONS で相関損・オープンリスクの肥大を抑える（既定10。OBS_MAX_POSITIONS で上書き可）。
 // 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
 const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
 const UNIT_SHARES = 100;
 const RISK_BUDGET = Number(process.env.OBS_RISK_BUDGET || 50000);
 const RISK_MAX_COST = Number(process.env.OBS_RISK_MAX_COST || 5000000);
+const MAX_POSITIONS = Math.max(1, Number(process.env.OBS_MAX_POSITIONS || 10));
 const PF_VARIANTS = ["fixed", "unit", "risk"];
 const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
-const BUY_CATEGORIES = new Set(["統合買い候補", "確認候補"]);
+const BUY_CATEGORIES = new Set(["統合買い候補"]);
 
 // 実戦候補の初期優先度。成績（損益率）に差が付くまでの同率時の並び順:
 //   ゆるめ > 標準 (2026-07-09入替) … 当初は「標準は深い押し目でRR有利」の理屈で標準を上位にしていたが、
@@ -232,6 +236,16 @@ function normalizeObs(obs) {
 // sl はリスク均等の株数逆算に使う（fixed/unit では未使用）。
 function tryBuy(pf, variant, code, name, signal, price, nowIso, sl) {
   if (!pf.startedAt) pf.startedAt = nowIso;
+  if (pf.positions[code]) {
+    return { action: "skip", cost: 0, reason: "既に保有中" };
+  }
+  const openCount = Object.keys(pf.positions || {}).length;
+  if (openCount >= MAX_POSITIONS) {
+    const reason = `同時保有上限（${MAX_POSITIONS}件）`;
+    pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+    if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+    return { action: "skip", cost: 0, reason };
+  }
   let shares;
   let cost;
   if (variant === "unit") {
@@ -837,6 +851,12 @@ async function main() {
 
   // UI表示用に判定状態を公開データへ保存
   obs.entryGuard = { marketOpen, regime, entryAllowed, exDivToday, checkedAt: nowIso };
+  obs.buyGate = {
+    categories: [...BUY_CATEGORIES],
+    maxPositions: MAX_POSITIONS,
+    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群（観測のみ）。同時保有は上限まで。",
+    since: "2026-08-12"
+  };
   for (const def of modeDefs) {
     if (!entryAllowed) break;
     const data = obs[def.key];
@@ -877,8 +897,8 @@ async function main() {
         activeCodes.add(code);
         summary.hits[def.key] += 1;
 
-        // 仮想資金: 到達＝購入（fixed=100万円分・unit=1単元100株 の両方式で並行運用）。
-        // 見送り・監視継続シグナルは購入対象外（対照群）、資金不足はスキップ記録
+        // 仮想資金: 到達＝購入（fixed/unit/risk 並行）。統合買い候補のみ購入対象。
+        // 確認候補・監視継続・見送りは対照群（観測のみ）。資金不足・保有上限はスキップ記録。
         if (BUY_CATEGORIES.has(getCategoryLabel(target.signal))) {
           // 通知は銘柄×モード単位（標準/ゆるめは達成基準もタイミングも違うため別通知）。
           // fixed/unit は同基準・同タイミングなので同じイベントにまとめる。
@@ -1078,6 +1098,7 @@ async function main() {
     regime: regime ? { index: regime.index, bullish: regime.bullish, deviationPct: regime.deviationPct } : null,
     entryAllowed,
     exDivToday,
+    buyGate: obs.buyGate,
     notified,
     settleNotified,
     targets: Object.keys(obs.targets).length,

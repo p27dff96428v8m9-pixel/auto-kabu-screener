@@ -2535,7 +2535,7 @@ function getCategoryLabel(sig) {
 }
 
 // === 仮想資金シミュレーション表示（サーバー側 update-integrated-obs.js が計算） ===
-// 観測スペースへの追加＝1銘柄100万円購入（見送り・監視継続シグナルは対象外）、利確/損切で資金が増減する。
+// 観測スペースへの追加＝仮想購入（統合買い候補のみ。確認候補・監視継続・見送りは対照群）、利確/損切で資金が増減する。
 const PF_INITIAL_CAPITAL = 50000000;
 
 function formatYen(value) {
@@ -2613,7 +2613,7 @@ function renderPortfolioPanel(modeKey, obs) {
         <div class="obs-pf-main">
           <span class="obs-pf-label" title="${def.hint}">${def.label}</span>
           ${rankHtml}
-          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（見送り・監視継続シグナルは購入対象外）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
+          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（仮想購入は統合買い候補のみ・同時保有上限あり）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
         </div>
         <div class="obs-pf-detail">
           <span>現金 ${formatYen(pf.cash)}円</span>
@@ -2761,8 +2761,10 @@ function renderBuyTargetObservations() {
           return `${d.short}: ${formatYen(pos.investedAmount)}円`;
         }).join(' / ');
         heldHtml = `<span class="obs-held" title="保有中: ${detail}（他方式は資金不足・計算不能等でスキップ）">💰保有(${heldList.map((d) => d.short).join('・')})</span>`;
-      } else if (cat === '見送り' || cat === '監視継続') {
-        heldHtml = `<span class="obs-held none" title="${cat}シグナルは仮想資金の購入対象外（対照群として観測のみ。監視継続は観測実績が損切に偏ったため2026-07-02から除外）">観測のみ</span>`;
+      } else if (cat !== '統合買い候補') {
+        heldHtml = `<span class="obs-held none" title="${cat}は仮想購入対象外（対照群として観測のみ。購入は統合買い候補のみ＝2026-08-12〜。確認候補は期待値マイナスが観測で確認済み）">観測のみ</span>`;
+      } else {
+        heldHtml = `<span class="obs-held none" title="統合買い候補だが資金不足・同時保有上限などで仮想購入されませんでした">未購入</span>`;
       }
       return `
         <div class="obs-card" data-code="${item.code}">
@@ -2975,13 +2977,14 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
 
       // 対照群・通知なしバッジ: LINE通知が出ない決済を明示する（「決済が見えるのに通知が来ない」混乱の防止）。
       // notifiedExit はサーバーが決済時に記録（2026-07-08以降）。無い旧レコードは区分から推定する。
-      const isBuyCat = cat === '統合買い候補' || cat === '確認候補';
+      // 2026-08-12〜: 仮想購入は統合買い候補のみ（確認候補も対照群）。
+      const isBuyCat = cat === '統合買い候補';
       let noNotifyBadge = '';
       if (item.notifiedExit === false || (item.notifiedExit == null && !isBuyCat)) {
         const label = isBuyCat ? '通知なし(未保有)' : '対照群・通知なし';
         const tip = isBuyCat
-          ? '買い到達時に資金不足などで仮想購入されなかったため、LINE通知の対象外です'
-          : 'この区分（監視継続・見送り）は成績検証用の対照群で仮想購入せず、買い到達・決済ともLINE通知しません';
+          ? '買い到達時に資金不足・同時保有上限などで仮想購入されなかったため、LINE通知の対象外です'
+          : 'この区分（確認候補・監視継続・見送り）は成績検証用の対照群で仮想購入せず、買い到達・決済ともLINE通知しません';
         noNotifyBadge = `<span class="obs-no-notify" title="${tip}">🔕 ${label}</span>`;
       }
 
