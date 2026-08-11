@@ -55,7 +55,9 @@ const CLOSED_LIMIT = 80;
 const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 
 // 仮想資金シミュレーション: 観測スペースへの追加を「購入」とみなし、利確/損切で資金を増減させる。
-// 3種類の購入ルールを並行運用して比較できるようにする:
+// 4種類の購入ルールを並行運用して比較できるようにする:
+//   practice: Grok推奨の少資金実践。初期100万円・評価額の10%を1銘柄に（ミニ株/S株想定）・同時保有3件。
+//             資金が増えると1銘柄の投入額も自動で増える（%ベース）。OBS_PRACTICE_CAPITAL / OBS_PRACTICE_PCT で調整可。
 //   fixed: 1銘柄100万円固定（端株可・S株/ミニ株想定）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る
 //   unit : 1単元（100株）購入。実際の発注（単元株取引）の再現。銘柄ごとに投入額が変わる
 //   risk : リスク均等（auto_trader.py の calc_lot_size と同じ考え方）。損切までの値幅から株数を逆算し、
@@ -66,7 +68,7 @@ const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 //   - 標準: 確認候補 WR25% / 監視継続 WR8% が期待値を破壊（全体 WR23.6%, sumR -24.7）
 //   - ゆるめ: 全体は勝率~49%でも円ベース微マイナス。統合買い候補のみ WR67% / E≈+0.83R / +49万 と明確にプラス
 //   - 確認候補・監視継続・見送りは対照群として観測のみ（仮想購入・LINE買い通知なし）
-// 同時保有上限 MAX_POSITIONS で相関損・オープンリスクの肥大を抑える（既定10。OBS_MAX_POSITIONS で上書き可）。
+// 同時保有上限: fixed/unit/risk は MAX_POSITIONS（既定10）、practice は PRACTICE_MAX_POSITIONS（既定3）。
 // 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
 const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
@@ -74,25 +76,24 @@ const UNIT_SHARES = 100;
 const RISK_BUDGET = Number(process.env.OBS_RISK_BUDGET || 50000);
 const RISK_MAX_COST = Number(process.env.OBS_RISK_MAX_COST || 5000000);
 const MAX_POSITIONS = Math.max(1, Number(process.env.OBS_MAX_POSITIONS || 10));
-const PF_VARIANTS = ["fixed", "unit", "risk"];
+// Grok推奨・少資金実践プロファイル（資金100万スタート、増資は OBS_PRACTICE_CAPITAL を上げるだけで追従）
+const PRACTICE_INITIAL_CAPITAL = Math.max(10000, Number(process.env.OBS_PRACTICE_CAPITAL || 1000000));
+const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.10)));
+const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 3));
+const PRACTICE_MIN_BUDGET = Math.max(1000, Number(process.env.OBS_PRACTICE_MIN_BUDGET || 10000));
+const PF_VARIANTS = ["practice", "fixed", "unit", "risk"];
 const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
 const BUY_CATEGORIES = new Set(["統合買い候補"]);
 
 // 実戦候補の初期優先度。成績（損益率）に差が付くまでの同率時の並び順:
-//   ゆるめ > 標準 (2026-07-09入替) … 当初は「標準は深い押し目でRR有利」の理屈で標準を上位にしていたが、
-//     5年バックテストで ゆるめ5078件 勝率53.4% 合計+7673pt vs 標準4271件 勝率43.3% 合計+6978pt と
-//     ゆるめが勝率+10pt・総益でも優位、ライブ観測でも ゆるめ70% vs 標準40% と同方向だったため入替。
-//     深い押し目待ちは「悪材料で下げた銘柄だけ約定する」逆選択が起きているとみられる
-//     （平均損益/件のみ標準+1.63% vs ゆるめ+1.51%で僅差逆転＝深押しの生存者は伸びるが勝率が低い）。
-//   100万固定 > リスク均等 > 1単元 … 6バケットの5年運用再現(scripts/analyze-candidate-ranking.js)より。
-//     fixed/risk系の上位4つは +2,306〜2,618万でほぼ同着（モード間の差もノイズ範囲）だが、
-//     1単元系だけは relax/unit +1,117万 / standard/unit +806万 と明確に劣後する
-//     （安い銘柄で数万円しか張れず資金が遊ぶため。同じ5,000万でも利益が伸びない）。
-//     モード内の relax 優先はライブ実測（ゆるめ70% vs 標準40%）と全取引バックテスト
-//     （ゆるめ勝率53.4%・総益+7673pt vs 標準43.3%・+6978pt）に基づく。
+//   practice（Grok推奨）を最上位 … 少資金の実運用に一番近い（100万・%定額・同時3本・統合買い候補のみ）
+//   ゆるめ > 標準 (2026-07-09入替)
+//   100万固定 > リスク均等 > 1単元
 // 損益率に差が出た後は評価額ベースで自動的に順位が入れ替わる（candidateRanking）。
 const STRUCTURAL_PRIORITY = [
+  { mode: "relax", variant: "practice" },
+  { mode: "standard", variant: "practice" },
   { mode: "relax", variant: "fixed" },
   { mode: "standard", variant: "fixed" },
   { mode: "relax", variant: "risk" },
@@ -101,12 +102,34 @@ const STRUCTURAL_PRIORITY = [
   { mode: "standard", variant: "unit" }
 ];
 
-// LINE通知（買い目標到達＝仮想購入時、および利確/損切＝決済時）。標準/ゆるめ × 方式（100万固定/1単元/リスク均等）の
+// LINE通知（買い目標到達＝仮想購入時、および利確/損切＝決済時）。標準/ゆるめ × 各方式の
 // 結果を1銘柄=1通にまとめて送る。LINE_ACCESS_TOKEN / LINE_USER_ID 未設定なら自動スキップ。
 const MODE_LABELS = { standard: "標準", relax: "ゆるめ" };
 // 標準/ゆるめを一目で見分けるための色分け絵文字（LINEはプレーンテキストなので色付き絵文字で代用）。
 const MODE_EMOJI = { standard: "🔵", relax: "🟠" };
-const VARIANT_LABELS = { fixed: "100万固定", unit: "1単元", risk: "リスク均等" };
+const VARIANT_LABELS = {
+  practice: "実践(Grok)",
+  fixed: "100万固定",
+  unit: "1単元",
+  risk: "リスク均等"
+};
+
+function initialCapitalFor(variant) {
+  return variant === "practice" ? PRACTICE_INITIAL_CAPITAL : INITIAL_CAPITAL;
+}
+
+function maxPositionsFor(variant) {
+  return variant === "practice" ? PRACTICE_MAX_POSITIONS : MAX_POSITIONS;
+}
+
+function portfolioEquityApprox(pf) {
+  if (Number.isFinite(Number(pf.equity)) && Number(pf.equity) > 0) return Number(pf.equity);
+  let invested = 0;
+  for (const pos of Object.values(pf.positions || {})) {
+    invested += Number(pos.investedAmount) || 0;
+  }
+  return Number(pf.cash || 0) + invested;
+}
 const PAGE_URL = process.env.OBS_PAGE_URL || "https://p27dff96428v8m9-pixel.github.io/auto-kabu-screener/fund-flow-ai-system/";
 
 function resolvePath(envName, fallback) {
@@ -174,17 +197,29 @@ function getCategoryLabel(signal) {
   return "見送り";
 }
 
-function makeEmptyPortfolio() {
+function makeEmptyPortfolio(variant = "fixed") {
+  const initial = initialCapitalFor(variant);
   return {
-    initialCapital: INITIAL_CAPITAL,
-    cash: INITIAL_CAPITAL,
+    initialCapital: initial,
+    cash: initial,
     positions: {},
     history: [],
     skipped: [],
     realizedPnl: 0,
     startedAt: null,
     tpCount: 0,
-    slCount: 0
+    slCount: 0,
+    timeoutCount: 0,
+    variant,
+    profile: variant === "practice"
+      ? {
+          name: "practice",
+          label: "実践(Grok推奨)",
+          positionPct: PRACTICE_POSITION_PCT,
+          maxPositions: PRACTICE_MAX_POSITIONS,
+          note: "評価額×10%を1銘柄（ミニ株想定）・同時最大3本・統合買い候補のみ。資金増加はOBS_PRACTICE_CAPITALまたは評価額の増加で自動反映。"
+        }
+      : null
   };
 }
 
@@ -211,13 +246,14 @@ function normalizeObs(obs) {
     if (m && typeof m === "object" && Number.isFinite(Number(m.cash))) m = { fixed: m };
     if (!m || typeof m !== "object") m = {};
     for (const variant of PF_VARIANTS) {
+      const expectedInitial = initialCapitalFor(variant);
       // 初期資金の設定が変わったら（増額など）そのバケットを作り直して全端末で公平に再スタートする。
       // 取りこぼし（資金不足スキップ）を避けるための資金変更は、過去の偏った成績を引き継がず仕切り直す。
-      if (!m[variant] || typeof m[variant] !== "object" || Number(m[variant].initialCapital) !== INITIAL_CAPITAL) {
-        m[variant] = makeEmptyPortfolio();
+      if (!m[variant] || typeof m[variant] !== "object" || Number(m[variant].initialCapital) !== expectedInitial) {
+        m[variant] = makeEmptyPortfolio(variant);
       }
       const p = m[variant];
-      if (!Number.isFinite(Number(p.initialCapital)) || Number(p.initialCapital) <= 0) p.initialCapital = INITIAL_CAPITAL;
+      if (!Number.isFinite(Number(p.initialCapital)) || Number(p.initialCapital) <= 0) p.initialCapital = expectedInitial;
       if (!Number.isFinite(Number(p.cash))) p.cash = p.initialCapital;
       if (!p.positions || typeof p.positions !== "object") p.positions = {};
       if (!Array.isArray(p.history)) p.history = [];
@@ -226,22 +262,33 @@ function normalizeObs(obs) {
       if (!Number.isFinite(Number(p.tpCount))) p.tpCount = 0;
       if (!Number.isFinite(Number(p.slCount))) p.slCount = 0;
       if (!Number.isFinite(Number(p.timeoutCount))) p.timeoutCount = 0;
+      p.variant = variant;
+      if (variant === "practice") {
+        p.profile = {
+          name: "practice",
+          label: "実践(Grok推奨)",
+          positionPct: PRACTICE_POSITION_PCT,
+          maxPositions: PRACTICE_MAX_POSITIONS,
+          note: "評価額×10%を1銘柄（ミニ株想定）・同時最大3本・統合買い候補のみ。"
+        };
+      }
     }
     obs.portfolio[key] = m;
   }
   return obs;
 }
 
-// 到達＝購入。variant に応じて 100万円分（端株）/ 1単元（100株）/ リスク均等分 を取得する。
-// sl はリスク均等の株数逆算に使う（fixed/unit では未使用）。
+// 到達＝購入。variant に応じて 実践%/100万円/1単元/リスク均等 を取得する。
+// sl はリスク均等の株数逆算に使う（fixed/unit/practice では未使用）。
 function tryBuy(pf, variant, code, name, signal, price, nowIso, sl) {
   if (!pf.startedAt) pf.startedAt = nowIso;
   if (pf.positions[code]) {
     return { action: "skip", cost: 0, reason: "既に保有中" };
   }
   const openCount = Object.keys(pf.positions || {}).length;
-  if (openCount >= MAX_POSITIONS) {
-    const reason = `同時保有上限（${MAX_POSITIONS}件）`;
+  const maxPos = maxPositionsFor(variant);
+  if (openCount >= maxPos) {
+    const reason = `同時保有上限（${maxPos}件）`;
     pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
     if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
     return { action: "skip", cost: 0, reason };
@@ -267,7 +314,28 @@ function tryBuy(pf, variant, code, name, signal, price, nowIso, sl) {
       shares = Number((RISK_MAX_COST / price).toFixed(4));
       cost = Math.round(shares * price);
     }
+  } else if (variant === "practice") {
+    // 少資金実践: 評価額の PRACTICE_POSITION_PCT（既定10%）を1銘柄に投入。資金が増えれば自動で大きくなる。
+    const equity = portfolioEquityApprox(pf);
+    let budget = Math.floor(equity * PRACTICE_POSITION_PCT);
+    if (budget < PRACTICE_MIN_BUDGET) {
+      const reason = `実践サイズ不足（予算${budget.toLocaleString()}円 < 下限${PRACTICE_MIN_BUDGET.toLocaleString()}円）`;
+      pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+      if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+      return { action: "skip", cost: 0, reason };
+    }
+    const cash = Number(pf.cash) || 0;
+    if (budget > cash) budget = Math.floor(cash);
+    if (budget < PRACTICE_MIN_BUDGET || budget <= 0 || !(price > 0)) {
+      const reason = "資金不足（実践プロファイル）";
+      pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+      if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+      return { action: "skip", cost: budget, reason };
+    }
+    shares = Number((budget / price).toFixed(4));
+    cost = budget;
   } else {
+    // fixed
     shares = Number((TRADE_BUDGET / price).toFixed(4));
     cost = TRADE_BUDGET;
   }
@@ -742,9 +810,9 @@ async function main() {
   // workflow_dispatch の reset_portfolio 入力で仮想資金を初期化（観測カウント・履歴はそのまま）
   if (process.env.RESET_PORTFOLIO === "1" || process.env.RESET_PORTFOLIO === "true") {
     for (const key of ["standard", "relax"]) {
-      for (const variant of PF_VARIANTS) obs.portfolio[key][variant] = makeEmptyPortfolio();
+      for (const variant of PF_VARIANTS) obs.portfolio[key][variant] = makeEmptyPortfolio(variant);
     }
-    console.log(`RESET_PORTFOLIO: 仮想資金を${INITIAL_CAPITAL.toLocaleString()}円に初期化しました（標準/ゆるめ × 100万固定/1単元 すべて）`);
+    console.log(`RESET_PORTFOLIO: 仮想資金を初期化（実践=${PRACTICE_INITIAL_CAPITAL.toLocaleString()}円 / 他=${INITIAL_CAPITAL.toLocaleString()}円 × 標準/ゆるめ）`);
   }
 
   const modeDefs = [
@@ -854,7 +922,14 @@ async function main() {
   obs.buyGate = {
     categories: [...BUY_CATEGORIES],
     maxPositions: MAX_POSITIONS,
-    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群（観測のみ）。同時保有は上限まで。",
+    practice: {
+      initialCapital: PRACTICE_INITIAL_CAPITAL,
+      positionPct: PRACTICE_POSITION_PCT,
+      maxPositions: PRACTICE_MAX_POSITIONS,
+      minBudget: PRACTICE_MIN_BUDGET,
+      label: "実践(Grok推奨)"
+    },
+    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。実践プロファイルは資金100万・評価額10%・同時3本。",
     since: "2026-08-12"
   };
   for (const def of modeDefs) {
@@ -976,15 +1051,15 @@ async function main() {
     }
   }
 
-  // 5) 実戦候補の優先順位: 6バケットを損益率でランク付けし、同率は STRUCTURAL_PRIORITY 順。
+  // 5) 実戦候補の優先順位: 全バケットを損益率でランク付けし、同率は STRUCTURAL_PRIORITY 順。
   //    どの通知・方式を実弾に使うか絞るための表示用（観測スペースのバッジ / LINE通知に反映）。
   //    決済実績が MIN_DECIDED_FOR_EQUITY 件貯まるまでは、含み損益の日次ノイズで順位が
   //    入れ替わるのを防ぐため初期優先度(structural)のまま並べる（資金リセット直後の decided=1 で
   //    第1候補が日替わりしていた実例への対策）。
-  const MIN_DECIDED_FOR_EQUITY = 10; // 6バケット合計の利確+損切件数
+  const MIN_DECIDED_FOR_EQUITY = 10; // 全バケット合計の利確+損切件数
   const candidates = STRUCTURAL_PRIORITY.map((c, idx) => {
     const pf = obs.portfolio[c.mode][c.variant];
-    const initial = Number(pf.initialCapital) || INITIAL_CAPITAL;
+    const initial = Number(pf.initialCapital) || initialCapitalFor(c.variant);
     return {
       mode: c.mode,
       variant: c.variant,

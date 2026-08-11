@@ -2537,15 +2537,51 @@ function getCategoryLabel(sig) {
 // === 仮想資金シミュレーション表示（サーバー側 update-integrated-obs.js が計算） ===
 // 観測スペースへの追加＝仮想購入（統合買い候補のみ。確認候補・監視継続・見送りは対照群）、利確/損切で資金が増減する。
 const PF_INITIAL_CAPITAL = 50000000;
+const PF_PRACTICE_CAPITAL = 1000000;
+const PF_VARIANT_DEFS = [
+  {
+    key: "practice",
+    label: "実践(Grok推奨)",
+    short: "実践",
+    recommended: true,
+    hint: "少資金向けGrok推奨。初期100万円・評価額の約10%を1銘柄（ミニ株想定）・同時最大3本・統合買い候補のみ。資金が増えると1銘柄の投入額も自動で増える。"
+  },
+  {
+    key: "fixed",
+    label: "100万円固定",
+    short: "100万",
+    recommended: false,
+    hint: "検証用5,000万円。1銘柄ちょうど100万円分購入（端株可）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る"
+  },
+  {
+    key: "unit",
+    label: "1単元(100株)",
+    short: "1単元",
+    recommended: false,
+    hint: "検証用5,000万円。実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる"
+  },
+  {
+    key: "risk",
+    label: "リスク均等",
+    short: "リスク均等",
+    recommended: false,
+    hint: "検証用5,000万円。損切までの値幅から株数を逆算し、どの銘柄も損切時の損失が同額（5万円）になるように購入"
+  }
+];
 
 function formatYen(value) {
   return Math.round(Number(value) || 0).toLocaleString('ja-JP');
 }
 
-function makeEmptyPortfolioClient() {
+function initialCapitalForClient(variant) {
+  return variant === "practice" ? PF_PRACTICE_CAPITAL : PF_INITIAL_CAPITAL;
+}
+
+function makeEmptyPortfolioClient(variant = "fixed") {
+  const initial = initialCapitalForClient(variant);
   return {
-    initialCapital: PF_INITIAL_CAPITAL,
-    cash: PF_INITIAL_CAPITAL,
+    initialCapital: initial,
+    cash: initial,
     positions: {},
     history: [],
     skipped: [],
@@ -2553,10 +2589,21 @@ function makeEmptyPortfolioClient() {
     startedAt: null,
     positionValue: 0,
     unrealizedPnl: 0,
-    equity: PF_INITIAL_CAPITAL,
+    equity: initial,
     tpCount: 0,
-    slCount: 0
+    slCount: 0,
+    timeoutCount: 0,
+    variant
   };
+}
+
+function emptyPortfolioBundleClient() {
+  return Object.fromEntries(PF_VARIANT_DEFS.map((d) => [d.key, makeEmptyPortfolioClient(d.key)]));
+}
+
+function variantLabel(variant) {
+  const def = PF_VARIANT_DEFS.find((d) => d.key === variant);
+  return def ? def.label : variant;
 }
 
 function getPortfolioVariants(obs, modeKey) {
@@ -2580,21 +2627,18 @@ function renderPortfolioPanel(modeKey, obs) {
   const el = document.getElementById(modeKey === 'relax' ? 'relaxPortfolio' : 'standardPortfolio');
   if (!el) return;
   const variants = getPortfolioVariants(obs, modeKey);
-  const defs = [
-    { key: 'fixed', label: '100万円固定', hint: '1銘柄ちょうど100万円分購入（端株可・S株想定）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る' },
-    { key: 'unit', label: '1単元(100株)', hint: '実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる。資金不足の単元はスキップ' },
-    { key: 'risk', label: 'リスク均等', hint: '損切までの値幅から株数を逆算し、どの銘柄も損切時の損失が同額（5万円）になるように購入。1銘柄への集中を防ぐため投入額は500万円で頭打ち（auto_trader由来のリスク基準ロット方式・2026-07-03追加）' }
-  ];
+  const defs = PF_VARIANT_DEFS;
   if (!variants || !defs.some((d) => variants[d.key] && Number.isFinite(Number(variants[d.key].cash)))) {
-    el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（各5,000万円 / 100万円固定・1単元・リスク均等の3方式）は次回のサーバー更新から開始されます。</span>';
+    el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（★実践Grok推奨100万 / 検証用5,000万×3方式）は次回のサーバー更新から開始されます。</span>';
     return;
   }
+  const gate = obs.buyGate && obs.buyGate.practice ? obs.buyGate.practice : null;
   const rows = defs.map((def) => {
     const pf = variants[def.key];
     if (!pf || !Number.isFinite(Number(pf.cash))) {
-      return `<div class="obs-pf-variant"><span class="obs-pf-label" title="${def.hint}">${def.label}</span><span class="obs-pf-note">次回サーバー更新から開始</span></div>`;
+      return `<div class="obs-pf-variant${def.recommended ? ' recommended' : ''}"><span class="obs-pf-label${def.recommended ? ' recommended' : ''}" title="${def.hint}">${def.recommended ? '★ ' : ''}${def.label}</span><span class="obs-pf-note">次回サーバー更新から開始</span></div>`;
     }
-    const initial = Number(pf.initialCapital) || PF_INITIAL_CAPITAL;
+    const initial = Number(pf.initialCapital) || initialCapitalForClient(def.key);
     const equity = Number.isFinite(Number(pf.equity)) ? Number(pf.equity) : Number(pf.cash);
     const totalPnl = equity - initial;
     const totalPct = ((totalPnl / initial) * 100).toFixed(2);
@@ -2606,20 +2650,24 @@ function renderPortfolioPanel(modeKey, obs) {
     const rank = getCandidateRank(obs, modeKey, def.key);
     const rankBasis = obs.candidateRanking ? obs.candidateRanking.basis : null;
     const rankHtml = rank
-      ? `<span class="obs-pf-rank rank-${rank}" title="実戦で絞る場合の優先順位。損益率で自動更新${rankBasis === 'structural' ? '（現在は成績差が無いため初期優先度: 標準>ゆるめ・100万固定>1単元）' : ''}">第${rank}候補</span>`
+      ? `<span class="obs-pf-rank rank-${rank}" title="実戦で絞る場合の優先順位。損益率で自動更新${rankBasis === 'structural' ? '（現在は成績差が無いため初期優先度: 実践Grok>ゆるめ>標準・fixed>risk>unit）' : ''}">第${rank}候補</span>`
+      : '';
+    const practiceMeta = def.key === 'practice'
+      ? `<span title="1銘柄あたり評価額の約${Math.round((gate && gate.positionPct ? gate.positionPct : 0.1) * 100)}%・同時最大${(gate && gate.maxPositions) || 3}本">ルール: 評価額×${Math.round((gate && gate.positionPct ? gate.positionPct : 0.1) * 100)}% / 同時${(gate && gate.maxPositions) || 3}本</span>`
       : '';
     return `
-      <div class="obs-pf-variant">
+      <div class="obs-pf-variant${def.recommended ? ' recommended' : ''}">
         <div class="obs-pf-main">
-          <span class="obs-pf-label" title="${def.hint}">${def.label}</span>
+          <span class="obs-pf-label${def.recommended ? ' recommended' : ''}" title="${def.hint}">${def.recommended ? '★ ' : ''}${def.label}</span>
           ${rankHtml}
-          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（仮想購入は統合買い候補のみ・同時保有上限あり）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
+          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（仮想購入は統合買い候補のみ）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
         </div>
         <div class="obs-pf-detail">
           <span>現金 ${formatYen(pf.cash)}円</span>
           <span>保有 ${posCount}銘柄（評価 ${formatYen(pf.positionValue || 0)}円 / 含み ${unreal >= 0 ? '+' : ''}${formatYen(unreal)}円）</span>
           <span>実現損益 ${realized >= 0 ? '+' : ''}${formatYen(realized)}円</span>
-          ${skippedCount ? `<span title="資金不足で購入できなかったシグナル">スキップ ${skippedCount}件</span>` : ''}
+          ${practiceMeta}
+          ${skippedCount ? `<span title="資金不足・保有上限で購入できなかったシグナル">スキップ ${skippedCount}件</span>` : ''}
         </div>
       </div>
     `;
@@ -2640,17 +2688,17 @@ function handlePortfolioReset(e) {
   if (!mode) return;
   const label = mode === 'standard' ? '標準モード' : 'ゆるめモード';
   if (isLocalDevHost()) {
-    if (!confirm(`${label} の仮想資金（100万円固定・1単元・リスク均等の全方式）を5,000万円に初期化します（観測カウント・決済履歴はそのまま）。よろしいですか？`)) return;
+    if (!confirm(`${label} の仮想資金（実践100万 / 検証3方式5,000万）を初期化します（観測カウント・決済履歴はそのまま）。よろしいですか？`)) return;
     const obs = normalizeObs(state.buyTargetObservations || loadObservations());
     if (!obs.portfolio || typeof obs.portfolio !== 'object') obs.portfolio = {};
-    obs.portfolio[mode] = { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient(), risk: makeEmptyPortfolioClient() };
+    obs.portfolio[mode] = emptyPortfolioBundleClient();
     saveObservations(obs);
     state.buyTargetObservations = obs;
     renderBuyTargetObservations();
   } else {
     // 公開ページの仮想資金は GitHub Actions 管理の共有データ（全端末共通）のため、
     // Actions の手動実行（reset_portfolio にチェック）でリセットする。
-    if (!confirm('仮想資金は全端末で共有しているため、GitHub Actions からリセットします。\n\nこれから開くページで「Run workflow」→「仮想資金…を初期化する」にチェック → 緑の「Run workflow」を押してください（標準/ゆるめ両方が5,000万円に戻り、数分で反映されます）。')) return;
+    if (!confirm('仮想資金は全端末で共有しているため、GitHub Actions からリセットします。\n\nこれから開くページで「Run workflow」→「仮想資金…を初期化する」にチェック → 緑の「Run workflow」を押してください（実践100万・検証5,000万に戻り、数分で反映されます）。')) return;
     window.open('https://github.com/p27dff96428v8m9-pixel/auto-kabu-screener/actions/workflows/update-market-data.yml', '_blank', 'noopener');
   }
 }
@@ -2700,21 +2748,14 @@ function renderBuyTargetObservations() {
     const resetBtnHtml = isLocalDevHost()
       ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
       : '';
-    // 利確/損切の回数は 100万固定 と 1単元 で別々に集計（同じ到達でも資金不足で1単元だけ
-    // スキップ＝トレード不成立になり得るため、合算せず方式ごとに表示する）。
+    // 利確/損切の回数は方式ごとに別集計（同じ到達でも資金不足で一部方式だけ不成立になり得る）。
     const pfm = (obs.portfolio && obs.portfolio[modeKey]) || {};
-    const fx = pfm.fixed || {};
-    const un = pfm.unit || {};
-    const rk = pfm.risk || {};
-    const fxTp = Number(fx.tpCount) || 0;
-    const fxSl = Number(fx.slCount) || 0;
-    const unTp = Number(un.tpCount) || 0;
-    const unSl = Number(un.slCount) || 0;
-    const rkTp = Number(rk.tpCount) || 0;
-    const rkSl = Number(rk.slCount) || 0;
-    // 方式ごとの塊(obs-total-seg)は途中改行させず、狭い幅では塊単位で折り返す
+    const segs = PF_VARIANT_DEFS.map((d) => {
+      const pf = pfm[d.key] || {};
+      return `<span class="obs-total-seg">${d.recommended ? '★' : ''}<b>${d.short}</b> 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}</span>`;
+    }).join(' ｜ ');
     sumEl.innerHTML = `
-      <span class="obs-total" title="カテゴリ別(観測): ${countLines}　／　観測合計 利確${totalTp}回 損切${totalSl}回"><span class="obs-total-seg">合計 <b>100万固定</b> 利確${fxTp}/損切${fxSl}</span> ｜ <span class="obs-total-seg"><b>1単元</b> 利確${unTp}/損切${unSl}</span> ｜ <span class="obs-total-seg"><b>リスク均等</b> 利確${rkTp}/損切${rkSl}</span></span>
+      <span class="obs-total" title="カテゴリ別(観測): ${countLines}　／　観測合計 利確${totalTp}回 損切${totalSl}回">${segs}</span>
       ${resetBtnHtml}
     `;
 
@@ -2738,12 +2779,8 @@ function renderBuyTargetObservations() {
       }
       const sigCls = signalClass(item.signal);
       const pfVariants = getPortfolioVariants(obs, modeKey);
-      // 保有中の方式を列挙してバッジ表示（fixed/unit/riskの3方式。資金不足等で一部方式のみ保有もあり得る）
-      const heldDefs = [
-        { key: 'fixed', short: '100万' },
-        { key: 'unit', short: '1単元' },
-        { key: 'risk', short: 'リスク均等' }
-      ];
+      // 保有中の方式を列挙してバッジ表示（資金不足等で一部方式のみ保有もあり得る）
+      const heldDefs = PF_VARIANT_DEFS.map((d) => ({ key: d.key, short: d.short }));
       const heldList = heldDefs.filter((d) => {
         const pf = pfVariants && pfVariants[d.key];
         return pf && pf.positions && pf.positions[item.code];
@@ -2808,20 +2845,16 @@ function renderBuyTargetObservations() {
       sTp += sc.tp || 0; sSl += sc.sl || 0;
       rTp += rc.tp || 0; rSl += rc.sl || 0;
     }
-    // 利確/損切回数は 100万固定 と 1単元 で別集計して表示（観測ベースの両方式合算はツールチップに残す）。
-    const vc = (modeKey) => {
+    // 利確/損切回数は方式ごとに別集計して表示。
+    const vcLine = (modeKey) => {
       const pfm = (obs.portfolio && obs.portfolio[modeKey]) || {};
-      const fx = pfm.fixed || {};
-      const un = pfm.unit || {};
-      const rk = pfm.risk || {};
-      return {
-        fxTp: Number(fx.tpCount) || 0, fxSl: Number(fx.slCount) || 0,
-        unTp: Number(un.tpCount) || 0, unSl: Number(un.slCount) || 0,
-        rkTp: Number(rk.tpCount) || 0, rkSl: Number(rk.slCount) || 0
-      };
+      return PF_VARIANT_DEFS.map((d) => {
+        const pf = pfm[d.key] || {};
+        return `${d.recommended ? '★' : ''}${d.short} 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}`;
+      }).join(' ｜ ');
     };
-    const s = vc('standard');
-    const r = vc('relax');
+    const sLine = vcLine('standard');
+    const rLine = vcLine('relax');
     // 判定に使っている価格ソース（サーバー側 intradayPrices）: 立花証券リアルタイム / Yahoo遅延 / J-Quants EODのみ
     const ip = obs.intradayPrices;
     let priceSrcLine = '';
@@ -2854,16 +2887,16 @@ function renderBuyTargetObservations() {
     const cr = obs.candidateRanking;
     let rankLine = '';
     if (cr && Array.isArray(cr.items) && cr.items.length) {
-      const nm = (c) => `${c.mode === 'relax' ? 'ゆるめ' : '標準'}×${c.variant === 'unit' ? '1単元' : (c.variant === 'risk' ? 'リスク均等' : '100万固定')}`;
+      const nm = (c) => `${c.mode === 'relax' ? 'ゆるめ' : '標準'}×${variantLabel(c.variant)}`;
       const body = cr.items.map((c) => `<span class="obs-total-seg"><b>第${c.rank}候補</b> ${nm(c)} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct}%)</span>`).join(' ');
-      rankLine = `<span class="mode-stat ranking" title="実戦で絞る場合の優先順位。損益率で自動更新${cr.basis === 'structural' ? '（現在は成績差が無いため初期優先度: 標準>ゆるめ・100万固定>1単元）' : ''}。LINE通知にも同じ順位を表示">🏅 実戦候補順位: ${body}</span>`;
+      rankLine = `<span class="mode-stat ranking" title="実戦で絞る場合の優先順位。損益率で自動更新${cr.basis === 'structural' ? '（現在は成績差が無いため初期優先度: 実践Grok>ゆるめ>標準）' : ''}。LINE通知にも同じ順位を表示">🏅 実戦候補順位: ${body}</span>`;
     }
     g.innerHTML = `
       ${priceSrcLine}
       ${guardLine}
       ${rankLine}
-      <span class="mode-stat standard" title="観測ベース(全方式合算) 利確${sTp}回/損切${sSl}回"><strong>標準モード</strong> 100万固定 利確${s.fxTp}/損切${s.fxSl} ｜ 1単元 利確${s.unTp}/損切${s.unSl} ｜ リスク均等 利確${s.rkTp}/損切${s.rkSl}</span>
-      <span class="mode-stat relax" title="観測ベース(全方式合算) 利確${rTp}回/損切${rSl}回"><strong>ゆるめモード</strong> 100万固定 利確${r.fxTp}/損切${r.fxSl} ｜ 1単元 利確${r.unTp}/損切${r.unSl} ｜ リスク均等 利確${r.rkTp}/損切${r.rkSl}</span>
+      <span class="mode-stat standard" title="観測ベース(全方式合算) 利確${sTp}回/損切${sSl}回"><strong>標準モード</strong> ${sLine}</span>
+      <span class="mode-stat relax" title="観測ベース(全方式合算) 利確${rTp}回/損切${rSl}回"><strong>ゆるめモード</strong> ${rLine}</span>
     `;
   }
 
@@ -2908,18 +2941,12 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     const closed = Array.isArray(data.closed) ? data.closed : [];
 
     // 仮想資金の決済履歴（code + exitAt で照合し、各方式の実損益円を表示）
-    const pfHistFixed = {};
-    const pfHistUnit = {};
-    const pfHistRisk = {};
+    const pfHistByVariant = Object.fromEntries(PF_VARIANT_DEFS.map((d) => [d.key, {}]));
     const pfVariants = getPortfolioVariants(obs, modeKey);
-    for (const h of (pfVariants && pfVariants.fixed && Array.isArray(pfVariants.fixed.history) ? pfVariants.fixed.history : [])) {
-      pfHistFixed[`${h.code}|${h.exitAt}`] = h;
-    }
-    for (const h of (pfVariants && pfVariants.unit && Array.isArray(pfVariants.unit.history) ? pfVariants.unit.history : [])) {
-      pfHistUnit[`${h.code}|${h.exitAt}`] = h;
-    }
-    for (const h of (pfVariants && pfVariants.risk && Array.isArray(pfVariants.risk.history) ? pfVariants.risk.history : [])) {
-      pfHistRisk[`${h.code}|${h.exitAt}`] = h;
+    for (const def of PF_VARIANT_DEFS) {
+      const hist = pfVariants && pfVariants[def.key] && Array.isArray(pfVariants[def.key].history)
+        ? pfVariants[def.key].history : [];
+      for (const h of hist) pfHistByVariant[def.key][`${h.code}|${h.exitAt}`] = h;
     }
 
     // サマリー：利確/損切件数 + 履歴総数 + リセットボタン
@@ -2933,22 +2960,17 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     }
     const totalClosed = closed.length;
     if (sumEl) {
-      const fx = (pfVariants && pfVariants.fixed) || {};
-      const un = (pfVariants && pfVariants.unit) || {};
-      const rk = (pfVariants && pfVariants.risk) || {};
-      const fxTp = Number(fx.tpCount) || 0;
-      const fxSl = Number(fx.slCount) || 0;
-      const unTp = Number(un.tpCount) || 0;
-      const unSl = Number(un.slCount) || 0;
-      const rkTp = Number(rk.tpCount) || 0;
-      const rkSl = Number(rk.slCount) || 0;
+      const closedSegs = PF_VARIANT_DEFS.map((d) => {
+        const pf = (pfVariants && pfVariants[d.key]) || {};
+        return `${d.recommended ? '★' : ''}${d.short} 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}`;
+      }).join(' ｜ ');
       // 時間切れ手仕舞い(保有期限126日到達)は勝率の分母に入れず件数だけ添える
       const toNote = cTo > 0 ? ` ｜ 期限手仕舞い${cTo}件` : '';
       const closedResetHtml = isLocalDevHost()
         ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
         : '';
       sumEl.innerHTML = `
-        <span class="obs-total" title="観測ベース(全方式合算) 利確${cTp}件 / 損切${cSl}件 / 期限手仕舞い${cTo}件">100万固定 利確${fxTp}/損切${fxSl} ｜ 1単元 利確${unTp}/損切${unSl} ｜ リスク均等 利確${rkTp}/損切${rkSl}（履歴${totalClosed}件）${toNote}</span>
+        <span class="obs-total" title="観測ベース(全方式合算) 利確${cTp}件 / 損切${cSl}件 / 期限手仕舞い${cTo}件">${closedSegs}（履歴${totalClosed}件）${toNote}</span>
         ${closedResetHtml}
       `;
     }
@@ -3015,13 +3037,13 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
             ${ret != null ? `<span class="obs-ret ${isTp ? 'pos' : 'neg'}">${ret}</span>` : ''}
             ${(() => {
               const key = `${item.code}|${item.exitAt}`;
-              const phF = pfHistFixed[key];
-              const phU = pfHistUnit[key];
-              const phR = pfHistRisk[key];
               let html = '';
-              if (phF) html += `<span class="obs-ret ${Number(phF.pnl) >= 0 ? 'pos' : 'neg'}" title="100万円固定の実現損益">100万 ${Number(phF.pnl) >= 0 ? '+' : ''}${formatYen(phF.pnl)}円</span>`;
-              if (phU) html += `<span class="obs-ret ${Number(phU.pnl) >= 0 ? 'pos' : 'neg'}" title="1単元（100株 ${formatYen(phU.investedAmount)}円投入）の実現損益">1単元 ${Number(phU.pnl) >= 0 ? '+' : ''}${formatYen(phU.pnl)}円</span>`;
-              if (phR) html += `<span class="obs-ret ${Number(phR.pnl) >= 0 ? 'pos' : 'neg'}" title="リスク均等（${formatYen(phR.investedAmount)}円投入）の実現損益">リスク均等 ${Number(phR.pnl) >= 0 ? '+' : ''}${formatYen(phR.pnl)}円</span>`;
+              for (const def of PF_VARIANT_DEFS) {
+                const ph = pfHistByVariant[def.key][key];
+                if (!ph) continue;
+                const tip = `${def.label}（${formatYen(ph.investedAmount)}円投入）の実現損益`;
+                html += `<span class="obs-ret ${Number(ph.pnl) >= 0 ? 'pos' : 'neg'}" title="${tip}">${def.recommended ? '★' : ''}${def.short} ${Number(ph.pnl) >= 0 ? '+' : ''}${formatYen(ph.pnl)}円</span>`;
+              }
               return html;
             })()}
             <span class="obs-mode-mini">${modeKey === 'relax' ? 'ゆるめ' : '標準'}</span>
@@ -3045,7 +3067,7 @@ function handleObsReset(e) {
   obs[mode] = { active: [], closed: [], counts: makeEmptyCounts() };
   // 観測中銘柄を消すと保有ポジションが決済不能になるため、仮想資金も一緒に初期化する
   if (!obs.portfolio || typeof obs.portfolio !== 'object') obs.portfolio = {};
-  obs.portfolio[mode] = { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient(), risk: makeEmptyPortfolioClient() };
+  obs.portfolio[mode] = emptyPortfolioBundleClient();
   saveObservations(obs);
   state.buyTargetObservations = normalizeObs(obs);
   renderBuyTargetObservations();
@@ -3068,8 +3090,8 @@ function setupGlobalObsReset() {
     }
     // 仮想資金も初期化（観測中銘柄が消えると保有ポジションが決済不能になるため）
     fresh.portfolio = {
-      standard: { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient(), risk: makeEmptyPortfolioClient() },
-      relax: { fixed: makeEmptyPortfolioClient(), unit: makeEmptyPortfolioClient(), risk: makeEmptyPortfolioClient() }
+      standard: emptyPortfolioBundleClient(),
+      relax: emptyPortfolioBundleClient()
     };
     saveObservations(fresh);
     state.buyTargetObservations = fresh;
