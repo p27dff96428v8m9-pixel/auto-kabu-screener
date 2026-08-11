@@ -2653,7 +2653,7 @@ function renderPortfolioPanel(modeKey, obs) {
       ? `<span class="obs-pf-rank rank-${rank}" title="実戦で絞る場合の優先順位。損益率で自動更新${rankBasis === 'structural' ? '（現在は成績差が無いため初期優先度: 実践Grok>ゆるめ>標準・fixed>risk>unit）' : ''}">第${rank}候補</span>`
       : '';
     const practiceMeta = def.key === 'practice'
-      ? `<span title="1銘柄あたり評価額の約${Math.round((gate && gate.positionPct ? gate.positionPct : 0.1) * 100)}%・同時最大${(gate && gate.maxPositions) || 3}本">ルール: 評価額×${Math.round((gate && gate.positionPct ? gate.positionPct : 0.1) * 100)}% / 同時${(gate && gate.maxPositions) || 3}本</span>`
+      ? `<span title="1銘柄あたり評価額の約${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}%・同時最大${(gate && gate.maxPositions) || 4}本">ルール: 評価額×${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}% / 同時${(gate && gate.maxPositions) || 4}本</span>`
       : '';
     return `
       <div class="obs-pf-variant${def.recommended ? ' recommended' : ''}">
