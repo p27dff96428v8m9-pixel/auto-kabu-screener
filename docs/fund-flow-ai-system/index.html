@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>日本版 資金フローAI v2</title>
-  <link rel="stylesheet" href="./styles.css?v=20260812-practice-b15" />
+  <link rel="stylesheet" href="./styles.css?v=20260817-grok-holdings" />
 </head>
 <body>
   <header class="app-header">
@@ -91,6 +91,7 @@
             <span class="obs-note">統合ランキング上位銘柄の買い目標（日次で固定）に価格が到達 → 各モードのスペースに自動記録。判定はサーバー側で約20分ごとに実行され、全端末で同じ観測状態を共有します。<b>仮想購入は「統合買い候補」のみ</b>（確認候補・監視継続・見送りは対照群）。方式は4つ並行：★<b>実践(Grok推奨)</b>＝資金100万円・評価額の15%を1銘柄（ミニ株想定）・同時最大4本（最大稼働≈60%、資金が増えれば1銘柄額も自動増）／<b>100万円固定</b>／<b>1単元</b>／<b>リスク均等</b>（後者3つは検証用5,000万円）。利確/損切で資金が増減します。</span>
             <div id="obsGlobalCounts" class="obs-global-counts" aria-live="polite"></div>
           </div>
+          <div id="grokHoldingsPanel" class="grok-holdings-panel" aria-live="polite"></div>
           <div class="obs-panels">
             <div class="obs-panel" data-mode="standard">
               <div class="obs-panel-head">
@@ -307,6 +308,6 @@
     </p>
   </footer>
 
-  <script src="./app.js?v=20260812-practice-b15"></script>
+  <script src="./app.js?v=20260817-grok-holdings"></script>
 </body>
 </html>

@@ -2613,6 +2613,126 @@ function getPortfolioVariants(obs, modeKey) {
   return (m && typeof m === 'object') ? m : null;
 }
 
+// 実践(Grok推奨)の現在保有を、現値・含み・利確/損切付きで返す
+function listPracticePositions(obs, modeKey, stockMap) {
+  const variants = getPortfolioVariants(obs, modeKey);
+  const pf = variants && variants.practice;
+  const positions = pf && pf.positions && typeof pf.positions === 'object' ? pf.positions : {};
+  const active = ((obs[modeKey] || {}).active || []);
+  const activeByCode = Object.fromEntries(active.map((it) => [String(it.code || '').trim(), it]));
+  return Object.keys(positions).sort((a, b) => {
+    const ta = Date.parse(positions[a] && positions[a].entryAt) || 0;
+    const tb = Date.parse(positions[b] && positions[b].entryAt) || 0;
+    return ta - tb;
+  }).map((code) => {
+    const pos = positions[code] || {};
+    const latest = stockMap && stockMap[code];
+    const item = activeByCode[code];
+    const curP = latest && Number.isFinite(Number(latest.price)) ? Number(latest.price) : null;
+    const entry = Number(pos.entryPrice);
+    const shares = Number(pos.shares);
+    const invested = Number(pos.investedAmount);
+    const marketValue = (curP != null && Number.isFinite(shares)) ? curP * shares : null;
+    const pnl = (marketValue != null && Number.isFinite(invested)) ? marketValue - invested : null;
+    const pnlPct = (curP != null && Number.isFinite(entry) && entry > 0) ? ((curP - entry) / entry) * 100 : null;
+    return {
+      code,
+      name: pos.name || (item && item.name) || (latest && latest.name) || '',
+      shares,
+      entryPrice: entry,
+      investedAmount: invested,
+      entryAt: pos.entryAt,
+      signal: pos.signal,
+      currentPrice: curP,
+      marketValue,
+      pnl,
+      pnlPct,
+      buy: item ? item.buy : null,
+      tp: item ? item.tp : null,
+      sl: item ? item.sl : null
+    };
+  });
+}
+
+function formatHoldDate(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return isNaN(d) ? '-' : d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+}
+
+function renderPracticeHoldRows(holds) {
+  if (!holds.length) {
+    return '<p class="grok-hold-empty">現在、実践(Grok推奨)で保有中の銘柄はありません。</p>';
+  }
+  return holds.map((h) => {
+    const pnlCls = h.pnlPct > 0 ? 'pos' : (h.pnlPct < 0 ? 'neg' : '');
+    const pnlPctText = Number.isFinite(h.pnlPct) ? `${h.pnlPct >= 0 ? '+' : ''}${h.pnlPct.toFixed(1)}%` : '-';
+    const pnlYenText = Number.isFinite(h.pnl) ? `${h.pnl >= 0 ? '+' : ''}${formatYen(h.pnl)}円` : '-';
+    const curText = h.currentPrice != null ? formatNumber(h.currentPrice, 1) : '-';
+    return `
+      <div class="grok-hold-row">
+        <div class="grok-hold-id">
+          <strong>${h.code}</strong>
+          <span class="obs-name">${h.name || ''}</span>
+          <span class="obs-ret ${pnlCls}">${pnlPctText}</span>
+        </div>
+        <div class="grok-hold-nums">
+          <span>取得 ${formatNumber(h.entryPrice, 1)}</span>
+          <span>現在 <b>${curText}</b></span>
+          <span>含み ${pnlYenText}</span>
+          <span>投入 ${formatYen(h.investedAmount)}円</span>
+        </div>
+        <div class="grok-hold-nums">
+          <span>利確 ${h.tp != null ? formatNumber(h.tp) : '-'}</span>
+          <span>損切 ${h.sl != null ? formatNumber(h.sl) : '-'}</span>
+          <span>取得日 ${formatHoldDate(h.entryAt)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderGrokHoldingsPanel(obs, stockMap) {
+  const el = document.getElementById('grokHoldingsPanel');
+  if (!el) return;
+  const gate = obs.buyGate && obs.buyGate.practice ? obs.buyGate.practice : null;
+  const maxPos = (gate && gate.maxPositions) || 4;
+  const modes = [
+    { key: 'standard', label: '標準' },
+    { key: 'relax', label: 'ゆるめ' }
+  ];
+  const blocks = modes.map((m) => {
+    const holds = listPracticePositions(obs, m.key, stockMap);
+    const variants = getPortfolioVariants(obs, m.key);
+    const pf = variants && variants.practice;
+    const equity = pf && Number.isFinite(Number(pf.equity)) ? Number(pf.equity) : null;
+    const initial = pf ? (Number(pf.initialCapital) || PF_PRACTICE_CAPITAL) : PF_PRACTICE_CAPITAL;
+    const totalPnl = equity != null ? equity - initial : null;
+    const totalPct = (totalPnl != null && initial) ? ((totalPnl / initial) * 100).toFixed(2) : null;
+    const cls = totalPnl > 0 ? 'pos' : (totalPnl < 0 ? 'neg' : '');
+    const eqText = equity != null
+      ? `評価 ${formatYen(equity)}円 (${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)`
+      : '評価 —';
+    return `
+      <div class="grok-hold-mode">
+        <div class="grok-hold-mode-head">
+          <span class="obs-mode-badge ${m.key}">${m.label}</span>
+          <span class="grok-hold-count">${holds.length}/${maxPos}本</span>
+          <span class="obs-pf-equity ${cls}">${eqText}</span>
+        </div>
+        ${renderPracticeHoldRows(holds)}
+      </div>
+    `;
+  }).join('');
+  el.innerHTML = `
+    <div class="grok-holdings-head">
+      <h4>★ 実践(Grok推奨) 現在保有中</h4>
+      <span class="obs-note-small">実弾に近い仮想保有（評価額の約15%×同時最大${maxPos}本）。標準とゆるめは別枠です。観測リストの★Grok保有バッジと対応します。</span>
+    </div>
+    <div class="grok-holdings-grid">${blocks}</div>
+  `;
+}
+
 // 実戦候補順位（サーバー側 candidateRanking）。どのモード×方式の通知を実弾に使うかの目安。
 // 損益率で自動更新され、成績差が無い間は初期優先度（標準>ゆるめ、100万固定>1単元）で並ぶ。
 function getCandidateRank(obs, modeKey, variantKey) {
@@ -2633,6 +2753,9 @@ function renderPortfolioPanel(modeKey, obs) {
     return;
   }
   const gate = obs.buyGate && obs.buyGate.practice ? obs.buyGate.practice : null;
+  const stockMap = (state.integratedRanking && Array.isArray(state.integratedRanking.stocks))
+    ? Object.fromEntries(state.integratedRanking.stocks.map((s) => [String(s.code || '').trim(), s]))
+    : {};
   const rows = defs.map((def) => {
     const pf = variants[def.key];
     if (!pf || !Number.isFinite(Number(pf.cash))) {
@@ -2655,6 +2778,9 @@ function renderPortfolioPanel(modeKey, obs) {
     const practiceMeta = def.key === 'practice'
       ? `<span title="1銘柄あたり評価額の約${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}%・同時最大${(gate && gate.maxPositions) || 4}本">ルール: 評価額×${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}% / 同時${(gate && gate.maxPositions) || 4}本</span>`
       : '';
+    const holdListHtml = def.key === 'practice'
+      ? `<div class="grok-hold-inline">${renderPracticeHoldRows(listPracticePositions(obs, modeKey, stockMap))}</div>`
+      : '';
     return `
       <div class="obs-pf-variant${def.recommended ? ' recommended' : ''}">
         <div class="obs-pf-main">
@@ -2669,6 +2795,7 @@ function renderPortfolioPanel(modeKey, obs) {
           ${practiceMeta}
           ${skippedCount ? `<span title="資金不足・保有上限で購入できなかったシグナル">スキップ ${skippedCount}件</span>` : ''}
         </div>
+        ${holdListHtml}
       </div>
     `;
   }).join('');
@@ -2767,7 +2894,13 @@ function renderBuyTargetObservations() {
       return;
     }
 
-    listEl.innerHTML = data.active.map((item) => {
+    const pfVariants = getPortfolioVariants(obs, modeKey);
+    const activeSorted = [...data.active].sort((a, b) => {
+      const aHeld = pfVariants && pfVariants.practice && pfVariants.practice.positions && pfVariants.practice.positions[a.code] ? 0 : 1;
+      const bHeld = pfVariants && pfVariants.practice && pfVariants.practice.positions && pfVariants.practice.positions[b.code] ? 0 : 1;
+      return aHeld - bHeld;
+    });
+    listEl.innerHTML = activeSorted.map((item) => {
       const latest = stockMap[item.code];
       const curP = latest ? Number(latest.price) : null;
       const dispCur = (curP != null && Number.isFinite(curP)) ? formatNumber(curP, 1) : (item.hitPrice != null ? formatNumber(item.hitPrice, 1) : '-');
@@ -2778,15 +2911,20 @@ function renderBuyTargetObservations() {
         prog = Math.max(0, Math.min(100, ((curP - item.buy) / (item.tp - item.buy)) * 100));
       }
       const sigCls = signalClass(item.signal);
-      const pfVariants = getPortfolioVariants(obs, modeKey);
       // 保有中の方式を列挙してバッジ表示（資金不足等で一部方式のみ保有もあり得る）
-      const heldDefs = PF_VARIANT_DEFS.map((d) => ({ key: d.key, short: d.short }));
+      const heldDefs = PF_VARIANT_DEFS.map((d) => ({ key: d.key, short: d.short, recommended: d.recommended }));
       const heldList = heldDefs.filter((d) => {
         const pf = pfVariants && pfVariants[d.key];
         return pf && pf.positions && pf.positions[item.code];
       });
+      const grokHeld = heldList.some((d) => d.key === 'practice');
       let heldHtml = '';
-      if (heldList.length === heldDefs.length) {
+      if (grokHeld) {
+        const pos = pfVariants.practice.positions[item.code];
+        const others = heldList.filter((d) => d.key !== 'practice').map((d) => d.short).join('・');
+        const extra = others ? ` ／他方式: ${others}` : '';
+        heldHtml = `<span class="obs-held grok" title="実践(Grok推奨)で保有中（投入 ${formatYen(pos.investedAmount)}円${extra}）">★Grok保有</span>`;
+      } else if (heldList.length === heldDefs.length) {
         const detail = heldList.map((d) => {
           const pos = pfVariants[d.key].positions[item.code];
           return `${d.short}: ${formatYen(pos.investedAmount)}円`;
@@ -2804,7 +2942,7 @@ function renderBuyTargetObservations() {
         heldHtml = `<span class="obs-held none" title="統合買い候補だが資金不足・同時保有上限などで仮想購入されませんでした">未購入</span>`;
       }
       return `
-        <div class="obs-card" data-code="${item.code}">
+        <div class="obs-card${grokHeld ? ' grok-held' : ''}" data-code="${item.code}">
           <div class="obs-card-head">
             <strong>${item.code}</strong>
             <span class="obs-name">${item.name || ''}</span>
@@ -2829,6 +2967,7 @@ function renderBuyTargetObservations() {
 
   renderPanel('standard', listStd, sumStd);
   renderPanel('relax', listRel, sumRel);
+  renderGrokHoldingsPanel(obs, stockMap);
 
   // === 別スペース: 利確・損切 決済済み銘柄の表示 ===
   renderClosedBuyTargetHistory(obs);
