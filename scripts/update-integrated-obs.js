@@ -81,12 +81,12 @@ const PRACTICE_INITIAL_CAPITAL = Math.max(10000, Number(process.env.OBS_PRACTICE
 const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.15)));
 const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 4));
 const PRACTICE_MIN_BUDGET = Math.max(1000, Number(process.env.OBS_PRACTICE_MIN_BUDGET || 10000));
-// 2026-08-17: 実践の資金が増えない主因は「枠4が先着の古い active で埋まり、後から来る統合買い候補を全部スキップ」
-// だった（例: りそな利確後に7/29到達のみずほを到達価格で補完購入し、同日の三菱商事などを取りこぼし）。
-// 運用開始後の実践は新規到達だけ買う。損切直後の同銘柄再エントリー（レーザーテック 7/17再SL）と
-// 損切幅>10%（SCREEN -14% など。ライブの統合買い候補利確は全て損切幅≤8.3%）も実践のみ見送り。
-const PRACTICE_SL_COOLDOWN_DAYS = Math.max(0, Number(process.env.OBS_PRACTICE_SL_COOLDOWN_DAYS || 14));
-const PRACTICE_MAX_SL_PCT = Math.min(0.3, Math.max(0.03, Number(process.env.OBS_PRACTICE_MAX_SL_PCT || 0.10)));
+// 2026-08-17: 空き枠を古い active の先着で埋めると後続の統合買い候補を取りこぼす
+// （例: りそな利確後に7/29到達のみずほを到達価格で補完購入）。運用開始後は4方式とも新規到達だけ買う。
+// 損切直後の同銘柄再エントリー（レーザーテック 7/17再SL）と損切幅>10%（SCREEN -14%。
+// ライブの統合買い候補利確は全て損切幅≤8.3%）も全方式で見送り。
+const SL_COOLDOWN_DAYS = Math.max(0, Number(process.env.OBS_SL_COOLDOWN_DAYS || process.env.OBS_PRACTICE_SL_COOLDOWN_DAYS || 14));
+const MAX_SL_PCT = Math.min(0.3, Math.max(0.03, Number(process.env.OBS_MAX_SL_PCT || process.env.OBS_PRACTICE_MAX_SL_PCT || 0.10)));
 const PF_VARIANTS = ["practice", "fixed", "unit", "risk"];
 const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
@@ -128,12 +128,12 @@ function maxPositionsFor(variant) {
   return variant === "practice" ? PRACTICE_MAX_POSITIONS : MAX_POSITIONS;
 }
 
-function isFreshPractice(pf) {
+function isFreshPortfolio(pf) {
   return Object.keys((pf && pf.positions) || {}).length === 0 && ((pf && pf.history) || []).length === 0;
 }
 
 function recentStopLoss(obs, modeKey, pf, code, nowIso) {
-  const cutoff = Date.parse(nowIso) - PRACTICE_SL_COOLDOWN_DAYS * 86400000;
+  const cutoff = Date.parse(nowIso) - SL_COOLDOWN_DAYS * 86400000;
   if (!Number.isFinite(cutoff)) return false;
   const hit = (list) => {
     for (const h of list || []) {
@@ -149,7 +149,7 @@ function recentStopLoss(obs, modeKey, pf, code, nowIso) {
 
 function slWidthTooWide(price, sl) {
   if (!(price > 0) || !Number.isFinite(Number(sl)) || Number(sl) <= 0) return false;
-  return (price - Number(sl)) / price > PRACTICE_MAX_SL_PCT;
+  return (price - Number(sl)) / price > MAX_SL_PCT;
 }
 
 function portfolioEquityApprox(pf) {
@@ -309,27 +309,25 @@ function normalizeObs(obs) {
 }
 
 // 到達＝購入。variant に応じて 実践%/100万円/1単元/リスク均等 を取得する。
-// sl はリスク均等の株数逆算と、実践の損切幅フィルタに使う。
+// sl はリスク均等の株数逆算と、全方式の損切幅フィルタに使う。
 function tryBuy(pf, variant, code, name, signal, price, nowIso, sl, opts) {
   opts = opts || {};
   if (!pf.startedAt) pf.startedAt = nowIso;
   if (pf.positions[code]) {
     return { action: "skip", cost: 0, reason: "既に保有中" };
   }
-  if (variant === "practice") {
-    if (recentStopLoss(opts.obs, opts.modeKey, pf, code, nowIso)) {
-      const reason = `損切後クールダウン（${PRACTICE_SL_COOLDOWN_DAYS}日以内）`;
-      pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
-      if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
-      return { action: "skip", cost: 0, reason };
-    }
-    if (slWidthTooWide(price, sl)) {
-      const slPct = ((price - Number(sl)) / price) * 100;
-      const reason = `損切幅が広い（${slPct.toFixed(1)}%>${Math.round(PRACTICE_MAX_SL_PCT * 100)}%）`;
-      pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
-      if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
-      return { action: "skip", cost: 0, reason };
-    }
+  if (recentStopLoss(opts.obs, opts.modeKey, pf, code, nowIso)) {
+    const reason = `損切後クールダウン（${SL_COOLDOWN_DAYS}日以内）`;
+    pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+    if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+    return { action: "skip", cost: 0, reason };
+  }
+  if (slWidthTooWide(price, sl)) {
+    const slPct = ((price - Number(sl)) / price) * 100;
+    const reason = `損切幅が広い（${slPct.toFixed(1)}%>${Math.round(MAX_SL_PCT * 100)}%）`;
+    pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+    if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+    return { action: "skip", cost: 0, reason };
   }
   const openCount = Object.keys(pf.positions || {}).length;
   const maxPos = maxPositionsFor(variant);
@@ -876,8 +874,7 @@ async function main() {
   // 0) 仮想資金を観測の保有状態(active)に同期する（塩漬け解消）。
   //    tryBuy は「新規に買い目標へ到達した瞬間」だけ買うため、仮想資金の方式が出揃う前から
   //    active に居座っている銘柄は永久に買い直されず、実現損益も決済LINE通知も出ない塩漬けになる。
-  //    検証用3方式は従来どおり到達価格でキャッチアップする。
-  //    実践は「運用開始後に古い active を先着で埋めて後続の統合買い候補を取りこぼす」のを避けるため、
+  //    4方式とも、運用開始後に古い active を先着で埋めて後続の統合買い候補を取りこぼすのを避ける。
   //    初期口座（保有も履歴も空）のときだけ、スコア順・現値優先で埋める。
   let syncedBuys = 0;
   for (const def of modeDefs) {
@@ -894,10 +891,8 @@ async function main() {
       for (const variant of PF_VARIANTS) {
         const pf = obs.portfolio[def.key][variant];
         if (pf.positions[item.code]) continue; // 既に保有していれば何もしない（冪等）
-        if (variant === "practice" && !isFreshPractice(pf)) continue;
-        const buyPrice = (variant === "practice" && Number.isFinite(livePrice) && livePrice > 0)
-          ? livePrice
-          : entryPrice;
+        if (!isFreshPortfolio(pf)) continue;
+        const buyPrice = (Number.isFinite(livePrice) && livePrice > 0) ? livePrice : entryPrice;
         const res = tryBuy(
           pf, variant, item.code, item.name || item.code, item.signal || "見送り",
           buyPrice, item.hitAt || nowIso, item.sl,
@@ -992,12 +987,15 @@ async function main() {
       positionPct: PRACTICE_POSITION_PCT,
       maxPositions: PRACTICE_MAX_POSITIONS,
       minBudget: PRACTICE_MIN_BUDGET,
-      slCooldownDays: PRACTICE_SL_COOLDOWN_DAYS,
-      maxSlPct: PRACTICE_MAX_SL_PCT,
+      slCooldownDays: SL_COOLDOWN_DAYS,
+      maxSlPct: MAX_SL_PCT,
       fillPolicy: "fresh-hit-only",
       label: "実践(Grok推奨)"
     },
-    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。実践は資金100万・評価額15%・同時4本。空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄再エントリーしない。損切幅>10%は見送り。",
+    slCooldownDays: SL_COOLDOWN_DAYS,
+    maxSlPct: MAX_SL_PCT,
+    fillPolicy: "fresh-hit-only",
+    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。4方式とも空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄再エントリーしない。損切幅>10%は見送り。実践は資金100万・評価額15%・同時4本。",
     since: "2026-08-12"
   };
   for (const def of modeDefs) {
