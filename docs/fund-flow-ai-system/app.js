@@ -2544,7 +2544,7 @@ const PF_VARIANT_DEFS = [
     label: "実践(Grok推奨)",
     short: "実践",
     recommended: true,
-    hint: "少資金向けGrok推奨（バランスB）。初期100万円・評価額の約15%を1銘柄（ミニ株想定）・同時最大4本（最大稼働≈60%）・統合買い候補のみ。資金が増えると1銘柄の投入額も自動で増える。"
+    hint: "少資金向けGrok推奨（バランスB）。初期100万円・評価額の約15%を1銘柄（ミニ株想定）・同時最大4本（最大稼働≈60%）・統合買い候補のみ。空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄を再エントリーしない。損切幅が10%超の銘柄は見送り。資金が増えると1銘柄の投入額も自動で増える。"
   },
   {
     key: "fixed",
@@ -2713,6 +2713,16 @@ function renderGrokHoldingsPanel(obs, stockMap) {
     const eqText = equity != null
       ? `評価 ${formatYen(equity)}円 (${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)`
       : '評価 —';
+    const skips = ((pf && pf.skipped) || []).filter((s) => /クールダウン|損切幅/.test(String(s.reason || '')));
+    const seen = new Set();
+    const skipLine = skips.filter((s) => {
+      if (seen.has(s.code)) return false;
+      seen.add(s.code);
+      return true;
+    }).slice(0, 3).map((s) => `${s.name || s.code}（${s.reason}）`).join(' / ');
+    const skipHtml = skipLine
+      ? `<p class="grok-hold-empty">見送り: ${skipLine}</p>`
+      : '';
     return `
       <div class="grok-hold-mode">
         <div class="grok-hold-mode-head">
@@ -2721,13 +2731,14 @@ function renderGrokHoldingsPanel(obs, stockMap) {
           <span class="obs-pf-equity ${cls}">${eqText}</span>
         </div>
         ${renderPracticeHoldRows(holds)}
+        ${skipHtml}
       </div>
     `;
   }).join('');
   el.innerHTML = `
     <div class="grok-holdings-head">
       <h4>★ 実践(Grok推奨) 現在保有中</h4>
-      <span class="obs-note-small">実弾に近い仮想保有（評価額の約15%×同時最大${maxPos}本）。標準とゆるめは別枠です。観測リストの★Grok保有バッジと対応します。</span>
+      <span class="obs-note-small">実弾に近い仮想保有（評価額の約15%×同時最大${maxPos}本）。空き枠は新規の統合買い候補到達だけ埋める。損切後14日は同銘柄再エントリーなし、損切幅10%超は見送り。標準とゆるめは別枠です。</span>
     </div>
     <div class="grok-holdings-grid">${blocks}</div>
   `;
@@ -2776,7 +2787,7 @@ function renderPortfolioPanel(modeKey, obs) {
       ? `<span class="obs-pf-rank rank-${rank}" title="実戦で絞る場合の優先順位。損益率で自動更新${rankBasis === 'structural' ? '（現在は成績差が無いため初期優先度: 実践Grok>ゆるめ>標準・fixed>risk>unit）' : ''}">第${rank}候補</span>`
       : '';
     const practiceMeta = def.key === 'practice'
-      ? `<span title="1銘柄あたり評価額の約${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}%・同時最大${(gate && gate.maxPositions) || 4}本">ルール: 評価額×${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}% / 同時${(gate && gate.maxPositions) || 4}本</span>`
+      ? `<span title="1銘柄あたり評価額の約${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}%・同時最大${(gate && gate.maxPositions) || 4}本・空き枠は新規到達のみ・損切後${(gate && gate.slCooldownDays) || 14}日再エントリーなし・損切幅${Math.round(((gate && gate.maxSlPct) || 0.1) * 100)}%超は見送り">ルール: 評価額×${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}% / 同時${(gate && gate.maxPositions) || 4}本 / 新規到達のみ</span>`
       : '';
     const holdListHtml = def.key === 'practice'
       ? `<div class="grok-hold-inline">${renderPracticeHoldRows(listPracticePositions(obs, modeKey, stockMap))}</div>`

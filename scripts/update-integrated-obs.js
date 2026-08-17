@@ -81,6 +81,12 @@ const PRACTICE_INITIAL_CAPITAL = Math.max(10000, Number(process.env.OBS_PRACTICE
 const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.15)));
 const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 4));
 const PRACTICE_MIN_BUDGET = Math.max(1000, Number(process.env.OBS_PRACTICE_MIN_BUDGET || 10000));
+// 2026-08-17: 実践の資金が増えない主因は「枠4が先着の古い active で埋まり、後から来る統合買い候補を全部スキップ」
+// だった（例: りそな利確後に7/29到達のみずほを到達価格で補完購入し、同日の三菱商事などを取りこぼし）。
+// 運用開始後の実践は新規到達だけ買う。損切直後の同銘柄再エントリー（レーザーテック 7/17再SL）と
+// 損切幅>10%（SCREEN -14% など。ライブの統合買い候補利確は全て損切幅≤8.3%）も実践のみ見送り。
+const PRACTICE_SL_COOLDOWN_DAYS = Math.max(0, Number(process.env.OBS_PRACTICE_SL_COOLDOWN_DAYS || 14));
+const PRACTICE_MAX_SL_PCT = Math.min(0.3, Math.max(0.03, Number(process.env.OBS_PRACTICE_MAX_SL_PCT || 0.10)));
 const PF_VARIANTS = ["practice", "fixed", "unit", "risk"];
 const PF_HISTORY_LIMIT = 200;
 const PF_SKIPPED_LIMIT = 40;
@@ -120,6 +126,30 @@ function initialCapitalFor(variant) {
 
 function maxPositionsFor(variant) {
   return variant === "practice" ? PRACTICE_MAX_POSITIONS : MAX_POSITIONS;
+}
+
+function isFreshPractice(pf) {
+  return Object.keys((pf && pf.positions) || {}).length === 0 && ((pf && pf.history) || []).length === 0;
+}
+
+function recentStopLoss(obs, modeKey, pf, code, nowIso) {
+  const cutoff = Date.parse(nowIso) - PRACTICE_SL_COOLDOWN_DAYS * 86400000;
+  if (!Number.isFinite(cutoff)) return false;
+  const hit = (list) => {
+    for (const h of list || []) {
+      if (String(h.code) !== String(code) || h.exitType !== "sl") continue;
+      const t = Date.parse(h.exitAt || h.closedAt || 0);
+      if (Number.isFinite(t) && t >= cutoff) return true;
+    }
+    return false;
+  };
+  if (hit(pf && pf.history)) return true;
+  return hit(obs && obs[modeKey] && obs[modeKey].closed);
+}
+
+function slWidthTooWide(price, sl) {
+  if (!(price > 0) || !Number.isFinite(Number(sl)) || Number(sl) <= 0) return false;
+  return (price - Number(sl)) / price > PRACTICE_MAX_SL_PCT;
 }
 
 function portfolioEquityApprox(pf) {
@@ -279,11 +309,27 @@ function normalizeObs(obs) {
 }
 
 // 到達＝購入。variant に応じて 実践%/100万円/1単元/リスク均等 を取得する。
-// sl はリスク均等の株数逆算に使う（fixed/unit/practice では未使用）。
-function tryBuy(pf, variant, code, name, signal, price, nowIso, sl) {
+// sl はリスク均等の株数逆算と、実践の損切幅フィルタに使う。
+function tryBuy(pf, variant, code, name, signal, price, nowIso, sl, opts) {
+  opts = opts || {};
   if (!pf.startedAt) pf.startedAt = nowIso;
   if (pf.positions[code]) {
     return { action: "skip", cost: 0, reason: "既に保有中" };
+  }
+  if (variant === "practice") {
+    if (recentStopLoss(opts.obs, opts.modeKey, pf, code, nowIso)) {
+      const reason = `損切後クールダウン（${PRACTICE_SL_COOLDOWN_DAYS}日以内）`;
+      pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+      if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+      return { action: "skip", cost: 0, reason };
+    }
+    if (slWidthTooWide(price, sl)) {
+      const slPct = ((price - Number(sl)) / price) * 100;
+      const reason = `損切幅が広い（${slPct.toFixed(1)}%>${Math.round(PRACTICE_MAX_SL_PCT * 100)}%）`;
+      pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
+      if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
+      return { action: "skip", cost: 0, reason };
+    }
   }
   const openCount = Object.keys(pf.positions || {}).length;
   const maxPos = maxPositionsFor(variant);
@@ -819,30 +865,49 @@ async function main() {
     { key: "standard", factor: 1.0 },
     { key: "relax", factor: RELAX_FACTOR }
   ];
+  const scoreByCode = Object.fromEntries(allStocks.map((s) => [String(s.code || "").trim(), Number(s.score) || 0]));
+  const rankIndexByCode = new Map(allStocks.map((s, i) => [String(s.code || "").trim(), i]));
+  const qualityCmp = (aCode, bCode) => {
+    const ds = (scoreByCode[bCode] || 0) - (scoreByCode[aCode] || 0);
+    if (ds) return ds;
+    return (rankIndexByCode.get(aCode) ?? 999) - (rankIndexByCode.get(bCode) ?? 999);
+  };
 
   // 0) 仮想資金を観測の保有状態(active)に同期する（塩漬け解消）。
   //    tryBuy は「新規に買い目標へ到達した瞬間」だけ買うため、仮想資金の方式が出揃う前から
   //    active に居座っている銘柄は永久に買い直されず、実現損益も決済LINE通知も出ない塩漬けになる。
-  //    そこで毎回、active のBUY対象で仮想資金が未保有のものを到達価格(hitPrice)で買い直してキャッチアップさせる。
-  //    観測の決済チェック(下記1)が active から tp/sl 到達を毎回除外するため、ここで買う銘柄は必ず tp と sl の間にあり
-  //    即決済は起きない。買い直し自体は通知しない（過去分の一括買いは通知ノイズになるため）。以後の利確/損切で通常の決済通知が出る。
+  //    検証用3方式は従来どおり到達価格でキャッチアップする。
+  //    実践は「運用開始後に古い active を先着で埋めて後続の統合買い候補を取りこぼす」のを避けるため、
+  //    初期口座（保有も履歴も空）のときだけ、スコア順・現値優先で埋める。
   let syncedBuys = 0;
   for (const def of modeDefs) {
     const data = obs[def.key];
-    for (const item of data.active) {
-      if (!BUY_CATEGORIES.has(getCategoryLabel(item.signal))) continue;
+    const items = data.active
+      .filter((item) => BUY_CATEGORIES.has(getCategoryLabel(item.signal)))
+      .slice()
+      .sort((a, b) => qualityCmp(a.code, b.code));
+    for (const item of items) {
       const entryPrice = Number.isFinite(Number(item.hitPrice)) ? Number(item.hitPrice)
         : (Number.isFinite(Number(item.buy)) ? Number(item.buy) : NaN);
       if (!Number.isFinite(entryPrice) || entryPrice <= 0) continue;
+      const livePrice = Number(priceMap[item.code]);
       for (const variant of PF_VARIANTS) {
         const pf = obs.portfolio[def.key][variant];
         if (pf.positions[item.code]) continue; // 既に保有していれば何もしない（冪等）
-        const res = tryBuy(pf, variant, item.code, item.name || item.code, item.signal || "見送り", entryPrice, item.hitAt || nowIso, item.sl);
+        if (variant === "practice" && !isFreshPractice(pf)) continue;
+        const buyPrice = (variant === "practice" && Number.isFinite(livePrice) && livePrice > 0)
+          ? livePrice
+          : entryPrice;
+        const res = tryBuy(
+          pf, variant, item.code, item.name || item.code, item.signal || "見送り",
+          buyPrice, item.hitAt || nowIso, item.sl,
+          { obs, modeKey: def.key }
+        );
         if (res && res.action === "buy") syncedBuys += 1;
       }
     }
   }
-  if (syncedBuys > 0) console.log(`仮想資金を active に同期: ${syncedBuys}件を到達価格で買い直し`);
+  if (syncedBuys > 0) console.log(`仮想資金を active に同期: ${syncedBuys}件を買い直し`);
 
   // 1) 既存アクティブの利確/損切判定（ランキング圏外でも価格があれば決済まで追跡）
   for (const def of modeDefs) {
@@ -927,15 +992,19 @@ async function main() {
       positionPct: PRACTICE_POSITION_PCT,
       maxPositions: PRACTICE_MAX_POSITIONS,
       minBudget: PRACTICE_MIN_BUDGET,
+      slCooldownDays: PRACTICE_SL_COOLDOWN_DAYS,
+      maxSlPct: PRACTICE_MAX_SL_PCT,
+      fillPolicy: "fresh-hit-only",
       label: "実践(Grok推奨)"
     },
-    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。実践プロファイルは資金100万・評価額15%・同時4本（最大稼働≈60%）。",
+    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。実践は資金100万・評価額15%・同時4本。空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄再エントリーしない。損切幅>10%は見送り。",
     since: "2026-08-12"
   };
   for (const def of modeDefs) {
     if (!entryAllowed) break;
     const data = obs[def.key];
     const activeCodes = new Set(data.active.map((it) => it.code));
+    const pendingBuys = [];
     for (const [code, target] of Object.entries(obs.targets)) {
       if (activeCodes.has(code)) continue;
       // 権利落ち日×配当月の銘柄は見送り（10年検証: 勝率25.9%/平均-1.45%の偽押し目）
@@ -972,32 +1041,47 @@ async function main() {
         activeCodes.add(code);
         summary.hits[def.key] += 1;
 
-        // 仮想資金: 到達＝購入（fixed/unit/risk 並行）。統合買い候補のみ購入対象。
-        // 確認候補・監視継続・見送りは対照群（観測のみ）。資金不足・保有上限はスキップ記録。
+        // 仮想資金: 到達＝購入。統合買い候補のみ。確認候補・監視継続・見送りは対照群。
         if (BUY_CATEGORIES.has(getCategoryLabel(target.signal))) {
-          // 通知は銘柄×モード単位（標準/ゆるめは達成基準もタイミングも違うため別通知）。
-          // fixed/unit は同基準・同タイミングなので同じイベントにまとめる。
-          const evKey = `${code}__${def.key}`;
-          for (const variant of PF_VARIANTS) {
-            const result = tryBuy(obs.portfolio[def.key][variant], variant, code, target.name || code, target.signal || "見送り", curPrice, nowIso, sl);
-            if (!buyEvents[evKey]) {
-              buyEvents[evKey] = {
-                code,
-                name: target.name || code,
-                mode: def.key,
-                category: getCategoryLabel(target.signal),
-                factor: def.factor,
-                threshold,
-                price: curPrice,
-                buy,
-                tp: Number.isFinite(Number(target.tp)) ? Number(target.tp) : null,
-                sl: Number.isFinite(sl) ? sl : null,
-                entries: []
-              };
-            }
-            buyEvents[evKey].entries.push({ variant, ...result });
-          }
+          pendingBuys.push({
+            code,
+            name: target.name || code,
+            signal: target.signal || "見送り",
+            curPrice,
+            sl,
+            buy,
+            tp: Number.isFinite(Number(target.tp)) ? Number(target.tp) : null,
+            threshold
+          });
         }
+      }
+    }
+    // 同時に複数到達したときはスコア高い銘柄から枠を埋める（Object順＝先着は期待値を落とす）
+    pendingBuys.sort((a, b) => qualityCmp(a.code, b.code));
+    for (const pb of pendingBuys) {
+      const evKey = `${pb.code}__${def.key}`;
+      for (const variant of PF_VARIANTS) {
+        const result = tryBuy(
+          obs.portfolio[def.key][variant], variant, pb.code, pb.name, pb.signal,
+          pb.curPrice, nowIso, pb.sl,
+          { obs, modeKey: def.key }
+        );
+        if (!buyEvents[evKey]) {
+          buyEvents[evKey] = {
+            code: pb.code,
+            name: pb.name,
+            mode: def.key,
+            category: getCategoryLabel(pb.signal),
+            factor: def.factor,
+            threshold: pb.threshold,
+            price: pb.curPrice,
+            buy: pb.buy,
+            tp: pb.tp,
+            sl: Number.isFinite(pb.sl) ? pb.sl : null,
+            entries: []
+          };
+        }
+        buyEvents[evKey].entries.push({ variant, ...result });
       }
     }
   }
