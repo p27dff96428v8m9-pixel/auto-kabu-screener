@@ -1,8 +1,8 @@
 {
   "source": "fund-flow-treasure-kabukazidou",
   "logic": "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime); 全市場発掘(market-discovery)上位5銘柄を治験合流",
-  "updatedAt": "2026-08-21T11:02:42.117Z",
-  "marketUpdatedAt": "2026-08-21T11:02:05.131Z",
+  "updatedAt": "2026-08-21T11:46:49.406Z",
+  "marketUpdatedAt": "2026-08-21T11:46:25.387Z",
   "marketRegime": {
     "index": "TOPIX連動(1306)",
     "current": 424.1,
@@ -16,7 +16,7 @@
   "winRateCalibration": "backtest atr / 地合いフィルタOFF(本番同等) / 4277件",
   "investorFlows": {
     "section": "TSEPrime",
-    "updatedAt": "2026-08-21T11:01:21.702Z",
+    "updatedAt": "2026-08-21T11:45:37.474Z",
     "weeks": [
       {
         "stDate": "2026-05-25",
@@ -132,32 +132,32 @@
   },
   "stocks": [
     {
-      "code": "3769",
-      "name": "ＧＭＯペイメントゲートウェイ",
-      "score": 73,
-      "flowScore": 61,
+      "code": "3774",
+      "name": "インターネットイニシアティブ",
+      "score": 83,
+      "flowScore": 94,
       "treasureScore": 58,
       "kabuScore": 93,
-      "confirmationScore": 71,
+      "confirmationScore": 75,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "確認候補",
-      "price": 9414,
-      "date": "2026-08-20",
+      "price": 3381,
+      "date": "2026-08-21",
       "theme": "全市場発掘 / 情報･通信業",
       "themeIds": [],
       "type": "日本株",
       "quality": "全市場発掘候補",
       "newsRisk": "未確認",
       "financial": null,
-      "buy": 9273,
-      "tp": 10703,
-      "sl": 8456,
+      "buy": 3330,
+      "tp": 3662,
+      "sl": 3140,
       "rr": 1.75,
       "winRate": 82,
       "winRateCalibrated": 44,
       "checks": {
-        "score": 71,
+        "score": 75,
         "passed": 2,
         "earnings": {
           "score": 58,
@@ -172,31 +172,173 @@
           "reason": "未確認"
         },
         "volume": {
-          "score": 66,
+          "score": 84,
           "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.18,
-          "volume7d": 22.69,
-          "volume30d": 34.57
+          "label": "出来高増加",
+          "ratio": 1.83,
+          "volume7d": 86.52,
+          "volume30d": 32.2
         },
         "chart": {
           "score": 100,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -3.7% / RSI 39.0"
+          "reason": "25日乖離 -3.2% / RSI 42.0"
         }
       },
       "changes": {
-        "7d": -7.48,
-        "30d": -5.43,
-        "90d": 9.54,
-        "volume7d": 22.69,
-        "volume30d": 34.57
+        "7d": -2.87,
+        "30d": -3.68,
+        "90d": 33.37,
+        "volume7d": 86.52,
+        "volume30d": 32.2
       },
       "technical": {
-        "deviation": -3.66,
-        "rsi": 39,
-        "volumeRatio": 1.18,
+        "deviation": -3.24,
+        "rsi": 42,
+        "volumeRatio": 1.83,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": true
+      }
+    },
+    {
+      "code": "7936",
+      "name": "アシックス",
+      "score": 81,
+      "flowScore": 88,
+      "treasureScore": 58,
+      "kabuScore": 93,
+      "confirmationScore": 73,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "確認候補",
+      "price": 4689,
+      "date": "2026-08-21",
+      "theme": "全市場発掘 / その他製品",
+      "themeIds": [],
+      "type": "日本株",
+      "quality": "全市場発掘候補",
+      "newsRisk": "未確認",
+      "financial": null,
+      "buy": 4619,
+      "tp": 5472,
+      "sl": 4132,
+      "rr": 1.75,
+      "winRate": 82,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 73,
+        "passed": 2,
+        "earnings": {
+          "score": 58,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "全市場発掘候補"
+        },
+        "material": {
+          "score": 54,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "未確認"
+        },
+        "volume": {
+          "score": 75,
+          "ok": true,
+          "label": "出来高増加",
+          "ratio": 1.22,
+          "volume7d": 50.65,
+          "volume30d": 218.71
+        },
+        "chart": {
+          "score": 100,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -4.0% / RSI 48.3"
+        }
+      },
+      "changes": {
+        "7d": -1.62,
+        "30d": 1.76,
+        "90d": 2.67,
+        "volume7d": 50.65,
+        "volume30d": 218.71
+      },
+      "technical": {
+        "deviation": -3.95,
+        "rsi": 48.3,
+        "volumeRatio": 1.22,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": true
+      }
+    },
+    {
+      "code": "6178",
+      "name": "日本郵政",
+      "score": 76,
+      "flowScore": 71,
+      "treasureScore": 58,
+      "kabuScore": 93,
+      "confirmationScore": 70,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "確認候補",
+      "price": 2336,
+      "date": "2026-08-21",
+      "theme": "全市場発掘 / サービス業",
+      "themeIds": [],
+      "type": "日本株",
+      "quality": "全市場発掘候補",
+      "newsRisk": "未確認",
+      "financial": null,
+      "buy": 2301,
+      "tp": 2514,
+      "sl": 2180,
+      "rr": 1.76,
+      "winRate": 82,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 70,
+        "passed": 2,
+        "earnings": {
+          "score": 58,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "全市場発掘候補"
+        },
+        "material": {
+          "score": 54,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "未確認"
+        },
+        "volume": {
+          "score": 64,
+          "ok": true,
+          "label": "出来高確認OK",
+          "ratio": 1.12,
+          "volume7d": 50.65,
+          "volume30d": -4.94
+        },
+        "chart": {
+          "score": 100,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -2.4% / RSI 44.5"
+        }
+      },
+      "changes": {
+        "7d": -1.81,
+        "30d": -1.04,
+        "90d": 25.86,
+        "volume7d": 50.65,
+        "volume30d": -4.94
+      },
+      "technical": {
+        "deviation": -2.4,
+        "rsi": 44.5,
+        "volumeRatio": 1.12,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": true
@@ -330,28 +472,28 @@
       }
     },
     {
-      "code": "6103",
-      "name": "オークマ",
-      "score": 73,
-      "flowScore": 64,
+      "code": "3382",
+      "name": "セブン＆アイ・ホールディングス",
+      "score": 71,
+      "flowScore": 56,
       "treasureScore": 58,
       "kabuScore": 91,
       "confirmationScore": 69,
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "監視継続",
-      "price": 4980,
-      "date": "2026-08-20",
-      "theme": "全市場発掘 / 機械",
+      "price": 2030.5,
+      "date": "2026-08-21",
+      "theme": "全市場発掘 / 小売業",
       "themeIds": [],
       "type": "日本株",
       "quality": "全市場発掘候補",
       "newsRisk": "未確認",
       "financial": null,
-      "buy": 4905,
-      "tp": 5679,
-      "sl": 4463,
-      "rr": 1.75,
+      "buy": 2000,
+      "tp": 2160,
+      "sl": 1909,
+      "rr": 1.76,
       "winRate": 82,
       "winRateCalibrated": 44,
       "checks": {
@@ -373,170 +515,28 @@
           "score": 59,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 1.01,
-          "volume7d": 24.65,
-          "volume30d": 1.83
-        },
-        "chart": {
-          "score": 100,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -2.5% / RSI 54.7"
-        }
-      },
-      "changes": {
-        "7d": -7.95,
-        "30d": 6.64,
-        "90d": 24.66,
-        "volume7d": 24.65,
-        "volume30d": 1.83
-      },
-      "technical": {
-        "deviation": -2.51,
-        "rsi": 54.7,
-        "volumeRatio": 1.01,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "6178",
-      "name": "日本郵政",
-      "score": 72,
-      "flowScore": 59,
-      "treasureScore": 58,
-      "kabuScore": 91,
-      "confirmationScore": 69,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 2314,
-      "date": "2026-08-20",
-      "theme": "全市場発掘 / サービス業",
-      "themeIds": [],
-      "type": "日本株",
-      "quality": "全市場発掘候補",
-      "newsRisk": "未確認",
-      "financial": null,
-      "buy": 2279,
-      "tp": 2489,
-      "sl": 2159,
-      "rr": 1.75,
-      "winRate": 82,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 69,
-        "passed": 1,
-        "earnings": {
-          "score": 58,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "全市場発掘候補"
-        },
-        "material": {
-          "score": 54,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "未確認"
-        },
-        "volume": {
-          "score": 58,
-          "ok": false,
-          "label": "出来高不足",
           "ratio": 1,
-          "volume7d": 31.3,
-          "volume30d": -20.67
+          "volume7d": 33.99,
+          "volume30d": -9.31
         },
         "chart": {
           "score": 100,
           "ok": true,
           "label": "好位置",
-          "reason": "25日乖離 -3.4% / RSI 37.9"
+          "reason": "25日乖離 -2.6% / RSI 38.5"
         }
       },
       "changes": {
-        "7d": -2.03,
-        "30d": -2.36,
-        "90d": 23.68,
-        "volume7d": 31.3,
-        "volume30d": -20.67
+        "7d": -0.88,
+        "30d": 0.07,
+        "90d": 0.17,
+        "volume7d": 33.99,
+        "volume30d": -9.31
       },
       "technical": {
-        "deviation": -3.44,
-        "rsi": 37.9,
+        "deviation": -2.56,
+        "rsi": 38.5,
         "volumeRatio": 1,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "8601",
-      "name": "大和証券グループ本社",
-      "score": 68,
-      "flowScore": 47,
-      "treasureScore": 58,
-      "kabuScore": 91,
-      "confirmationScore": 69,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 1757,
-      "date": "2026-08-20",
-      "theme": "全市場発掘 / 証券･商品先物取引業",
-      "themeIds": [],
-      "type": "日本株",
-      "quality": "全市場発掘候補",
-      "newsRisk": "未確認",
-      "financial": null,
-      "buy": 1731,
-      "tp": 1883,
-      "sl": 1644,
-      "rr": 1.75,
-      "winRate": 82,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 69,
-        "passed": 1,
-        "earnings": {
-          "score": 58,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "全市場発掘候補"
-        },
-        "material": {
-          "score": 54,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "未確認"
-        },
-        "volume": {
-          "score": 58,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 1.04,
-          "volume7d": -2.69,
-          "volume30d": -8.95
-        },
-        "chart": {
-          "score": 100,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -3.2% / RSI 44.0"
-        }
-      },
-      "changes": {
-        "7d": -2.74,
-        "30d": -1.15,
-        "90d": 14.02,
-        "volume7d": -2.69,
-        "volume30d": -8.95
-      },
-      "technical": {
-        "deviation": -3.23,
-        "rsi": 44,
-        "volumeRatio": 1.04,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": true
@@ -664,6 +664,77 @@
         "deviation": 0.56,
         "rsi": 49.5,
         "volumeRatio": 1.29,
+        "trendOk": true,
+        "pullbackOk": true,
+        "volumeOk": true
+      }
+    },
+    {
+      "code": "3863",
+      "name": "日本製紙",
+      "score": 81,
+      "flowScore": 91,
+      "treasureScore": 58,
+      "kabuScore": 88,
+      "confirmationScore": 76,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "確認候補",
+      "price": 1396,
+      "date": "2026-08-21",
+      "theme": "全市場発掘 / パルプ・紙",
+      "themeIds": [],
+      "type": "日本株",
+      "quality": "全市場発掘候補",
+      "newsRisk": "未確認",
+      "financial": null,
+      "buy": 1375,
+      "tp": 1587,
+      "sl": 1254,
+      "rr": 1.75,
+      "winRate": 82,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 76,
+        "passed": 2,
+        "earnings": {
+          "score": 58,
+          "ok": false,
+          "label": "決算確認待ち",
+          "reason": "全市場発掘候補"
+        },
+        "material": {
+          "score": 54,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "未確認"
+        },
+        "volume": {
+          "score": 89,
+          "ok": true,
+          "label": "出来高増加",
+          "ratio": 1.58,
+          "volume7d": 100.64,
+          "volume30d": 174.85
+        },
+        "chart": {
+          "score": 100,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -1.8% / RSI 52.5"
+        }
+      },
+      "changes": {
+        "7d": -0.43,
+        "30d": 5.84,
+        "90d": 5.6,
+        "volume7d": 100.64,
+        "volume30d": 174.85
+      },
+      "technical": {
+        "deviation": -1.79,
+        "rsi": 52.5,
+        "volumeRatio": 1.58,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": true
@@ -819,7 +890,7 @@
       "financial": {
         "ticker": "8001",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T06:56:06.707Z",
+        "updatedAt": "2026-08-21T11:46:24.148Z",
         "latestStatement": {
           "disclosedDate": "2026-08-06",
           "disclosedTime": "15:30:00",
@@ -946,7 +1017,7 @@
       "financial": {
         "ticker": "8306",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T07:42:16.734Z",
+        "updatedAt": "2026-08-21T11:46:25.387Z",
         "latestStatement": {
           "disclosedDate": "2026-08-06",
           "disclosedTime": "16:00:00",
@@ -1708,7 +1779,7 @@
       "financial": {
         "ticker": "7270",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T06:56:06.140Z",
+        "updatedAt": "2026-08-21T11:46:23.625Z",
         "latestStatement": {
           "disclosedDate": "2026-08-05",
           "disclosedTime": "13:00:00",
@@ -1836,7 +1907,7 @@
       "financial": {
         "ticker": "8058",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T07:42:16.174Z",
+        "updatedAt": "2026-08-21T11:46:25.030Z",
         "latestStatement": {
           "disclosedDate": "2026-08-06",
           "disclosedTime": "15:25:00",
@@ -2342,7 +2413,7 @@
       "financial": {
         "ticker": "8031",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T07:42:15.480Z",
+        "updatedAt": "2026-08-21T11:46:24.492Z",
         "latestStatement": {
           "disclosedDate": "2026-08-04",
           "disclosedTime": "12:00:00",
@@ -2467,7 +2538,7 @@
       "financial": {
         "ticker": "8053",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T07:42:15.930Z",
+        "updatedAt": "2026-08-21T11:46:24.851Z",
         "latestStatement": {
           "disclosedDate": "2026-07-31",
           "disclosedTime": "13:00:00",
@@ -3225,7 +3296,7 @@
       "financial": {
         "ticker": "8267",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T07:42:16.487Z",
+        "updatedAt": "2026-08-21T11:46:25.211Z",
         "latestStatement": {
           "disclosedDate": "2026-07-10",
           "disclosedTime": "15:30:00",
@@ -3327,77 +3398,6 @@
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": false
-      }
-    },
-    {
-      "code": "6971",
-      "name": "京セラ",
-      "score": 69,
-      "flowScore": 73,
-      "treasureScore": 58,
-      "kabuScore": 73,
-      "confirmationScore": 66,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "確認候補",
-      "price": 3567,
-      "date": "2026-08-20",
-      "theme": "全市場発掘 / 電気機器",
-      "themeIds": [],
-      "type": "日本株",
-      "quality": "全市場発掘候補",
-      "newsRisk": "未確認",
-      "financial": null,
-      "buy": 3549,
-      "tp": 4055,
-      "sl": 3260,
-      "rr": 1.75,
-      "winRate": 67,
-      "winRateCalibrated": 45,
-      "checks": {
-        "score": 66,
-        "passed": 2,
-        "earnings": {
-          "score": 58,
-          "ok": false,
-          "label": "決算確認待ち",
-          "reason": "全市場発掘候補"
-        },
-        "material": {
-          "score": 54,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "未確認"
-        },
-        "volume": {
-          "score": 61,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.04,
-          "volume7d": 63.29,
-          "volume30d": -23.1
-        },
-        "chart": {
-          "score": 86,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -4.1% / RSI 50.7"
-        }
-      },
-      "changes": {
-        "7d": -5.88,
-        "30d": -2.35,
-        "90d": 38.63,
-        "volume7d": 63.29,
-        "volume30d": -23.1
-      },
-      "technical": {
-        "deviation": -4.12,
-        "rsi": 50.7,
-        "volumeRatio": 1.04,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": true
       }
     },
     {
@@ -3800,7 +3800,7 @@
       "financial": {
         "ticker": "8015",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T06:56:06.898Z",
+        "updatedAt": "2026-08-21T11:46:24.321Z",
         "latestStatement": {
           "disclosedDate": "2026-07-31",
           "disclosedTime": "15:00:00",
@@ -5569,7 +5569,7 @@
       "financial": {
         "ticker": "7267",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T06:56:05.961Z",
+        "updatedAt": "2026-08-21T11:46:23.440Z",
         "latestStatement": {
           "disclosedDate": "2026-08-05",
           "disclosedTime": "15:30:00",
@@ -6835,7 +6835,7 @@
       "financial": {
         "ticker": "7532",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T06:56:06.330Z",
+        "updatedAt": "2026-08-21T11:46:23.802Z",
         "latestStatement": {
           "disclosedDate": "2026-08-18",
           "disclosedTime": "15:30:00",
@@ -7843,7 +7843,7 @@
       "financial": {
         "ticker": "7735",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T06:56:06.516Z",
+        "updatedAt": "2026-08-21T11:46:23.974Z",
         "latestStatement": {
           "disclosedDate": "2026-08-13",
           "disclosedTime": "15:35:00",
@@ -7970,7 +7970,7 @@
       "financial": {
         "ticker": "8035",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-08-21T07:42:15.708Z",
+        "updatedAt": "2026-08-21T11:46:24.670Z",
         "latestStatement": {
           "disclosedDate": "2026-07-30",
           "disclosedTime": "16:00:00",
