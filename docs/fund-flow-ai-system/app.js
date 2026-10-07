@@ -2283,6 +2283,203 @@ function signalClass(signal = "") {
   return "neutral";
 }
 
+// フォワード観測から勝率と期待値を出す。標準とゆるめは決済が別なので、モードごとに計算する。
+// 加点式の winRate と、バックテストの winRateCalibrated は計画RRと組むと期待値がプラスに見える。
+const FORWARD_EDGE_SHRINK = 8;
+const FORWARD_EDGE_PRIORS = {
+  standard: {
+    overall: { n: 80, wins: 25, winRate: 0.313, avgPct: -3.84 },
+    by: {
+      tight: { n: 26, wins: 16, winRate: 0.544, expectancyPct: 0.47 },
+      mid: { n: 24, wins: 5, winRate: 0.234, expectancyPct: -3.71 },
+      wide: { n: 30, wins: 4, winRate: 0.171, expectancyPct: -7.80 }
+    },
+    realizedPayoff: 1.08
+  },
+  relax: {
+    overall: { n: 80, wins: 36, winRate: 0.45, avgPct: 0.07 },
+    by: {
+      tight: { n: 38, wins: 20, winRate: 0.513, expectancyPct: 0.08 },
+      mid: { n: 28, wins: 11, winRate: 0.406, expectancyPct: 0.27 },
+      wide: { n: 14, wins: 5, winRate: 0.391, expectancyPct: -0.29 }
+    },
+    realizedPayoff: 1.24
+  }
+};
+
+function edgeModeKey(modeKey) {
+  return modeKey === "relax" ? "relax" : "standard";
+}
+
+function priorForEdge(modeKey) {
+  return FORWARD_EDGE_PRIORS[edgeModeKey(modeKey)];
+}
+
+function positionStopPct(buy, sl) {
+  const entry = Number(buy);
+  const stop = Number(sl);
+  if (!(entry > 0) || !Number.isFinite(stop) || !(entry > stop)) return null;
+  return ((entry - stop) / entry) * 100;
+}
+
+function positionReturnPct(buy, exitPrice) {
+  const entry = Number(buy);
+  const exit = Number(exitPrice);
+  if (!(entry > 0) || !Number.isFinite(exit)) return null;
+  return ((exit - entry) / entry) * 100;
+}
+
+function stopWidthBucket(slPct) {
+  if (slPct == null) return null;
+  if (slPct <= 6) return "tight";
+  if (slPct <= 8) return "mid";
+  return "wide";
+}
+
+function summarizeClosedTrades(rows) {
+  const usable = (rows || []).filter((row) => row.ret != null);
+  const n = usable.length;
+  const wins = usable.filter((row) => row.exitType === "tp").length;
+  const avgPct = n ? usable.reduce((sum, row) => sum + row.ret, 0) / n : null;
+  return { n, wins, winRate: n ? wins / n : null, avgPct };
+}
+
+function shrinkToward(n, value, k, prior) {
+  if (value == null || prior == null || !(n >= 0)) return value ?? prior;
+  return (n * value + k * prior) / (n + k);
+}
+
+function buildForwardEdge(obs, modeKey) {
+  const mode = edgeModeKey(modeKey);
+  const prior = priorForEdge(mode);
+  const closed = obs && obs[mode] && Array.isArray(obs[mode].closed) ? obs[mode].closed : [];
+  const rows = closed.map((trade) => ({
+    exitType: trade.exitType || "",
+    ret: positionReturnPct(trade.buy, trade.exitPrice),
+    bucket: stopWidthBucket(positionStopPct(trade.buy, trade.sl))
+  }));
+  const overall = summarizeClosedTrades(rows);
+  if (!overall.n) {
+    return { ...prior, ready: false, mode };
+  }
+  const by = {};
+  for (const key of ["tight", "mid", "wide"]) {
+    const raw = summarizeClosedTrades(rows.filter((row) => row.bucket === key));
+    by[key] = {
+      n: raw.n,
+      wins: raw.wins,
+      winRate: raw.n ? shrinkToward(raw.n, raw.winRate, FORWARD_EDGE_SHRINK, overall.winRate) : overall.winRate,
+      expectancyPct: raw.n ? shrinkToward(raw.n, raw.avgPct, FORWARD_EDGE_SHRINK, overall.avgPct) : overall.avgPct
+    };
+  }
+  const winners = rows.filter((row) => row.exitType === "tp" && row.ret != null);
+  const losers = rows.filter((row) => row.exitType === "sl" && row.ret != null);
+  const avgWin = winners.length ? winners.reduce((sum, row) => sum + row.ret, 0) / winners.length : null;
+  const avgLoss = losers.length ? losers.reduce((sum, row) => sum + row.ret, 0) / losers.length : null;
+  const realizedPayoff = avgWin != null && avgLoss != null && avgLoss !== 0 ? avgWin / Math.abs(avgLoss) : null;
+  return { overall, by, realizedPayoff, ready: true, mode };
+}
+
+function edgeForStock(stock, model) {
+  const slPct = positionStopPct(stock.buy, stock.sl);
+  const bucket = stopWidthBucket(slPct) || "wide";
+  const cell = (model.by && model.by[bucket]) || priorForEdge(model && model.mode).by.wide;
+  return {
+    slPct,
+    bucket,
+    n: cell.n,
+    winRate: cell.winRate,
+    expectancyPct: cell.expectancyPct,
+    sample: model.overall ? model.overall.n : 0,
+    realizedPayoff: model.realizedPayoff,
+    mode: edgeModeKey(model && model.mode)
+  };
+}
+
+const PRACTICE_STANDARD_RULE = {
+  maxPositions: 6,
+  positionPct: 0.15,
+  maxSlPct: 5.5,
+  cooldownDays: 14,
+  halfSellDays: 45,
+  halfSellRemain: 0.3
+};
+
+function buyStopLimitPct(mode) {
+  return mode === "relax" ? 8 : PRACTICE_STANDARD_RULE.maxSlPct;
+}
+
+function shouldHalfSellPractice(hold) {
+  const entry = Number(hold.entryPrice);
+  const tp = Number(hold.tp);
+  const cur = Number(hold.currentPrice);
+  const started = Date.parse(hold.entryAt);
+  if (!(entry > 0) || !(tp > entry) || !Number.isFinite(cur) || !Number.isFinite(started)) return null;
+  const remain = (tp - cur) / (tp - entry);
+  const days = (Date.now() - started) / 86400000;
+  if (!(remain > 0 && remain <= PRACTICE_STANDARD_RULE.halfSellRemain && days >= PRACTICE_STANDARD_RULE.halfSellDays)) return null;
+  return { days: Math.floor(days), remainPct: remain * 100 };
+}
+
+function signalAfterEdge(stock, edge) {
+  const original = stock.signal || "";
+  const modeLabel = edge.mode === "relax" ? "ゆるめ" : "標準";
+  const limit = buyStopLimitPct(edge.mode);
+  const width = edge.slPct != null ? `${edge.slPct.toFixed(1)}%` : "不明";
+  const labeled = original === "統合買い候補" || original === "確認候補" || original === "監視継続";
+  const qualifies = labeled && edge.slPct != null && edge.slPct <= limit && Number(edge.expectancyPct) > 0;
+  if (qualifies && original !== "統合買い候補") {
+    return {
+      signal: "統合買い候補",
+      demoted: false,
+      reason: `元の区分は${original}。${modeLabel}の決済では損切幅${limit}%以内の平均がプラスのため、買い候補に上げています（損切幅${width}）`
+    };
+  }
+  if (!qualifies && original === "統合買い候補") {
+    return {
+      signal: "監視継続",
+      demoted: true,
+      reason: `元の区分は統合買い候補。${modeLabel}の買い候補は損切幅${limit}%以内かつ期待値プラスだけです（この銘柄は${width}）`
+    };
+  }
+  return { signal: original, demoted: false, reason: qualifies ? `${modeLabel}の決済で損切幅${limit}%以内、期待値プラス` : "" };
+}
+
+function formatExpectancyPct(value, digits = 2) {
+  if (value == null || !Number.isFinite(Number(value))) return "-";
+  const number = Number(value);
+  return `${number >= 0 ? "+" : ""}${number.toFixed(digits)}%`;
+}
+
+function variantEdgeSuffix(pf) {
+  if (!pf) return "";
+  const hist = Array.isArray(pf.history) ? pf.history : [];
+  const tp = Number(pf.tpCount) || 0;
+  const sl = Number(pf.slCount) || 0;
+  const timeout = Number(pf.timeoutCount) || 0;
+  const denom = hist.length || (tp + sl + timeout);
+  if (!denom) return "";
+  const wins = hist.length ? hist.filter((row) => row.exitType === "tp").length : tp;
+  const wr = ((wins / denom) * 100).toFixed(1);
+  const rets = hist.map((row) => Number(row.pnlPct)).filter((value) => Number.isFinite(value));
+  const ev = rets.length ? rets.reduce((sum, value) => sum + value, 0) / rets.length : null;
+  const evText = ev == null ? "" : ` 期待値${formatExpectancyPct(ev, 1)}`;
+  const thin = denom < 20 ? "・参考" : "";
+  return ` 勝率${wr}%${evText}（${denom}件${thin}）`;
+}
+
+function formatClosedEdge(closed) {
+  const rows = (closed || []).map((trade) => ({
+    exitType: trade.exitType || "",
+    ret: positionReturnPct(trade.buy, trade.exitPrice)
+  }));
+  const stats = summarizeClosedTrades(rows);
+  if (!stats.n) return "";
+  const timeouts = (closed || []).filter((trade) => trade.exitType === "timeout").length;
+  const timeoutNote = timeouts ? `、期限手仕舞い${timeouts}件は分母に含む` : "";
+  return ` ｜ 勝率${(stats.winRate * 100).toFixed(1)}% 期待値${formatExpectancyPct(stats.avgPct)}（${stats.n}件${timeoutNote}）`;
+}
+
 function isIndexLinkedStock(stock = {}) {
   return /ETF|投信|連動|REIT|リート/i.test(`${stock.type || ""} ${stock.name || ""}`);
 }
@@ -2544,28 +2741,28 @@ const PF_VARIANT_DEFS = [
     label: "実践(Grok推奨)",
     short: "実践",
     recommended: true,
-    hint: "少資金向けGrok推奨（バランスB）。初期100万円・評価額の約15%を1銘柄（ミニ株想定）・同時最大4本（最大稼働≈60%）・統合買い候補のみ。空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄を再エントリーしない。損切幅が10%超の銘柄は見送り。資金が増えると1銘柄の投入額も自動で増える。"
+    hint: "標準は同時6枠・1枠は評価額の15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内で保有45日超は半分売って枠を空ける。ゆるめの新規は損切8%以内。実践の決済件数はまだ少ないので、その勝率は参考値です。"
   },
   {
     key: "fixed",
     label: "100万円固定",
     short: "100万",
     recommended: false,
-    hint: "検証用5,000万円。1銘柄ちょうど100万円分購入（端株可）。全銘柄が同じ重み＝戦略の期待値がそのまま資金曲線に出る。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし・損切幅10%超は見送り。"
+    hint: "検証用5,000万円。1銘柄ちょうど100万円分購入（端株可）。全銘柄が同じ重みなので、この資金曲線が戦略の期待値です。勝率は利確件数÷全決済（期限手仕舞いも含む）。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
   },
   {
     key: "unit",
     label: "1単元(100株)",
     short: "1単元",
     recommended: false,
-    hint: "検証用5,000万円。実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし・損切幅10%超は見送り。"
+    hint: "検証用5,000万円。実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
   },
   {
     key: "risk",
     label: "リスク均等",
     short: "リスク均等",
     recommended: false,
-    hint: "検証用5,000万円。損切までの値幅から株数を逆算し、どの銘柄も損切時の損失が同額（5万円）になるように購入。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし・損切幅10%超は見送り。"
+    hint: "検証用5,000万円。損切までの値幅から株数を逆算し、どの銘柄も損切時の損失が同額（5万円）になるように購入。狭い損切へ厚く張るため、同額購入の期待値とは金額がずれます。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
   }
 ];
 
@@ -2686,6 +2883,7 @@ function renderPracticeHoldRows(holds) {
           <span>利確 ${h.tp != null ? formatNumber(h.tp) : '-'}</span>
           <span>損切 ${h.sl != null ? formatNumber(h.sl) : '-'}</span>
           <span>取得日 ${formatHoldDate(h.entryAt)}</span>
+          ${h.halfSell ? `<span class="obs-ret pos" title="利確までの残り${h.halfSell.remainPct.toFixed(0)}%・保有${h.halfSell.days}日。半分売って枠を空けます">半分売却</span>` : ""}
         </div>
       </div>
     `;
@@ -2696,13 +2894,16 @@ function renderGrokHoldingsPanel(obs, stockMap) {
   const el = document.getElementById('grokHoldingsPanel');
   if (!el) return;
   const gate = obs.buyGate && obs.buyGate.practice ? obs.buyGate.practice : null;
-  const maxPos = (gate && gate.maxPositions) || 4;
   const modes = [
     { key: 'standard', label: '標準' },
     { key: 'relax', label: 'ゆるめ' }
   ];
   const blocks = modes.map((m) => {
-    const holds = listPracticePositions(obs, m.key, stockMap);
+    const holds = listPracticePositions(obs, m.key, stockMap).map((hold) => ({
+      ...hold,
+      halfSell: m.key === "standard" ? shouldHalfSellPractice(hold) : null
+    }));
+    const maxPos = m.key === "standard" ? PRACTICE_STANDARD_RULE.maxPositions : ((gate && gate.maxPositions) || 4);
     const variants = getPortfolioVariants(obs, m.key);
     const pf = variants && variants.practice;
     const equity = pf && Number.isFinite(Number(pf.equity)) ? Number(pf.equity) : null;
@@ -2738,7 +2939,7 @@ function renderGrokHoldingsPanel(obs, stockMap) {
   el.innerHTML = `
     <div class="grok-holdings-head">
       <h4>★ 実践(Grok推奨) 現在保有中</h4>
-      <span class="obs-note-small">実弾に近い仮想保有（評価額の約15%×同時最大${maxPos}本）。空き枠は新規の統合買い候補到達だけ埋める。損切後14日は同銘柄再エントリーなし、損切幅10%超は見送り。標準とゆるめは別枠です。</span>
+      <span class="obs-note-small">標準は同時${PRACTICE_STANDARD_RULE.maxPositions}枠・1枠は評価額の${Math.round(PRACTICE_STANDARD_RULE.positionPct * 100)}%・新規は予定損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内・損切後${PRACTICE_STANDARD_RULE.cooldownDays}日は再購入なし。利確まで残り${Math.round(PRACTICE_STANDARD_RULE.halfSellRemain * 100)}%以内で保有${PRACTICE_STANDARD_RULE.halfSellDays}日超は半分売ります。ゆるめの新規は損切8%以内です。</span>
     </div>
     <div class="grok-holdings-grid">${blocks}</div>
   `;
@@ -2763,7 +2964,6 @@ function renderPortfolioPanel(modeKey, obs) {
     el.innerHTML = '<span class="obs-pf-note">💰 仮想資金シミュレーション（★実践Grok推奨100万 / 検証用5,000万×3方式）は次回のサーバー更新から開始されます。</span>';
     return;
   }
-  const gate = obs.buyGate && obs.buyGate.practice ? obs.buyGate.practice : null;
   const stockMap = (state.integratedRanking && Array.isArray(state.integratedRanking.stocks))
     ? Object.fromEntries(state.integratedRanking.stocks.map((s) => [String(s.code || '').trim(), s]))
     : {};
@@ -2787,7 +2987,7 @@ function renderPortfolioPanel(modeKey, obs) {
       ? `<span class="obs-pf-rank rank-${rank}" title="実戦で絞る場合の優先順位。損益率で自動更新${rankBasis === 'structural' ? '（現在は成績差が無いため初期優先度: 実践Grok>ゆるめ>標準・fixed>risk>unit）' : ''}">第${rank}候補</span>`
       : '';
     const practiceMeta = def.key === 'practice'
-      ? `<span title="1銘柄あたり評価額の約${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}%・同時最大${(gate && gate.maxPositions) || 4}本・空き枠は新規到達のみ・損切後${(gate && gate.slCooldownDays) || 14}日再エントリーなし・損切幅${Math.round(((gate && gate.maxSlPct) || 0.1) * 100)}%超は見送り">ルール: 評価額×${Math.round((gate && gate.positionPct ? gate.positionPct : 0.15) * 100)}% / 同時${(gate && gate.maxPositions) || 4}本 / 新規到達のみ</span>`
+      ? `<span title="標準は同時${PRACTICE_STANDARD_RULE.maxPositions}枠・評価額の${Math.round(PRACTICE_STANDARD_RULE.positionPct * 100)}%・新規は損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内・損切後${PRACTICE_STANDARD_RULE.cooldownDays}日は再購入なし・利確まで残り3割以内かつ保有${PRACTICE_STANDARD_RULE.halfSellDays}日超は半分売却。ゆるめは損切8%以内">ルール: ${modeKey === "relax" ? "ゆるめは損切幅8%以内" : `標準は同時${PRACTICE_STANDARD_RULE.maxPositions}枠 / 損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内 / 45日で半分売却`}</span>`
       : '';
     const holdListHtml = def.key === 'practice'
       ? `<div class="grok-hold-inline">${renderPracticeHoldRows(listPracticePositions(obs, modeKey, stockMap))}</div>`
@@ -2890,7 +3090,7 @@ function renderBuyTargetObservations() {
     const pfm = (obs.portfolio && obs.portfolio[modeKey]) || {};
     const segs = PF_VARIANT_DEFS.map((d) => {
       const pf = pfm[d.key] || {};
-      return `<span class="obs-total-seg">${d.recommended ? '★' : ''}<b>${d.short}</b> 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}</span>`;
+      return `<span class="obs-total-seg">${d.recommended ? '★' : ''}<b>${d.short}</b> 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}${variantEdgeSuffix(pf)}</span>`;
     }).join(' ｜ ');
     sumEl.innerHTML = `
       <span class="obs-total" title="カテゴリ別(観測): ${countLines}　／　観測合計 利確${totalTp}回 損切${totalSl}回">${segs}</span>
@@ -2948,7 +3148,7 @@ function renderBuyTargetObservations() {
         }).join(' / ');
         heldHtml = `<span class="obs-held" title="保有中: ${detail}（他方式は資金不足・計算不能等でスキップ）">💰保有(${heldList.map((d) => d.short).join('・')})</span>`;
       } else if (cat !== '統合買い候補') {
-        heldHtml = `<span class="obs-held none" title="${cat}は仮想購入対象外（対照群として観測のみ。購入は統合買い候補のみ＝2026-08-12〜。確認候補は期待値マイナスが観測で確認済み）">観測のみ</span>`;
+        heldHtml = `<span class="obs-held none" title="${cat}は仮想購入対象外（対照群として観測のみ）。${modeKey === "relax" ? "ゆるめの新規は損切幅8%以内" : "標準の新規は予定損切5.5%以内。確認候補でもこの幅なら買います"}">観測のみ</span>`;
       } else {
         heldHtml = `<span class="obs-held none" title="統合買い候補だが資金不足・同時保有上限などで仮想購入されませんでした">未購入</span>`;
       }
@@ -3000,7 +3200,7 @@ function renderBuyTargetObservations() {
       const pfm = (obs.portfolio && obs.portfolio[modeKey]) || {};
       return PF_VARIANT_DEFS.map((d) => {
         const pf = pfm[d.key] || {};
-        return `${d.recommended ? '★' : ''}${d.short} 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}`;
+        return `${d.recommended ? '★' : ''}${d.short} 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}${variantEdgeSuffix(pf)}`;
       }).join(' ｜ ');
     };
     const sLine = vcLine('standard');
@@ -3112,15 +3312,14 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
     if (sumEl) {
       const closedSegs = PF_VARIANT_DEFS.map((d) => {
         const pf = (pfVariants && pfVariants[d.key]) || {};
-        return `${d.recommended ? '★' : ''}${d.short} 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}`;
+        return `${d.recommended ? '★' : ''}${d.short} 利確${Number(pf.tpCount) || 0}/損切${Number(pf.slCount) || 0}${variantEdgeSuffix(pf)}`;
       }).join(' ｜ ');
-      // 時間切れ手仕舞い(保有期限126日到達)は勝率の分母に入れず件数だけ添える
-      const toNote = cTo > 0 ? ` ｜ 期限手仕舞い${cTo}件` : '';
+      const edgeNote = formatClosedEdge(closed);
       const closedResetHtml = isLocalDevHost()
         ? `<button type="button" class="obs-reset-btn" data-mode="${modeKey}">リセット</button>`
         : '';
       sumEl.innerHTML = `
-        <span class="obs-total" title="観測ベース(全方式合算) 利確${cTp}件 / 損切${cSl}件 / 期限手仕舞い${cTo}件">${closedSegs}（履歴${totalClosed}件）${toNote}</span>
+        <span class="obs-total" title="観測ベース 利確${cTp}件 / 損切${cSl}件 / 期限手仕舞い${cTo}件。勝率の分母は利確・損切・期限手仕舞いの合計">${closedSegs}（履歴${totalClosed}件）${edgeNote}</span>
         ${closedResetHtml}
       `;
     }
@@ -3291,6 +3490,7 @@ function renderIntegratedRanking() {
   const fixedTargets = (obsForBadge && typeof obsForBadge.targets === 'object')
     ? obsForBadge.targets
     : null;
+  const edgeModel = buildForwardEdge(obsForBadge, isRelax ? "relax" : "standard");
 
   if (!stocks.length) {
     container.innerHTML = '<p class="empty">統合ランキングデータがまだありません。</p>';
@@ -3329,6 +3529,13 @@ function renderIntegratedRanking() {
     const priceNum = Number(stock.price) || 0;
     const fixedTarget = fixedTargets ? fixedTargets[String(stock.code || '').trim()] : null;
     const fixedBuy = fixedTarget ? Number(fixedTarget.buy) : NaN;
+    const edge = edgeForStock(stock, edgeModel);
+    const shown = signalAfterEdge(stock, edge);
+    const bucketLabel = edge.bucket === "tight" ? "6%以内" : edge.bucket === "mid" ? "6〜8%" : "8%超";
+    const modeLabel = edge.mode === "relax" ? "ゆるめ" : "標準";
+    const winTitle = `${modeLabel}のフォワード決済の勝率（利確÷全決済、期限手仕舞いも含む）。損切幅${bucketLabel}の${edge.n}件を、全体${edge.sample}件へ${FORWARD_EDGE_SHRINK}件分だけ寄せています。加点スコア ${formatNumber(stock.winRate)}% とバックテスト較正 ${stock.winRateCalibrated != null ? formatNumber(stock.winRateCalibrated) : "-"}% は期待値の計算に使いません`;
+    const evTitle = `同じ損切幅の平均騰落率を全体平均へ寄せた期待値。計画RR ${formatNumber(stock.rr, 2)} に勝率を掛けるとプラスに見えますが、実現ペイオフは ${edge.realizedPayoff != null ? Number(edge.realizedPayoff).toFixed(2) : "-"} です`;
+    const evClass = edge.expectancyPct > 0 ? "pos" : "neg";
     // 到達バッジは「サーバーが実際に登録した（＝active入り）」銘柄だけに点ける（表示と実態を一致）。
     const isAtTarget = activeCodeSet.has(String(stock.code || '').trim());
     return `
@@ -3363,7 +3570,7 @@ function renderIntegratedRanking() {
         </div>
         <div class="integrated-score-block">
           <strong>${formatNumber(stock.score)}</strong>
-          <span class="integrated-signal ${signalClass(stock.signal)}">${stock.signal || "-"}</span>
+          <span class="integrated-signal ${signalClass(shown.signal)}" title="${shown.reason}">${shown.signal || "-"}${shown.demoted ? "（期待値マイナス）" : ""}</span>
         </div>
         <div class="integrated-metrics">
           <span>資金 ${formatNumber(stock.flowScore)}</span>
@@ -3380,8 +3587,9 @@ function renderIntegratedRanking() {
           ${actual ? `<span>EPS ${actual.eps != null ? Number(actual.eps).toFixed(2) : "-"}</span>` : ""}
           ${actual ? `<span>進捗 ${actual.progressBasis != null ? `${Number(actual.progressBasis).toFixed(1)}%` : "-"}</span>` : ""}
           ${actual ? `<span>期待比 ${actual.progressVsExpectedPct != null ? `${Number(actual.progressVsExpectedPct).toFixed(1)}pt` : "-"}</span>` : ""}
-          <span title="予測勝率(未較正) ${formatNumber(stock.winRate)}%">勝率 ${stock.winRateCalibrated != null ? `${formatNumber(stock.winRateCalibrated)}%(実測較正)` : `${formatNumber(stock.winRate)}%`}</span>
-          <span>RR ${formatNumber(stock.rr, 2)}</span>
+          <span title="${winTitle}">勝率 ${edge.winRate != null ? `${(edge.winRate * 100).toFixed(1)}%` : "-"}</span>
+          <span class="obs-ret ${evClass}" title="${evTitle}">期待値 ${formatExpectancyPct(edge.expectancyPct)}</span>
+          <span title="${evTitle}">計画RR ${formatNumber(stock.rr, 2)}</span>
           <span>7日 ${formatSignedPercent(changes["7d"])}</span>
           <span>30日 ${formatSignedPercent(changes["30d"])}</span>
           <span>25日乖離 ${formatSignedPercent(technical.deviation)}</span>
