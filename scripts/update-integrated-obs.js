@@ -68,9 +68,9 @@ const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 //   - 標準: 確認候補 WR25% / 監視継続 WR8% が期待値を破壊（全体 WR23.6%, sumR -24.7）
 //   - ゆるめ: 全体は勝率~49%でも円ベース微マイナス。統合買い候補のみ WR67% / E≈+0.83R / +49万 と明確にプラス
 //   - 確認候補・監視継続・見送りは対照群として観測のみ（仮想購入・LINE買い通知なし）
-// 2026-10-07: 実践・標準だけ例外。同時6本、新規は予定損切幅5.5%以内（統合買い候補または確認候補）、
-//   利確まで残り3割以内かつ保有45日超は半分売却。ゆるめと他方式は従来どおり統合買い候補のみ。
-// 同時保有上限: fixed/unit/risk は MAX_POSITIONS（既定10）、practice ゆるめは4、practice 標準は6。
+// 2026-10-07: 標準・ゆるめ、4方式すべて同じ。新規は予定損切幅5.5%以内（統合買い候補または確認候補）。
+//   利確まで残り3割以内かつ保有45日超は半分売却。監視継続・見送りは観測のみ。
+// 同時保有上限: fixed/unit/risk は MAX_POSITIONS（既定10）、practice は標準もゆるめも6。
 // 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
 const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
@@ -78,10 +78,10 @@ const UNIT_SHARES = 100;
 const RISK_BUDGET = Number(process.env.OBS_RISK_BUDGET || 50000);
 const RISK_MAX_COST = Number(process.env.OBS_RISK_MAX_COST || 5000000);
 const MAX_POSITIONS = Math.max(1, Number(process.env.OBS_MAX_POSITIONS || 10));
-// Grok推奨・少資金実践プロファイル（バランスB: 15%×4本≈60%稼働。増資は OBS_PRACTICE_CAPITAL で追従）
+// Grok推奨・少資金実践プロファイル（15%×6本。増資は OBS_PRACTICE_CAPITAL で追従。標準・ゆるめ共通）
 const PRACTICE_INITIAL_CAPITAL = Math.max(10000, Number(process.env.OBS_PRACTICE_CAPITAL || 1000000));
 const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.15)));
-const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 4));
+const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 6));
 const PRACTICE_STANDARD_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_STANDARD_MAX_POSITIONS || 6));
 const PRACTICE_STANDARD_MAX_SL_PCT = Math.min(0.2, Math.max(0.02, Number(process.env.OBS_PRACTICE_STANDARD_MAX_SL_PCT || 0.055)));
 const PRACTICE_HALF_SELL_DAYS = Math.max(1, Number(process.env.OBS_PRACTICE_HALF_SELL_DAYS || 45));
@@ -130,8 +130,7 @@ function initialCapitalFor(variant) {
   return variant === "practice" ? PRACTICE_INITIAL_CAPITAL : INITIAL_CAPITAL;
 }
 
-function maxPositionsFor(variant, modeKey) {
-  if (variant === "practice" && modeKey === "standard") return PRACTICE_STANDARD_MAX_POSITIONS;
+function maxPositionsFor(variant) {
   return variant === "practice" ? PRACTICE_MAX_POSITIONS : MAX_POSITIONS;
 }
 
@@ -162,11 +161,17 @@ function recentStopLoss(obs, modeKey, pf, code, nowIso) {
 }
 
 function slWidthTooWide(price, sl, opts) {
-  const practiceStandard = opts && opts.variant === "practice" && opts.modeKey === "standard";
-  const limit = practiceStandard ? PRACTICE_STANDARD_MAX_SL_PCT : MAX_SL_PCT;
-  const basis = practiceStandard && Number(opts.buy) > 0 ? Number(opts.buy) : price;
+  const limit = PRACTICE_STANDARD_MAX_SL_PCT;
+  const basis = opts && Number(opts.buy) > 0 ? Number(opts.buy) : price;
   if (!(basis > 0) || !Number.isFinite(Number(sl)) || Number(sl) <= 0) return false;
   return { tooWide: (basis - Number(sl)) / basis > limit, pct: ((basis - Number(sl)) / basis) * 100, limitPct: limit * 100 };
+}
+
+function qualifiesForBuy(signal, buy, sl) {
+  const label = getCategoryLabel(signal);
+  if (label !== "統合買い候補" && label !== "確認候補") return false;
+  const pct = plannedStopPct(buy, sl);
+  return pct != null && pct <= PRACTICE_STANDARD_MAX_SL_PCT;
 }
 
 function portfolioEquityApprox(pf) {
@@ -266,7 +271,7 @@ function makeEmptyPortfolio(variant = "fixed") {
           maxPositions: PRACTICE_MAX_POSITIONS,
           standardMaxPositions: PRACTICE_STANDARD_MAX_POSITIONS,
           standardMaxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
-          note: "標準は同時6本・新規は予定損切5.5%以内（確認候補も含む）・利確まで残り3割以内かつ保有45日超は半分売却。ゆるめは同時4本・統合買い候補のみ。"
+          note: "標準もゆるめも同時6本・評価額15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内かつ保有45日超は半分売却。検証用3方式も同じ買い条件と半分売却。"
         }
       : null
   };
@@ -317,12 +322,10 @@ function normalizeObs(obs) {
           name: "practice",
           label: "実践(Grok推奨)",
           positionPct: PRACTICE_POSITION_PCT,
-          maxPositions: key === "standard" ? PRACTICE_STANDARD_MAX_POSITIONS : PRACTICE_MAX_POSITIONS,
-          standardMaxPositions: PRACTICE_STANDARD_MAX_POSITIONS,
+          maxPositions: PRACTICE_MAX_POSITIONS,
+          standardMaxPositions: PRACTICE_MAX_POSITIONS,
           standardMaxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
-          note: key === "standard"
-            ? "標準は同時6本・評価額15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内かつ保有45日超は半分売却。"
-            : "ゆるめは同時4本・統合買い候補のみ・損切幅10%超は見送り。"
+          note: "標準もゆるめも同時6本・評価額15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内かつ保有45日超は半分売却。検証用3方式も同じ買い条件と半分売却。"
         };
       }
     }
@@ -353,7 +356,7 @@ function tryBuy(pf, variant, code, name, signal, price, nowIso, sl, opts) {
     return { action: "skip", cost: 0, reason };
   }
   const openCount = Object.keys(pf.positions || {}).length;
-  const maxPos = maxPositionsFor(variant, opts.modeKey);
+  const maxPos = maxPositionsFor(variant);
   if (openCount >= maxPos) {
     const reason = `同時保有上限（${maxPos}件）`;
     pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
@@ -718,7 +721,7 @@ function settlePosition(pf, item, exitType, exitPrice, nowIso) {
   return record;
 }
 
-// 実践・標準: 利確までの残りが計画幅の3割以内で、保有45日を超えたら半分売る。1回だけ。
+// 全モード・全方式: 利確までの残りが計画幅の3割以内で、保有45日を超えたら半分売る。1回だけ。
 function maybeHalfSellPractice(pf, item, curPrice, nowIso) {
   const pos = pf.positions[item.code];
   if (!pos || pos.halfSold) return null;
@@ -948,9 +951,14 @@ async function main() {
   for (const def of modeDefs) {
     const data = obs[def.key];
     const items = data.active
-      .filter((item) => BUY_CATEGORIES.has(getCategoryLabel(item.signal)))
+      .filter((item) => qualifiesForBuy(item.signal, item.buy, item.sl))
       .slice()
-      .sort((a, b) => qualityCmp(a.code, b.code));
+      .sort((a, b) => {
+        const da = plannedStopPct(a.buy, a.sl);
+        const db = plannedStopPct(b.buy, b.sl);
+        if (da !== db) return da - db;
+        return qualityCmp(a.code, b.code);
+      });
     for (const item of items) {
       const entryPrice = Number.isFinite(Number(item.hitPrice)) ? Number(item.hitPrice)
         : (Number.isFinite(Number(item.buy)) ? Number(item.buy) : NaN);
@@ -1019,11 +1027,15 @@ async function main() {
           };
         }
       } else {
-        if (def.key === "standard" && Number.isFinite(curPrice)) {
-          const pf = obs.portfolio.standard.practice;
-          const record = maybeHalfSellPractice(pf, item, curPrice, nowIso);
-          if (record) {
-            console.log(`半分売却: ${item.code} ${item.name || ""} ${record.shares}株 ${record.pnl >= 0 ? "+" : ""}${record.pnl}円`);
+        if (Number.isFinite(curPrice)) {
+          const halfEntries = [];
+          for (const variant of PF_VARIANTS) {
+            const record = maybeHalfSellPractice(obs.portfolio[def.key][variant], item, curPrice, nowIso);
+            if (!record) continue;
+            console.log(`半分売却[${variant}/${def.key}]: ${item.code} ${item.name || ""} ${record.shares}株 ${record.pnl >= 0 ? "+" : ""}${record.pnl}円`);
+            halfEntries.push({ variant, pnl: record.pnl, pnlPct: record.pnlPct, entryPrice: record.entryPrice, exitPrice: record.exitPrice });
+          }
+          if (halfEntries.length) {
             settleEvents[`${item.code}__${def.key}__half`] = {
               code: item.code,
               name: item.name || item.code,
@@ -1033,7 +1045,7 @@ async function main() {
               exitPrice: curPrice,
               tp: item.tp,
               sl: item.sl,
-              entries: [{ variant: "practice", pnl: record.pnl, pnlPct: record.pnlPct, entryPrice: record.entryPrice, exitPrice: record.exitPrice }]
+              entries: halfEntries
             };
           }
         }
@@ -1066,26 +1078,26 @@ async function main() {
   // UI表示用に判定状態を公開データへ保存
   obs.entryGuard = { marketOpen, regime, entryAllowed, exDivToday, checkedAt: nowIso };
   obs.buyGate = {
-    categories: [...BUY_CATEGORIES],
+    categories: ["統合買い候補", "確認候補"],
     maxPositions: MAX_POSITIONS,
     practice: {
       initialCapital: PRACTICE_INITIAL_CAPITAL,
       positionPct: PRACTICE_POSITION_PCT,
       maxPositions: PRACTICE_MAX_POSITIONS,
-      standardMaxPositions: PRACTICE_STANDARD_MAX_POSITIONS,
+      standardMaxPositions: PRACTICE_MAX_POSITIONS,
       standardMaxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
       halfSellDays: PRACTICE_HALF_SELL_DAYS,
       halfSellRemain: PRACTICE_HALF_SELL_REMAIN,
       minBudget: PRACTICE_MIN_BUDGET,
       slCooldownDays: SL_COOLDOWN_DAYS,
-      maxSlPct: MAX_SL_PCT,
+      maxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
       fillPolicy: "fresh-hit-only",
       label: "実践(Grok推奨)"
     },
     slCooldownDays: SL_COOLDOWN_DAYS,
-    maxSlPct: MAX_SL_PCT,
+    maxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
     fillPolicy: "fresh-hit-only",
-    note: "仮想購入は原則として統合買い候補のみ。実践・標準だけは予定損切5.5%以内なら確認候補も買い、同時6本。利確まで残り3割以内かつ保有45日超は半分売却。他方式は損切幅>10%を見送り、実践・ゆるめは同時4本。空き枠は新規到達だけ埋める。損切後14日は同銘柄再エントリーしない。",
+    note: "標準もゆるめも、4方式とも新規は予定損切5.5%以内（統合買い候補または確認候補）。実践は同時6本・評価額15%。検証用3方式は同時10本。利確まで残り3割以内かつ保有45日超は半分売却。空き枠は新規到達だけ埋める。損切後14日は同銘柄再エントリーしない。",
     since: "2026-10-07"
   };
   for (const def of modeDefs) {
@@ -1093,7 +1105,6 @@ async function main() {
     const data = obs[def.key];
     const activeCodes = new Set(data.active.map((it) => it.code));
     const pendingBuys = [];
-    const practiceStandardBuys = [];
     for (const [code, target] of Object.entries(obs.targets)) {
       if (activeCodes.has(code)) continue;
       // 権利落ち日×配当月の銘柄は見送り（10年検証: 勝率25.9%/平均-1.45%の偽押し目）
@@ -1130,8 +1141,7 @@ async function main() {
         activeCodes.add(code);
         summary.hits[def.key] += 1;
 
-        // 仮想資金: 到達＝購入。原則は統合買い候補のみ。
-        // 実践・標準だけ、予定損切5.5%以内なら確認候補も対象（狭い損切から枠を埋める）。
+        // 仮想資金: 標準・ゆるめとも、4方式すべて予定損切5.5%以内の統合買い候補か確認候補だけ買う。
         const hit = {
           code,
           name: target.name || code,
@@ -1142,19 +1152,19 @@ async function main() {
           tp: Number.isFinite(Number(target.tp)) ? Number(target.tp) : null,
           threshold
         };
-        if (BUY_CATEGORIES.has(getCategoryLabel(target.signal))) pendingBuys.push(hit);
-        if (def.key === "standard") {
-          const stopPct = plannedStopPct(buy, sl);
-          const label = getCategoryLabel(target.signal);
-          if ((label === "統合買い候補" || label === "確認候補") && stopPct != null && stopPct <= PRACTICE_STANDARD_MAX_SL_PCT) {
-            practiceStandardBuys.push(hit);
-          }
-        }
+        if (qualifiesForBuy(target.signal, buy, sl)) pendingBuys.push(hit);
       }
     }
-    // 同時に複数到達したときはスコア高い銘柄から枠を埋める（Object順＝先着は期待値を落とす）
-    // 実践・標準は別キューで、予定損切が狭い順に最大6本まで埋める。
-    pendingBuys.sort((a, b) => qualityCmp(a.code, b.code));
+    // 同時に複数到達したときは、予定損切が狭い銘柄から枠を埋める。
+    pendingBuys.sort((a, b) => {
+      const da = plannedStopPct(a.buy, a.sl);
+      const db = plannedStopPct(b.buy, b.sl);
+      if (da == null && db == null) return qualityCmp(a.code, b.code);
+      if (da == null) return 1;
+      if (db == null) return -1;
+      if (da !== db) return da - db;
+      return qualityCmp(a.code, b.code);
+    });
     const recordBuy = (pb, variant, result) => {
       const evKey = `${pb.code}__${def.key}`;
       if (!buyEvents[evKey]) {
@@ -1176,7 +1186,6 @@ async function main() {
     };
     for (const pb of pendingBuys) {
       for (const variant of PF_VARIANTS) {
-        if (variant === "practice" && def.key === "standard") continue;
         const result = tryBuy(
           obs.portfolio[def.key][variant], variant, pb.code, pb.name, pb.signal,
           pb.curPrice, nowIso, pb.sl,
@@ -1184,23 +1193,6 @@ async function main() {
         );
         recordBuy(pb, variant, result);
       }
-    }
-    practiceStandardBuys.sort((a, b) => {
-      const da = plannedStopPct(a.buy, a.sl);
-      const db = plannedStopPct(b.buy, b.sl);
-      if (da == null && db == null) return qualityCmp(a.code, b.code);
-      if (da == null) return 1;
-      if (db == null) return -1;
-      if (da !== db) return da - db;
-      return qualityCmp(a.code, b.code);
-    });
-    for (const pb of practiceStandardBuys) {
-      const result = tryBuy(
-        obs.portfolio[def.key].practice, "practice", pb.code, pb.name, pb.signal,
-        pb.curPrice, nowIso, pb.sl,
-        { obs, modeKey: def.key, buy: pb.buy }
-      );
-      recordBuy(pb, "practice", result);
     }
   }
 

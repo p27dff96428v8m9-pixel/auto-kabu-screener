@@ -2405,8 +2405,8 @@ const PRACTICE_STANDARD_RULE = {
   halfSellRemain: 0.3
 };
 
-function buyStopLimitPct(mode) {
-  return mode === "relax" ? 8 : PRACTICE_STANDARD_RULE.maxSlPct;
+function buyStopLimitPct() {
+  return PRACTICE_STANDARD_RULE.maxSlPct;
 }
 
 function shouldHalfSellPractice(hold) {
@@ -2424,7 +2424,7 @@ function shouldHalfSellPractice(hold) {
 function signalAfterEdge(stock, edge) {
   const original = stock.signal || "";
   const modeLabel = edge.mode === "relax" ? "ゆるめ" : "標準";
-  const limit = buyStopLimitPct(edge.mode);
+  const limit = buyStopLimitPct();
   const width = edge.slPct != null ? `${edge.slPct.toFixed(1)}%` : "不明";
   const labeled = original === "統合買い候補" || original === "確認候補" || original === "監視継続";
   const qualifies = labeled && edge.slPct != null && edge.slPct <= limit && Number(edge.expectancyPct) > 0;
@@ -2732,7 +2732,7 @@ function getCategoryLabel(sig) {
 }
 
 // === 仮想資金シミュレーション表示（サーバー側 update-integrated-obs.js が計算） ===
-// 観測スペースへの追加＝仮想購入（統合買い候補のみ。確認候補・監視継続・見送りは対照群）、利確/損切で資金が増減する。
+// 観測スペースへの追加＝仮想購入。標準・ゆるめとも、予定損切5.5%以内の統合買い候補と確認候補だけ買う。
 const PF_INITIAL_CAPITAL = 50000000;
 const PF_PRACTICE_CAPITAL = 1000000;
 const PF_VARIANT_DEFS = [
@@ -2741,28 +2741,28 @@ const PF_VARIANT_DEFS = [
     label: "実践(Grok推奨)",
     short: "実践",
     recommended: true,
-    hint: "標準は同時6枠・1枠は評価額の15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内で保有45日超は半分売って枠を空ける。ゆるめの新規は損切8%以内。実践の決済件数はまだ少ないので、その勝率は参考値です。"
+    hint: "標準もゆるめも同時6枠・1枠は評価額の15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内で保有45日超は半分売って枠を空ける。検証用3方式も同じ買い条件と半分売却です。実践の決済件数はまだ少ないので、その勝率は参考値です。"
   },
   {
     key: "fixed",
     label: "100万円固定",
     short: "100万",
     recommended: false,
-    hint: "検証用5,000万円。1銘柄ちょうど100万円分購入（端株可）。全銘柄が同じ重みなので、この資金曲線が戦略の期待値です。勝率は利確件数÷全決済（期限手仕舞いも含む）。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
+    hint: "検証用5,000万円。1銘柄ちょうど100万円分購入（端株可）。全銘柄が同じ重みなので、この資金曲線が戦略の期待値です。新規は予定損切5.5%以内（確認候補も含む）・同時10本・保有45日超で利確まで残り3割以内は半分売却。勝率は利確件数÷全決済（期限手仕舞いも含む）。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
   },
   {
     key: "unit",
     label: "1単元(100株)",
     short: "1単元",
     recommended: false,
-    hint: "検証用5,000万円。実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
+    hint: "検証用5,000万円。実際の発注と同じ1単元（100株）購入。銘柄の株価によって投入額が変わる。新規は予定損切5.5%以内（確認候補も含む）・同時10本・保有45日超で利確まで残り3割以内は半分売却。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
   },
   {
     key: "risk",
     label: "リスク均等",
     short: "リスク均等",
     recommended: false,
-    hint: "検証用5,000万円。損切までの値幅から株数を逆算し、どの銘柄も損切時の損失が同額（5万円）になるように購入。狭い損切へ厚く張るため、同額購入の期待値とは金額がずれます。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
+    hint: "検証用5,000万円。損切までの値幅から株数を逆算し、どの銘柄も損切時の損失が同額（5万円）になるように購入。狭い損切へ厚く張るため、同額購入の期待値とは金額がずれます。新規は予定損切5.5%以内（確認候補も含む）・同時10本・保有45日超で利確まで残り3割以内は半分売却。空き枠は新規到達のみ・損切後14日は同銘柄再エントリーなし。"
   }
 ];
 
@@ -2893,7 +2893,6 @@ function renderPracticeHoldRows(holds) {
 function renderGrokHoldingsPanel(obs, stockMap) {
   const el = document.getElementById('grokHoldingsPanel');
   if (!el) return;
-  const gate = obs.buyGate && obs.buyGate.practice ? obs.buyGate.practice : null;
   const modes = [
     { key: 'standard', label: '標準' },
     { key: 'relax', label: 'ゆるめ' }
@@ -2901,9 +2900,9 @@ function renderGrokHoldingsPanel(obs, stockMap) {
   const blocks = modes.map((m) => {
     const holds = listPracticePositions(obs, m.key, stockMap).map((hold) => ({
       ...hold,
-      halfSell: m.key === "standard" ? shouldHalfSellPractice(hold) : null
+      halfSell: shouldHalfSellPractice(hold)
     }));
-    const maxPos = m.key === "standard" ? PRACTICE_STANDARD_RULE.maxPositions : ((gate && gate.maxPositions) || 4);
+    const maxPos = PRACTICE_STANDARD_RULE.maxPositions;
     const variants = getPortfolioVariants(obs, m.key);
     const pf = variants && variants.practice;
     const equity = pf && Number.isFinite(Number(pf.equity)) ? Number(pf.equity) : null;
@@ -2939,7 +2938,7 @@ function renderGrokHoldingsPanel(obs, stockMap) {
   el.innerHTML = `
     <div class="grok-holdings-head">
       <h4>★ 実践(Grok推奨) 現在保有中</h4>
-      <span class="obs-note-small">標準は同時${PRACTICE_STANDARD_RULE.maxPositions}枠・1枠は評価額の${Math.round(PRACTICE_STANDARD_RULE.positionPct * 100)}%・新規は予定損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内・損切後${PRACTICE_STANDARD_RULE.cooldownDays}日は再購入なし。利確まで残り${Math.round(PRACTICE_STANDARD_RULE.halfSellRemain * 100)}%以内で保有${PRACTICE_STANDARD_RULE.halfSellDays}日超は半分売ります。ゆるめの新規は損切8%以内です。</span>
+      <span class="obs-note-small">標準もゆるめも同時${PRACTICE_STANDARD_RULE.maxPositions}枠・1枠は評価額の${Math.round(PRACTICE_STANDARD_RULE.positionPct * 100)}%・新規は予定損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内（確認候補も含む）・損切後${PRACTICE_STANDARD_RULE.cooldownDays}日は再購入なし。利確まで残り${Math.round(PRACTICE_STANDARD_RULE.halfSellRemain * 100)}%以内で保有${PRACTICE_STANDARD_RULE.halfSellDays}日超は半分売ります。検証用3方式も同じ買い条件と半分売却で、同時保有は10本です。</span>
     </div>
     <div class="grok-holdings-grid">${blocks}</div>
   `;
@@ -2986,9 +2985,7 @@ function renderPortfolioPanel(modeKey, obs) {
     const rankHtml = rank
       ? `<span class="obs-pf-rank rank-${rank}" title="実戦で絞る場合の優先順位。損益率で自動更新${rankBasis === 'structural' ? '（現在は成績差が無いため初期優先度: 実践Grok>ゆるめ>標準・fixed>risk>unit）' : ''}">第${rank}候補</span>`
       : '';
-    const practiceMeta = def.key === 'practice'
-      ? `<span title="標準は同時${PRACTICE_STANDARD_RULE.maxPositions}枠・評価額の${Math.round(PRACTICE_STANDARD_RULE.positionPct * 100)}%・新規は損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内・損切後${PRACTICE_STANDARD_RULE.cooldownDays}日は再購入なし・利確まで残り3割以内かつ保有${PRACTICE_STANDARD_RULE.halfSellDays}日超は半分売却。ゆるめは損切8%以内">ルール: ${modeKey === "relax" ? "ゆるめは損切幅8%以内" : `標準は同時${PRACTICE_STANDARD_RULE.maxPositions}枠 / 損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内 / 45日で半分売却`}</span>`
-      : '';
+    const practiceMeta = `<span title="標準もゆるめも同じ。新規は予定損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内（確認候補も含む）。保有${PRACTICE_STANDARD_RULE.halfSellDays}日超で利確まで残り3割以内は半分売却。">ルール: ${def.key === "practice" ? `同時${PRACTICE_STANDARD_RULE.maxPositions}枠 / ` : "同時10本 / "}損切${PRACTICE_STANDARD_RULE.maxSlPct}%以内 / 45日で半分売却</span>`;
     const holdListHtml = def.key === 'practice'
       ? `<div class="grok-hold-inline">${renderPracticeHoldRows(listPracticePositions(obs, modeKey, stockMap))}</div>`
       : '';
@@ -2997,7 +2994,7 @@ function renderPortfolioPanel(modeKey, obs) {
         <div class="obs-pf-main">
           <span class="obs-pf-label${def.recommended ? ' recommended' : ''}" title="${def.hint}">${def.recommended ? '★ ' : ''}${def.label}</span>
           ${rankHtml}
-          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（仮想購入は統合買い候補のみ）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
+          <span class="obs-pf-equity ${cls}" title="初期資金 ${formatYen(initial)}円（新規は予定損切5.5%以内の統合買い候補か確認候補）">💰 評価額 <b>${formatYen(equity)}円</b> <small>(${totalPnl >= 0 ? '+' : ''}${formatYen(totalPnl)}円 / ${totalPnl >= 0 ? '+' : ''}${totalPct}%)</small></span>
         </div>
         <div class="obs-pf-detail">
           <span>現金 ${formatYen(pf.cash)}円</span>
@@ -3148,7 +3145,7 @@ function renderBuyTargetObservations() {
         }).join(' / ');
         heldHtml = `<span class="obs-held" title="保有中: ${detail}（他方式は資金不足・計算不能等でスキップ）">💰保有(${heldList.map((d) => d.short).join('・')})</span>`;
       } else if (cat !== '統合買い候補') {
-        heldHtml = `<span class="obs-held none" title="${cat}は仮想購入対象外（対照群として観測のみ）。${modeKey === "relax" ? "ゆるめの新規は損切幅8%以内" : "標準の新規は予定損切5.5%以内。確認候補でもこの幅なら買います"}">観測のみ</span>`;
+        heldHtml = `<span class="obs-held none" title="${cat === "確認候補" ? "確認候補は予定損切5.5%以内のときだけ、標準もゆるめも全方式で買います。この銘柄は幅が広いか、まだ到達していません。" : "監視継続・見送りは観測のみで、仮想購入しません。"}">観測のみ</span>`;
       } else {
         heldHtml = `<span class="obs-held none" title="統合買い候補だが資金不足・同時保有上限などで仮想購入されませんでした">未購入</span>`;
       }
@@ -3348,14 +3345,16 @@ function renderClosedBuyTargetHistory(obs /* stockMap unused for closed (snapsho
 
       // 対照群・通知なしバッジ: LINE通知が出ない決済を明示する（「決済が見えるのに通知が来ない」混乱の防止）。
       // notifiedExit はサーバーが決済時に記録（2026-07-08以降）。無い旧レコードは区分から推定する。
-      // 2026-08-12〜: 仮想購入は統合買い候補のみ（確認候補も対照群）。
-      const isBuyCat = cat === '統合買い候補';
+      // 確認候補は予定損切5.5%以内のときだけ買う。監視継続・見送りは観測のみ。
+      const isBuyCat = cat === '統合買い候補' || cat === '確認候補';
       let noNotifyBadge = '';
-      if (item.notifiedExit === false || (item.notifiedExit == null && !isBuyCat)) {
+      if (item.notifiedExit === false || (item.notifiedExit == null && cat !== '統合買い候補' && cat !== '確認候補')) {
         const label = isBuyCat ? '通知なし(未保有)' : '対照群・通知なし';
-        const tip = isBuyCat
-          ? '買い到達時に資金不足・同時保有上限などで仮想購入されなかったため、LINE通知の対象外です'
-          : 'この区分（確認候補・監視継続・見送り）は成績検証用の対照群で仮想購入せず、買い到達・決済ともLINE通知しません';
+        const tip = cat === '確認候補'
+          ? '確認候補は予定損切5.5%以内のときだけ仮想購入します。この決済は未保有か、ルール変更前の対照群です'
+          : isBuyCat
+            ? '買い到達時に資金不足・同時保有上限などで仮想購入されなかったため、LINE通知の対象外です'
+            : '監視継続・見送りは観測のみで、仮想購入もLINE通知もしません';
         noNotifyBadge = `<span class="obs-no-notify" title="${tip}">🔕 ${label}</span>`;
       }
 
