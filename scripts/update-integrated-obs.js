@@ -68,9 +68,7 @@ const HOLD_LIMIT_DAYS = Number(process.env.OBS_HOLD_LIMIT_DAYS || 126);
 //   - 標準: 確認候補 WR25% / 監視継続 WR8% が期待値を破壊（全体 WR23.6%, sumR -24.7）
 //   - ゆるめ: 全体は勝率~49%でも円ベース微マイナス。統合買い候補のみ WR67% / E≈+0.83R / +49万 と明確にプラス
 //   - 確認候補・監視継続・見送りは対照群として観測のみ（仮想購入・LINE買い通知なし）
-// 2026-10-07: 標準・ゆるめ、4方式すべて同じ。新規は予定損切幅5.5%以内（統合買い候補または確認候補）。
-//   利確まで残り3割以内かつ保有45日超は半分売却。監視継続・見送りは観測のみ。
-// 同時保有上限: fixed/unit/risk は MAX_POSITIONS（既定10）、practice は標準もゆるめも6。
+// 同時保有上限: fixed/unit/risk は MAX_POSITIONS（既定10）、practice は PRACTICE_MAX_POSITIONS（既定4）。
 // 資金不足時はスキップとして記録（資金管理の検証）。標準/ゆるめで別々の資金を運用する。
 const INITIAL_CAPITAL = Number(process.env.OBS_INITIAL_CAPITAL || 50000000);
 const TRADE_BUDGET = Number(process.env.OBS_TRADE_BUDGET || 1000000);
@@ -78,14 +76,10 @@ const UNIT_SHARES = 100;
 const RISK_BUDGET = Number(process.env.OBS_RISK_BUDGET || 50000);
 const RISK_MAX_COST = Number(process.env.OBS_RISK_MAX_COST || 5000000);
 const MAX_POSITIONS = Math.max(1, Number(process.env.OBS_MAX_POSITIONS || 10));
-// Grok推奨・少資金実践プロファイル（15%×6本。増資は OBS_PRACTICE_CAPITAL で追従。標準・ゆるめ共通）
+// Grok推奨・少資金実践プロファイル（バランスB: 15%×4本≈60%稼働。増資は OBS_PRACTICE_CAPITAL で追従）
 const PRACTICE_INITIAL_CAPITAL = Math.max(10000, Number(process.env.OBS_PRACTICE_CAPITAL || 1000000));
 const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.15)));
-const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 6));
-const PRACTICE_STANDARD_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_STANDARD_MAX_POSITIONS || 6));
-const PRACTICE_STANDARD_MAX_SL_PCT = Math.min(0.2, Math.max(0.02, Number(process.env.OBS_PRACTICE_STANDARD_MAX_SL_PCT || 0.055)));
-const PRACTICE_HALF_SELL_DAYS = Math.max(1, Number(process.env.OBS_PRACTICE_HALF_SELL_DAYS || 45));
-const PRACTICE_HALF_SELL_REMAIN = Math.min(0.9, Math.max(0.05, Number(process.env.OBS_PRACTICE_HALF_SELL_REMAIN || 0.3)));
+const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 4));
 const PRACTICE_MIN_BUDGET = Math.max(1000, Number(process.env.OBS_PRACTICE_MIN_BUDGET || 10000));
 // 2026-08-17: 空き枠を古い active の先着で埋めると後続の統合買い候補を取りこぼす
 // （例: りそな利確後に7/29到達のみずほを到達価格で補完購入）。運用開始後は4方式とも新規到達だけ買う。
@@ -99,7 +93,7 @@ const PF_SKIPPED_LIMIT = 40;
 const BUY_CATEGORIES = new Set(["統合買い候補"]);
 
 // 実戦候補の初期優先度。成績（損益率）に差が付くまでの同率時の並び順:
-//   practice（Grok推奨）を最上位 … 少資金の実運用に一番近い（100万・15%定額。標準は同時6本・予定損切5.5%以内）
+//   practice（Grok推奨）を最上位 … 少資金の実運用に一番近い（100万・15%定額・同時4本・統合買い候補のみ）
 //   ゆるめ > 標準 (2026-07-09入替)
 //   100万固定 > リスク均等 > 1単元
 // 損益率に差が出た後は評価額ベースで自動的に順位が入れ替わる（candidateRanking）。
@@ -134,13 +128,6 @@ function maxPositionsFor(variant) {
   return variant === "practice" ? PRACTICE_MAX_POSITIONS : MAX_POSITIONS;
 }
 
-function plannedStopPct(buy, sl) {
-  const entry = Number(buy);
-  const stop = Number(sl);
-  if (!(entry > stop) || !(entry > 0)) return null;
-  return (entry - stop) / entry;
-}
-
 function isFreshPortfolio(pf) {
   return Object.keys((pf && pf.positions) || {}).length === 0 && ((pf && pf.history) || []).length === 0;
 }
@@ -160,18 +147,9 @@ function recentStopLoss(obs, modeKey, pf, code, nowIso) {
   return hit(obs && obs[modeKey] && obs[modeKey].closed);
 }
 
-function slWidthTooWide(price, sl, opts) {
-  const limit = PRACTICE_STANDARD_MAX_SL_PCT;
-  const basis = opts && Number(opts.buy) > 0 ? Number(opts.buy) : price;
-  if (!(basis > 0) || !Number.isFinite(Number(sl)) || Number(sl) <= 0) return false;
-  return { tooWide: (basis - Number(sl)) / basis > limit, pct: ((basis - Number(sl)) / basis) * 100, limitPct: limit * 100 };
-}
-
-function qualifiesForBuy(signal, buy, sl) {
-  const label = getCategoryLabel(signal);
-  if (label !== "統合買い候補" && label !== "確認候補") return false;
-  const pct = plannedStopPct(buy, sl);
-  return pct != null && pct <= PRACTICE_STANDARD_MAX_SL_PCT;
+function slWidthTooWide(price, sl) {
+  if (!(price > 0) || !Number.isFinite(Number(sl)) || Number(sl) <= 0) return false;
+  return (price - Number(sl)) / price > MAX_SL_PCT;
 }
 
 function portfolioEquityApprox(pf) {
@@ -269,9 +247,7 @@ function makeEmptyPortfolio(variant = "fixed") {
           label: "実践(Grok推奨)",
           positionPct: PRACTICE_POSITION_PCT,
           maxPositions: PRACTICE_MAX_POSITIONS,
-          standardMaxPositions: PRACTICE_STANDARD_MAX_POSITIONS,
-          standardMaxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
-          note: "標準もゆるめも同時6本・評価額15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内かつ保有45日超は半分売却。検証用3方式も同じ買い条件と半分売却。"
+          note: "評価額×15%を1銘柄（ミニ株想定）・同時最大4本・統合買い候補のみ。資金増加はOBS_PRACTICE_CAPITALまたは評価額の増加で自動反映。"
         }
       : null
   };
@@ -323,9 +299,7 @@ function normalizeObs(obs) {
           label: "実践(Grok推奨)",
           positionPct: PRACTICE_POSITION_PCT,
           maxPositions: PRACTICE_MAX_POSITIONS,
-          standardMaxPositions: PRACTICE_MAX_POSITIONS,
-          standardMaxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
-          note: "標準もゆるめも同時6本・評価額15%・新規は予定損切5.5%以内（確認候補も含む）・損切後14日は再購入なし。利確まで残り3割以内かつ保有45日超は半分売却。検証用3方式も同じ買い条件と半分売却。"
+          note: "評価額×15%を1銘柄（ミニ株想定）・同時最大4本・統合買い候補のみ。"
         };
       }
     }
@@ -348,9 +322,9 @@ function tryBuy(pf, variant, code, name, signal, price, nowIso, sl, opts) {
     if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
     return { action: "skip", cost: 0, reason };
   }
-  const width = slWidthTooWide(price, sl, { ...opts, variant });
-  if (width && width.tooWide) {
-    const reason = `損切幅が広い（${width.pct.toFixed(1)}%>${width.limitPct.toFixed(1)}%）`;
+  if (slWidthTooWide(price, sl)) {
+    const slPct = ((price - Number(sl)) / price) * 100;
+    const reason = `損切幅が広い（${slPct.toFixed(1)}%>${Math.round(MAX_SL_PCT * 100)}%）`;
     pf.skipped.unshift({ code, name, signal, price, at: nowIso, reason });
     if (pf.skipped.length > PF_SKIPPED_LIMIT) pf.skipped.length = PF_SKIPPED_LIMIT;
     return { action: "skip", cost: 0, reason };
@@ -721,55 +695,13 @@ function settlePosition(pf, item, exitType, exitPrice, nowIso) {
   return record;
 }
 
-// 全モード・全方式: 利確までの残りが計画幅の3割以内で、保有45日を超えたら半分売る。1回だけ。
-function maybeHalfSellPractice(pf, item, curPrice, nowIso) {
-  const pos = pf.positions[item.code];
-  if (!pos || pos.halfSold) return null;
-  const entry = Number(pos.entryPrice);
-  const tp = Number(item.tp);
-  const started = Date.parse(pos.entryAt || item.hitAt);
-  if (!(entry > 0) || !(tp > entry) || !(curPrice > entry) || !(curPrice < tp) || !Number.isFinite(started)) return null;
-  const remain = (tp - curPrice) / (tp - entry);
-  const days = (Date.now() - started) / 86400000;
-  if (!(remain <= PRACTICE_HALF_SELL_REMAIN && days >= PRACTICE_HALF_SELL_DAYS)) return null;
-  const sellShares = Number((Number(pos.shares) / 2).toFixed(4));
-  if (!(sellShares > 0)) return null;
-  const proceeds = Math.round(sellShares * curPrice);
-  const costOut = Math.round(Number(pos.investedAmount) / 2);
-  const pnl = proceeds - costOut;
-  pos.shares = Number((Number(pos.shares) - sellShares).toFixed(4));
-  pos.investedAmount = Math.round(Number(pos.investedAmount) - costOut);
-  pos.halfSold = true;
-  pf.cash = Math.round(Number(pf.cash) + proceeds);
-  pf.realizedPnl = Math.round((Number(pf.realizedPnl) || 0) + pnl);
-  const record = {
-    code: item.code,
-    name: item.name || item.code,
-    signal: pos.signal || item.signal,
-    exitType: "half",
-    shares: sellShares,
-    investedAmount: costOut,
-    entryPrice: entry,
-    exitPrice: curPrice,
-    proceeds,
-    pnl,
-    pnlPct: costOut > 0 ? Number(((pnl / costOut) * 100).toFixed(2)) : null,
-    entryAt: pos.entryAt,
-    exitAt: nowIso
-  };
-  pf.history.unshift(record);
-  if (pf.history.length > PF_HISTORY_LIMIT) pf.history.length = PF_HISTORY_LIMIT;
-  return record;
-}
-
 // 1銘柄×1モードの利確/損切イベントをLINE本文に整形する。
 // 実弾運用の判断材料になるよう、方式ごとの実現損益と実戦候補順位を併記する。
 function buildSettleMessage(ev, rankMap) {
   const yen = (n) => `${Math.round(n).toLocaleString()}円`;
   const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
-  const emoji = ev.exitType === "tp" ? "✅" : ev.exitType === "half" ? "✂️" : ev.exitType === "timeout" ? "⏱️" : "⚠️";
+  const emoji = ev.exitType === "tp" ? "✅" : ev.exitType === "timeout" ? "⏱️" : "⚠️";
   const title = ev.exitType === "tp" ? "利確ライン到達"
-    : ev.exitType === "half" ? "利確接近のため半分売却"
     : ev.exitType === "timeout" ? `保有期限(${HOLD_LIMIT_DAYS}日)到達・手仕舞い`
     : "損切ライン到達";
   const lines = [
@@ -778,8 +710,6 @@ function buildSettleMessage(ev, rankMap) {
     `区分: ${ev.category || "—"}`,
     ev.exitType === "tp"
       ? `現在値 ${yen(ev.exitPrice)} ≥ 利確 ${ev.tp != null ? yen(ev.tp) : "—"}`
-      : ev.exitType === "half"
-        ? `現在値 ${yen(ev.exitPrice)}（利確まで残り3割以内・保有45日超のため半分売却）`
       : ev.exitType === "timeout"
         ? `現在値 ${yen(ev.exitPrice)}（利確/損切に未到達のまま期限超過）`
         : `現在値 ${yen(ev.exitPrice)} ≤ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`,
@@ -793,7 +723,6 @@ function buildSettleMessage(ev, rankMap) {
   }
   lines.push("──────────");
   lines.push(ev.exitType === "tp" ? "実弾保有中なら利益確定の検討を。"
-    : ev.exitType === "half" ? "実弾保有中なら半分利確の検討を。残りは利確/損切まで保有。"
     : ev.exitType === "timeout" ? "実弾保有中なら資金回転のため手仕舞いの検討を。"
     : "実弾保有中なら迷わず損切りを。");
   lines.push(`詳細: ${PAGE_URL}`);
@@ -951,14 +880,9 @@ async function main() {
   for (const def of modeDefs) {
     const data = obs[def.key];
     const items = data.active
-      .filter((item) => qualifiesForBuy(item.signal, item.buy, item.sl))
+      .filter((item) => BUY_CATEGORIES.has(getCategoryLabel(item.signal)))
       .slice()
-      .sort((a, b) => {
-        const da = plannedStopPct(a.buy, a.sl);
-        const db = plannedStopPct(b.buy, b.sl);
-        if (da !== db) return da - db;
-        return qualityCmp(a.code, b.code);
-      });
+      .sort((a, b) => qualityCmp(a.code, b.code));
     for (const item of items) {
       const entryPrice = Number.isFinite(Number(item.hitPrice)) ? Number(item.hitPrice)
         : (Number.isFinite(Number(item.buy)) ? Number(item.buy) : NaN);
@@ -972,7 +896,7 @@ async function main() {
         const res = tryBuy(
           pf, variant, item.code, item.name || item.code, item.signal || "見送り",
           buyPrice, item.hitAt || nowIso, item.sl,
-          { obs, modeKey: def.key, buy: item.buy }
+          { obs, modeKey: def.key }
         );
         if (res && res.action === "buy") syncedBuys += 1;
       }
@@ -1027,28 +951,6 @@ async function main() {
           };
         }
       } else {
-        if (Number.isFinite(curPrice)) {
-          const halfEntries = [];
-          for (const variant of PF_VARIANTS) {
-            const record = maybeHalfSellPractice(obs.portfolio[def.key][variant], item, curPrice, nowIso);
-            if (!record) continue;
-            console.log(`半分売却[${variant}/${def.key}]: ${item.code} ${item.name || ""} ${record.shares}株 ${record.pnl >= 0 ? "+" : ""}${record.pnl}円`);
-            halfEntries.push({ variant, pnl: record.pnl, pnlPct: record.pnlPct, entryPrice: record.entryPrice, exitPrice: record.exitPrice });
-          }
-          if (halfEntries.length) {
-            settleEvents[`${item.code}__${def.key}__half`] = {
-              code: item.code,
-              name: item.name || item.code,
-              mode: def.key,
-              category: getCategoryLabel(item.signal),
-              exitType: "half",
-              exitPrice: curPrice,
-              tp: item.tp,
-              sl: item.sl,
-              entries: halfEntries
-            };
-          }
-        }
         stillActive.push(item);
       }
     }
@@ -1078,27 +980,23 @@ async function main() {
   // UI表示用に判定状態を公開データへ保存
   obs.entryGuard = { marketOpen, regime, entryAllowed, exDivToday, checkedAt: nowIso };
   obs.buyGate = {
-    categories: ["統合買い候補", "確認候補"],
+    categories: [...BUY_CATEGORIES],
     maxPositions: MAX_POSITIONS,
     practice: {
       initialCapital: PRACTICE_INITIAL_CAPITAL,
       positionPct: PRACTICE_POSITION_PCT,
       maxPositions: PRACTICE_MAX_POSITIONS,
-      standardMaxPositions: PRACTICE_MAX_POSITIONS,
-      standardMaxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
-      halfSellDays: PRACTICE_HALF_SELL_DAYS,
-      halfSellRemain: PRACTICE_HALF_SELL_REMAIN,
       minBudget: PRACTICE_MIN_BUDGET,
       slCooldownDays: SL_COOLDOWN_DAYS,
-      maxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
+      maxSlPct: MAX_SL_PCT,
       fillPolicy: "fresh-hit-only",
       label: "実践(Grok推奨)"
     },
     slCooldownDays: SL_COOLDOWN_DAYS,
-    maxSlPct: PRACTICE_STANDARD_MAX_SL_PCT,
+    maxSlPct: MAX_SL_PCT,
     fillPolicy: "fresh-hit-only",
-    note: "標準もゆるめも、4方式とも新規は予定損切5.5%以内（統合買い候補または確認候補）。実践は同時6本・評価額15%。検証用3方式は同時10本。利確まで残り3割以内かつ保有45日超は半分売却。空き枠は新規到達だけ埋める。損切後14日は同銘柄再エントリーしない。",
-    since: "2026-10-07"
+    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。4方式とも空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄再エントリーしない。損切幅>10%は見送り。実践は資金100万・評価額15%・同時4本。",
+    since: "2026-08-12"
   };
   for (const def of modeDefs) {
     if (!entryAllowed) break;
@@ -1141,57 +1039,47 @@ async function main() {
         activeCodes.add(code);
         summary.hits[def.key] += 1;
 
-        // 仮想資金: 標準・ゆるめとも、4方式すべて予定損切5.5%以内の統合買い候補か確認候補だけ買う。
-        const hit = {
-          code,
-          name: target.name || code,
-          signal: target.signal || "見送り",
-          curPrice,
-          sl,
-          buy,
-          tp: Number.isFinite(Number(target.tp)) ? Number(target.tp) : null,
-          threshold
-        };
-        if (qualifiesForBuy(target.signal, buy, sl)) pendingBuys.push(hit);
+        // 仮想資金: 到達＝購入。統合買い候補のみ。確認候補・監視継続・見送りは対照群。
+        if (BUY_CATEGORIES.has(getCategoryLabel(target.signal))) {
+          pendingBuys.push({
+            code,
+            name: target.name || code,
+            signal: target.signal || "見送り",
+            curPrice,
+            sl,
+            buy,
+            tp: Number.isFinite(Number(target.tp)) ? Number(target.tp) : null,
+            threshold
+          });
+        }
       }
     }
-    // 同時に複数到達したときは、予定損切が狭い銘柄から枠を埋める。
-    pendingBuys.sort((a, b) => {
-      const da = plannedStopPct(a.buy, a.sl);
-      const db = plannedStopPct(b.buy, b.sl);
-      if (da == null && db == null) return qualityCmp(a.code, b.code);
-      if (da == null) return 1;
-      if (db == null) return -1;
-      if (da !== db) return da - db;
-      return qualityCmp(a.code, b.code);
-    });
-    const recordBuy = (pb, variant, result) => {
-      const evKey = `${pb.code}__${def.key}`;
-      if (!buyEvents[evKey]) {
-        buyEvents[evKey] = {
-          code: pb.code,
-          name: pb.name,
-          mode: def.key,
-          category: getCategoryLabel(pb.signal),
-          factor: def.factor,
-          threshold: pb.threshold,
-          price: pb.curPrice,
-          buy: pb.buy,
-          tp: pb.tp,
-          sl: Number.isFinite(pb.sl) ? pb.sl : null,
-          entries: []
-        };
-      }
-      buyEvents[evKey].entries.push({ variant, ...result });
-    };
+    // 同時に複数到達したときはスコア高い銘柄から枠を埋める（Object順＝先着は期待値を落とす）
+    pendingBuys.sort((a, b) => qualityCmp(a.code, b.code));
     for (const pb of pendingBuys) {
+      const evKey = `${pb.code}__${def.key}`;
       for (const variant of PF_VARIANTS) {
         const result = tryBuy(
           obs.portfolio[def.key][variant], variant, pb.code, pb.name, pb.signal,
           pb.curPrice, nowIso, pb.sl,
-          { obs, modeKey: def.key, buy: pb.buy }
+          { obs, modeKey: def.key }
         );
-        recordBuy(pb, variant, result);
+        if (!buyEvents[evKey]) {
+          buyEvents[evKey] = {
+            code: pb.code,
+            name: pb.name,
+            mode: def.key,
+            category: getCategoryLabel(pb.signal),
+            factor: def.factor,
+            threshold: pb.threshold,
+            price: pb.curPrice,
+            buy: pb.buy,
+            tp: pb.tp,
+            sl: Number.isFinite(pb.sl) ? pb.sl : null,
+            entries: []
+          };
+        }
+        buyEvents[evKey].entries.push({ variant, ...result });
       }
     }
   }
