@@ -1,8 +1,8 @@
 {
   "source": "fund-flow-treasure-kabukazidou",
   "logic": "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime); 全市場発掘(market-discovery)上位5銘柄を治験合流",
-  "updatedAt": "2026-10-20T11:02:21.302Z",
-  "marketUpdatedAt": "2026-10-20T11:00:18.594Z",
+  "updatedAt": "2026-10-20T11:15:06.997Z",
+  "marketUpdatedAt": "2026-10-20T11:14:32.616Z",
   "marketRegime": {
     "index": "TOPIX連動(1306)",
     "current": 421.8,
@@ -16,7 +16,7 @@
   "winRateCalibration": "backtest atr / 地合いフィルタOFF(本番同等) / 4208件",
   "investorFlows": {
     "section": "TSEPrime",
-    "updatedAt": "2026-10-20T10:59:31.308Z",
+    "updatedAt": "2026-10-20T11:13:45.244Z",
     "weeks": [
       {
         "stDate": "2026-07-21",
@@ -197,133 +197,6 @@
         "deviation": -4.09,
         "rsi": 41.1,
         "volumeRatio": 1.32,
-        "trendOk": true,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
-      "code": "6857",
-      "name": "アドバンテスト",
-      "score": 83,
-      "flowScore": 92,
-      "treasureScore": 68,
-      "kabuScore": 91,
-      "confirmationScore": 70,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "統合買い候補",
-      "price": 34450,
-      "date": "2026-10-19",
-      "theme": "半導体",
-      "themeIds": [
-        "jp-semiconductor"
-      ],
-      "type": "大型株",
-      "quality": "注意あり",
-      "newsRisk": "悪材料確認あり",
-      "financial": {
-        "ticker": "6857",
-        "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-20T00:55:57.703Z",
-        "latestStatement": {
-          "disclosedDate": "2026-07-29",
-          "disclosedTime": "15:30:00",
-          "localCode": "68570",
-          "documentType": "1QFinancialStatements_Consolidated_IFRS",
-          "period": "1Q",
-          "fiscalYearEnd": "2027-03-31",
-          "periodEnd": "2026-06-30",
-          "netSales": 367473000000,
-          "operatingProfit": 189990000000,
-          "ordinaryProfit": null,
-          "profit": 174780000000,
-          "eps": 241.27,
-          "forecastNetSales": 1714000000000,
-          "forecastOperatingProfit": 846000000000,
-          "forecastProfit": 660000000000,
-          "forecastEps": 911.64,
-          "expectedProgressPct": 25,
-          "profitProgressPct": 26.5,
-          "epsProgressPct": 26.5,
-          "netSalesProgressPct": 21.4,
-          "operatingProfitProgressPct": 22.5,
-          "progressBasis": 26.5,
-          "progressVsExpectedPct": 1.5
-        }
-      },
-      "buy": 33933,
-      "tp": 41806,
-      "sl": 29434,
-      "rr": 1.75,
-      "winRate": 82,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 70,
-        "passed": 3,
-        "earnings": {
-          "score": 82,
-          "ok": true,
-          "label": "実決算良好",
-          "reason": "決算日 2026-07-29 / EPS 241.27 / 進捗 26.5% / 期待比 1.5pt",
-          "actual": {
-            "disclosedDate": "2026-07-29",
-            "disclosedTime": "15:30:00",
-            "localCode": "68570",
-            "documentType": "1QFinancialStatements_Consolidated_IFRS",
-            "period": "1Q",
-            "fiscalYearEnd": "2027-03-31",
-            "periodEnd": "2026-06-30",
-            "netSales": 367473000000,
-            "operatingProfit": 189990000000,
-            "ordinaryProfit": null,
-            "profit": 174780000000,
-            "eps": 241.27,
-            "forecastNetSales": 1714000000000,
-            "forecastOperatingProfit": 846000000000,
-            "forecastProfit": 660000000000,
-            "forecastEps": 911.64,
-            "expectedProgressPct": 25,
-            "profitProgressPct": 26.5,
-            "epsProgressPct": 26.5,
-            "netSalesProgressPct": 21.4,
-            "operatingProfitProgressPct": 22.5,
-            "progressBasis": 26.5,
-            "progressVsExpectedPct": 1.5
-          }
-        },
-        "material": {
-          "score": 28,
-          "ok": false,
-          "label": "材料確認待ち",
-          "reason": "悪材料確認あり"
-        },
-        "volume": {
-          "score": 64,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.08,
-          "volume7d": 17.16,
-          "volume30d": 99.36
-        },
-        "chart": {
-          "score": 100,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -3.0% / RSI 52.1"
-        }
-      },
-      "changes": {
-        "7d": -15.83,
-        "30d": 5.87,
-        "90d": 36.52,
-        "volume7d": 17.16,
-        "volume30d": 99.36
-      },
-      "technical": {
-        "deviation": -3.01,
-        "rsi": 52.1,
-        "volumeRatio": 1.08,
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": true
@@ -993,6 +866,133 @@
       }
     },
     {
+      "code": "6857",
+      "name": "アドバンテスト",
+      "score": 78,
+      "flowScore": 93,
+      "treasureScore": 68,
+      "kabuScore": 77,
+      "confirmationScore": 68,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "統合買い候補",
+      "price": 33870,
+      "date": "2026-10-20",
+      "theme": "半導体",
+      "themeIds": [
+        "jp-semiconductor"
+      ],
+      "type": "大型株",
+      "quality": "注意あり",
+      "newsRisk": "悪材料確認あり",
+      "financial": {
+        "ticker": "6857",
+        "source": "jquants-fins-statements",
+        "updatedAt": "2026-10-20T00:55:57.703Z",
+        "latestStatement": {
+          "disclosedDate": "2026-07-29",
+          "disclosedTime": "15:30:00",
+          "localCode": "68570",
+          "documentType": "1QFinancialStatements_Consolidated_IFRS",
+          "period": "1Q",
+          "fiscalYearEnd": "2027-03-31",
+          "periodEnd": "2026-06-30",
+          "netSales": 367473000000,
+          "operatingProfit": 189990000000,
+          "ordinaryProfit": null,
+          "profit": 174780000000,
+          "eps": 241.27,
+          "forecastNetSales": 1714000000000,
+          "forecastOperatingProfit": 846000000000,
+          "forecastProfit": 660000000000,
+          "forecastEps": 911.64,
+          "expectedProgressPct": 25,
+          "profitProgressPct": 26.5,
+          "epsProgressPct": 26.5,
+          "netSalesProgressPct": 21.4,
+          "operatingProfitProgressPct": 22.5,
+          "progressBasis": 26.5,
+          "progressVsExpectedPct": 1.5
+        }
+      },
+      "buy": 33701,
+      "tp": 41629,
+      "sl": 29171,
+      "rr": 1.75,
+      "winRate": 73,
+      "winRateCalibrated": 40,
+      "checks": {
+        "score": 68,
+        "passed": 3,
+        "earnings": {
+          "score": 82,
+          "ok": true,
+          "label": "実決算良好",
+          "reason": "決算日 2026-07-29 / EPS 241.27 / 進捗 26.5% / 期待比 1.5pt",
+          "actual": {
+            "disclosedDate": "2026-07-29",
+            "disclosedTime": "15:30:00",
+            "localCode": "68570",
+            "documentType": "1QFinancialStatements_Consolidated_IFRS",
+            "period": "1Q",
+            "fiscalYearEnd": "2027-03-31",
+            "periodEnd": "2026-06-30",
+            "netSales": 367473000000,
+            "operatingProfit": 189990000000,
+            "ordinaryProfit": null,
+            "profit": 174780000000,
+            "eps": 241.27,
+            "forecastNetSales": 1714000000000,
+            "forecastOperatingProfit": 846000000000,
+            "forecastProfit": 660000000000,
+            "forecastEps": 911.64,
+            "expectedProgressPct": 25,
+            "profitProgressPct": 26.5,
+            "epsProgressPct": 26.5,
+            "netSalesProgressPct": 21.4,
+            "operatingProfitProgressPct": 22.5,
+            "progressBasis": 26.5,
+            "progressVsExpectedPct": 1.5
+          }
+        },
+        "material": {
+          "score": 28,
+          "ok": false,
+          "label": "材料確認待ち",
+          "reason": "悪材料確認あり"
+        },
+        "volume": {
+          "score": 71,
+          "ok": true,
+          "label": "出来高確認OK",
+          "ratio": 1.24,
+          "volume7d": 21.75,
+          "volume30d": 113.18
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -4.8% / RSI 49.9"
+        }
+      },
+      "changes": {
+        "7d": -18.6,
+        "30d": 4.93,
+        "90d": 28.64,
+        "volume7d": 21.75,
+        "volume30d": 113.18
+      },
+      "technical": {
+        "deviation": -4.75,
+        "rsi": 49.9,
+        "volumeRatio": 1.24,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": true
+      }
+    },
+    {
       "code": "4568",
       "name": "第一三共",
       "score": 74,
@@ -1371,133 +1371,6 @@
         "trendOk": true,
         "pullbackOk": true,
         "volumeOk": false
-      }
-    },
-    {
-      "code": "7013",
-      "name": "IHI",
-      "score": 66,
-      "flowScore": 44,
-      "treasureScore": 80,
-      "kabuScore": 73,
-      "confirmationScore": 73,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 2578.5,
-      "date": "2026-10-19",
-      "theme": "防衛",
-      "themeIds": [
-        "jp-defense"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": {
-        "ticker": "7013",
-        "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-20T00:55:59.053Z",
-        "latestStatement": {
-          "disclosedDate": "2026-08-05",
-          "disclosedTime": "13:00:00",
-          "localCode": "70130",
-          "documentType": "1QFinancialStatements_Consolidated_IFRS",
-          "period": "1Q",
-          "fiscalYearEnd": "2027-03-31",
-          "periodEnd": "2026-06-30",
-          "netSales": 374548000000,
-          "operatingProfit": 73218000000,
-          "ordinaryProfit": null,
-          "profit": 53518000000,
-          "eps": 50.48,
-          "forecastNetSales": 1840000000000,
-          "forecastOperatingProfit": 250000000000,
-          "forecastProfit": 172000000000,
-          "forecastEps": 161.67,
-          "expectedProgressPct": 25,
-          "profitProgressPct": 31.1,
-          "epsProgressPct": 31.2,
-          "netSalesProgressPct": 20.4,
-          "operatingProfitProgressPct": 29.3,
-          "progressBasis": 31.1,
-          "progressVsExpectedPct": 6.1
-        }
-      },
-      "buy": 2566,
-      "tp": 2893,
-      "sl": 2379,
-      "rr": 1.75,
-      "winRate": 67,
-      "winRateCalibrated": 44,
-      "checks": {
-        "score": 73,
-        "passed": 3,
-        "earnings": {
-          "score": 82,
-          "ok": true,
-          "label": "実決算良好",
-          "reason": "決算日 2026-08-05 / EPS 50.48 / 進捗 31.1% / 期待比 6.1pt",
-          "actual": {
-            "disclosedDate": "2026-08-05",
-            "disclosedTime": "13:00:00",
-            "localCode": "70130",
-            "documentType": "1QFinancialStatements_Consolidated_IFRS",
-            "period": "1Q",
-            "fiscalYearEnd": "2027-03-31",
-            "periodEnd": "2026-06-30",
-            "netSales": 374548000000,
-            "operatingProfit": 73218000000,
-            "ordinaryProfit": null,
-            "profit": 53518000000,
-            "eps": 50.48,
-            "forecastNetSales": 1840000000000,
-            "forecastOperatingProfit": 250000000000,
-            "forecastProfit": 172000000000,
-            "forecastEps": 161.67,
-            "expectedProgressPct": 25,
-            "profitProgressPct": 31.1,
-            "epsProgressPct": 31.2,
-            "netSalesProgressPct": 20.4,
-            "operatingProfitProgressPct": 29.3,
-            "progressBasis": 31.1,
-            "progressVsExpectedPct": 6.1
-          }
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 56,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 1.03,
-          "volume7d": -17.8,
-          "volume30d": -14.75
-        },
-        "chart": {
-          "score": 86,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -4.1% / RSI 36.2"
-        }
-      },
-      "changes": {
-        "7d": -0.44,
-        "30d": -0.83,
-        "90d": 2.93,
-        "volume7d": -17.8,
-        "volume30d": -14.75
-      },
-      "technical": {
-        "deviation": -4.11,
-        "rsi": 36.2,
-        "volumeRatio": 1.03,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": true
       }
     },
     {
@@ -2789,7 +2662,7 @@
       "financial": {
         "ticker": "3099",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-19T17:21:34.949Z",
+        "updatedAt": "2026-10-20T11:14:32.616Z",
         "latestStatement": {
           "disclosedDate": "2026-08-13",
           "disclosedTime": "13:00:00",
@@ -3515,6 +3388,133 @@
         "deviation": -4.29,
         "rsi": 41.2,
         "volumeRatio": 0.75,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "7012",
+      "name": "川崎重工業",
+      "score": 62,
+      "flowScore": 45,
+      "treasureScore": 84,
+      "kabuScore": 61,
+      "confirmationScore": 65,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "監視継続",
+      "price": 2226.5,
+      "date": "2026-10-20",
+      "theme": "防衛",
+      "themeIds": [
+        "jp-defense"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": {
+        "ticker": "7012",
+        "source": "jquants-fins-statements",
+        "updatedAt": "2026-10-20T00:55:58.851Z",
+        "latestStatement": {
+          "disclosedDate": "2026-08-07",
+          "disclosedTime": "11:30:00",
+          "localCode": "70120",
+          "documentType": "1QFinancialStatements_Consolidated_IFRS",
+          "period": "1Q",
+          "fiscalYearEnd": "2027-03-31",
+          "periodEnd": "2026-06-30",
+          "netSales": 543576000000,
+          "operatingProfit": null,
+          "ordinaryProfit": null,
+          "profit": 15663000000,
+          "eps": 18.74,
+          "forecastNetSales": 2560000000000,
+          "forecastOperatingProfit": null,
+          "forecastProfit": 115000000000,
+          "forecastEps": 133.12,
+          "expectedProgressPct": 25,
+          "profitProgressPct": 13.6,
+          "epsProgressPct": 14.1,
+          "netSalesProgressPct": 21.2,
+          "operatingProfitProgressPct": null,
+          "progressBasis": 13.6,
+          "progressVsExpectedPct": -11.4
+        }
+      },
+      "buy": 2215,
+      "tp": 2459,
+      "sl": 2076,
+      "rr": 1.76,
+      "winRate": 60,
+      "winRateCalibrated": 46,
+      "checks": {
+        "score": 65,
+        "passed": 2,
+        "earnings": {
+          "score": 54,
+          "ok": false,
+          "label": "実決算弱い",
+          "reason": "決算日 2026-08-07 / EPS 18.74 / 進捗 13.6% / 期待比 -11.4pt",
+          "actual": {
+            "disclosedDate": "2026-08-07",
+            "disclosedTime": "11:30:00",
+            "localCode": "70120",
+            "documentType": "1QFinancialStatements_Consolidated_IFRS",
+            "period": "1Q",
+            "fiscalYearEnd": "2027-03-31",
+            "periodEnd": "2026-06-30",
+            "netSales": 543576000000,
+            "operatingProfit": null,
+            "ordinaryProfit": null,
+            "profit": 15663000000,
+            "eps": 18.74,
+            "forecastNetSales": 2560000000000,
+            "forecastOperatingProfit": null,
+            "forecastProfit": 115000000000,
+            "forecastEps": 133.12,
+            "expectedProgressPct": 25,
+            "profitProgressPct": 13.6,
+            "epsProgressPct": 14.1,
+            "netSalesProgressPct": 21.2,
+            "operatingProfitProgressPct": null,
+            "progressBasis": 13.6,
+            "progressVsExpectedPct": -11.4
+          }
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 52,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.83,
+          "volume7d": 21.03,
+          "volume30d": -14.69
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -4.6% / RSI 37.1"
+        }
+      },
+      "changes": {
+        "7d": -2.26,
+        "30d": -9.14,
+        "90d": -20.34,
+        "volume7d": 21.03,
+        "volume30d": -14.69
+      },
+      "technical": {
+        "deviation": -4.59,
+        "rsi": 37.1,
+        "volumeRatio": 0.83,
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
@@ -4405,133 +4405,6 @@
       }
     },
     {
-      "code": "7012",
-      "name": "川崎重工業",
-      "score": 56,
-      "flowScore": 25,
-      "treasureScore": 84,
-      "kabuScore": 61,
-      "confirmationScore": 64,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 2288.5,
-      "date": "2026-10-19",
-      "theme": "防衛",
-      "themeIds": [
-        "jp-defense"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": {
-        "ticker": "7012",
-        "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-20T00:55:58.851Z",
-        "latestStatement": {
-          "disclosedDate": "2026-08-07",
-          "disclosedTime": "11:30:00",
-          "localCode": "70120",
-          "documentType": "1QFinancialStatements_Consolidated_IFRS",
-          "period": "1Q",
-          "fiscalYearEnd": "2027-03-31",
-          "periodEnd": "2026-06-30",
-          "netSales": 543576000000,
-          "operatingProfit": null,
-          "ordinaryProfit": null,
-          "profit": 15663000000,
-          "eps": 18.74,
-          "forecastNetSales": 2560000000000,
-          "forecastOperatingProfit": null,
-          "forecastProfit": 115000000000,
-          "forecastEps": 133.12,
-          "expectedProgressPct": 25,
-          "profitProgressPct": 13.6,
-          "epsProgressPct": 14.1,
-          "netSalesProgressPct": 21.2,
-          "operatingProfitProgressPct": null,
-          "progressBasis": 13.6,
-          "progressVsExpectedPct": -11.4
-        }
-      },
-      "buy": 2254,
-      "tp": 2497,
-      "sl": 2115,
-      "rr": 1.75,
-      "winRate": 60,
-      "winRateCalibrated": 46,
-      "checks": {
-        "score": 64,
-        "passed": 2,
-        "earnings": {
-          "score": 54,
-          "ok": false,
-          "label": "実決算弱い",
-          "reason": "決算日 2026-08-07 / EPS 18.74 / 進捗 13.6% / 期待比 -11.4pt",
-          "actual": {
-            "disclosedDate": "2026-08-07",
-            "disclosedTime": "11:30:00",
-            "localCode": "70120",
-            "documentType": "1QFinancialStatements_Consolidated_IFRS",
-            "period": "1Q",
-            "fiscalYearEnd": "2027-03-31",
-            "periodEnd": "2026-06-30",
-            "netSales": 543576000000,
-            "operatingProfit": null,
-            "ordinaryProfit": null,
-            "profit": 15663000000,
-            "eps": 18.74,
-            "forecastNetSales": 2560000000000,
-            "forecastOperatingProfit": null,
-            "forecastProfit": 115000000000,
-            "forecastEps": 133.12,
-            "expectedProgressPct": 25,
-            "profitProgressPct": 13.6,
-            "epsProgressPct": 14.1,
-            "netSalesProgressPct": 21.2,
-            "operatingProfitProgressPct": null,
-            "progressBasis": 13.6,
-            "progressVsExpectedPct": -11.4
-          }
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 49,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.88,
-          "volume7d": -42.32,
-          "volume30d": -48.22
-        },
-        "chart": {
-          "score": 86,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -2.3% / RSI 38.4"
-        }
-      },
-      "changes": {
-        "7d": 0.81,
-        "30d": -5.76,
-        "90d": -16.9,
-        "volume7d": -42.32,
-        "volume30d": -48.22
-      },
-      "technical": {
-        "deviation": -2.25,
-        "rsi": 38.4,
-        "volumeRatio": 0.88,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": false
-      }
-    },
-    {
       "code": "1802",
       "name": "大林組",
       "score": 55,
@@ -4554,7 +4427,7 @@
       "financial": {
         "ticker": "1802",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-19T17:21:34.107Z",
+        "updatedAt": "2026-10-20T11:14:31.907Z",
         "latestStatement": {
           "disclosedDate": "2026-08-07",
           "disclosedTime": "12:00:00",
@@ -5799,6 +5672,133 @@
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": false
+      }
+    },
+    {
+      "code": "7013",
+      "name": "IHI",
+      "score": 64,
+      "flowScore": 65,
+      "treasureScore": 80,
+      "kabuScore": 55,
+      "confirmationScore": 66,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "監視継続",
+      "price": 2472.5,
+      "date": "2026-10-20",
+      "theme": "防衛",
+      "themeIds": [
+        "jp-defense"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": {
+        "ticker": "7013",
+        "source": "jquants-fins-statements",
+        "updatedAt": "2026-10-20T00:55:59.053Z",
+        "latestStatement": {
+          "disclosedDate": "2026-08-05",
+          "disclosedTime": "13:00:00",
+          "localCode": "70130",
+          "documentType": "1QFinancialStatements_Consolidated_IFRS",
+          "period": "1Q",
+          "fiscalYearEnd": "2027-03-31",
+          "periodEnd": "2026-06-30",
+          "netSales": 374548000000,
+          "operatingProfit": 73218000000,
+          "ordinaryProfit": null,
+          "profit": 53518000000,
+          "eps": 50.48,
+          "forecastNetSales": 1840000000000,
+          "forecastOperatingProfit": 250000000000,
+          "forecastProfit": 172000000000,
+          "forecastEps": 161.67,
+          "expectedProgressPct": 25,
+          "profitProgressPct": 31.1,
+          "epsProgressPct": 31.2,
+          "netSalesProgressPct": 20.4,
+          "operatingProfitProgressPct": 29.3,
+          "progressBasis": 31.1,
+          "progressVsExpectedPct": 6.1
+        }
+      },
+      "buy": 2460,
+      "tp": 2781,
+      "sl": 2277,
+      "rr": 1.75,
+      "winRate": 56,
+      "winRateCalibrated": 41,
+      "checks": {
+        "score": 66,
+        "passed": 2,
+        "earnings": {
+          "score": 82,
+          "ok": true,
+          "label": "実決算良好",
+          "reason": "決算日 2026-08-05 / EPS 50.48 / 進捗 31.1% / 期待比 6.1pt",
+          "actual": {
+            "disclosedDate": "2026-08-05",
+            "disclosedTime": "13:00:00",
+            "localCode": "70130",
+            "documentType": "1QFinancialStatements_Consolidated_IFRS",
+            "period": "1Q",
+            "fiscalYearEnd": "2027-03-31",
+            "periodEnd": "2026-06-30",
+            "netSales": 374548000000,
+            "operatingProfit": 73218000000,
+            "ordinaryProfit": null,
+            "profit": 53518000000,
+            "eps": 50.48,
+            "forecastNetSales": 1840000000000,
+            "forecastOperatingProfit": 250000000000,
+            "forecastProfit": 172000000000,
+            "forecastEps": 161.67,
+            "expectedProgressPct": 25,
+            "profitProgressPct": 31.1,
+            "epsProgressPct": 31.2,
+            "netSalesProgressPct": 20.4,
+            "operatingProfitProgressPct": 29.3,
+            "progressBasis": 31.1,
+            "progressVsExpectedPct": 6.1
+          }
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 59,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.99,
+          "volume7d": 38.26,
+          "volume30d": 15.35
+        },
+        "chart": {
+          "score": 60,
+          "ok": false,
+          "label": "押し目待ち",
+          "reason": "25日乖離 -7.6% / RSI 36.0"
+        }
+      },
+      "changes": {
+        "7d": -5.83,
+        "30d": -6.33,
+        "90d": 0.61,
+        "volume7d": 38.26,
+        "volume30d": 15.35
+      },
+      "technical": {
+        "deviation": -7.6,
+        "rsi": 36,
+        "volumeRatio": 0.99,
+        "trendOk": false,
+        "pullbackOk": false,
+        "volumeOk": true
       }
     },
     {
@@ -7192,133 +7192,6 @@
       }
     },
     {
-      "code": "7735",
-      "name": "SCREENホールディングス",
-      "score": 58,
-      "flowScore": 56,
-      "treasureScore": 82,
-      "kabuScore": 46,
-      "confirmationScore": 58,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 13340,
-      "date": "2026-10-19",
-      "theme": "半導体",
-      "themeIds": [
-        "jp-semiconductor"
-      ],
-      "type": "大型株",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": {
-        "ticker": "7735",
-        "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-20T05:42:23.749Z",
-        "latestStatement": {
-          "disclosedDate": "2026-08-13",
-          "disclosedTime": "15:35:00",
-          "localCode": "77350",
-          "documentType": "1QFinancialStatements_Consolidated_JP",
-          "period": "1Q",
-          "fiscalYearEnd": "2027-03-31",
-          "periodEnd": "2026-06-30",
-          "netSales": 121775000000,
-          "operatingProfit": 14368000000,
-          "ordinaryProfit": 15419000000,
-          "profit": 10490000000,
-          "eps": 55.47,
-          "forecastNetSales": 743000000000,
-          "forecastOperatingProfit": 156500000000,
-          "forecastProfit": 115000000000,
-          "forecastEps": 608.06,
-          "expectedProgressPct": 25,
-          "profitProgressPct": 9.1,
-          "epsProgressPct": 9.1,
-          "netSalesProgressPct": 16.4,
-          "operatingProfitProgressPct": 9.2,
-          "progressBasis": 9.1,
-          "progressVsExpectedPct": -15.9
-        }
-      },
-      "buy": 13273,
-      "tp": 16027,
-      "sl": 11699,
-      "rr": 1.75,
-      "winRate": 55,
-      "winRateCalibrated": 41,
-      "checks": {
-        "score": 58,
-        "passed": 1,
-        "earnings": {
-          "score": 54,
-          "ok": false,
-          "label": "実決算弱い",
-          "reason": "決算日 2026-08-13 / EPS 55.47 / 進捗 9.1% / 期待比 -15.9pt",
-          "actual": {
-            "disclosedDate": "2026-08-13",
-            "disclosedTime": "15:35:00",
-            "localCode": "77350",
-            "documentType": "1QFinancialStatements_Consolidated_JP",
-            "period": "1Q",
-            "fiscalYearEnd": "2027-03-31",
-            "periodEnd": "2026-06-30",
-            "netSales": 121775000000,
-            "operatingProfit": 14368000000,
-            "ordinaryProfit": 15419000000,
-            "profit": 10490000000,
-            "eps": 55.47,
-            "forecastNetSales": 743000000000,
-            "forecastOperatingProfit": 156500000000,
-            "forecastProfit": 115000000000,
-            "forecastEps": 608.06,
-            "expectedProgressPct": 25,
-            "profitProgressPct": 9.1,
-            "epsProgressPct": 9.1,
-            "netSalesProgressPct": 16.4,
-            "operatingProfitProgressPct": 9.2,
-            "progressBasis": 9.1,
-            "progressVsExpectedPct": -15.9
-          }
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 52,
-          "ok": false,
-          "label": "出来高不足",
-          "ratio": 0.85,
-          "volume7d": -10.31,
-          "volume30d": 34.79
-        },
-        "chart": {
-          "score": 60,
-          "ok": false,
-          "label": "押し目待ち",
-          "reason": "25日乖離 -5.6% / RSI 45.7"
-        }
-      },
-      "changes": {
-        "7d": -16.15,
-        "30d": 1.48,
-        "90d": 13.44,
-        "volume7d": -10.31,
-        "volume30d": 34.79
-      },
-      "technical": {
-        "deviation": -5.59,
-        "rsi": 45.7,
-        "volumeRatio": 0.85,
-        "trendOk": false,
-        "pullbackOk": false,
-        "volumeOk": false
-      }
-    },
-    {
       "code": "8306",
       "name": "三菱UFJフィナンシャル・グループ",
       "score": 53,
@@ -7466,7 +7339,7 @@
       "financial": {
         "ticker": "2768",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-19T17:21:34.730Z",
+        "updatedAt": "2026-10-20T11:14:32.440Z",
         "latestStatement": {
           "disclosedDate": "2026-07-31",
           "disclosedTime": "12:30:00",
@@ -7593,7 +7466,7 @@
       "financial": {
         "ticker": "1803",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-19T17:21:34.327Z",
+        "updatedAt": "2026-10-20T11:14:32.097Z",
         "latestStatement": {
           "disclosedDate": "2026-07-30",
           "disclosedTime": "13:00:00",
@@ -7847,7 +7720,7 @@
       "financial": {
         "ticker": "1801",
         "source": "jquants-fins-statements",
-        "updatedAt": "2026-10-19T17:21:33.872Z",
+        "updatedAt": "2026-10-20T11:14:31.721Z",
         "latestStatement": {
           "disclosedDate": "2026-08-06",
           "disclosedTime": "13:00:00",
@@ -7945,6 +7818,133 @@
       "technical": {
         "deviation": -6.1,
         "rsi": 38.4,
+        "volumeRatio": 0.72,
+        "trendOk": false,
+        "pullbackOk": false,
+        "volumeOk": false
+      }
+    },
+    {
+      "code": "7735",
+      "name": "SCREENホールディングス",
+      "score": 47,
+      "flowScore": 24,
+      "treasureScore": 82,
+      "kabuScore": 43,
+      "confirmationScore": 56,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "見送り",
+      "price": 12805,
+      "date": "2026-10-20",
+      "theme": "半導体",
+      "themeIds": [
+        "jp-semiconductor"
+      ],
+      "type": "大型株",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": {
+        "ticker": "7735",
+        "source": "jquants-fins-statements",
+        "updatedAt": "2026-10-20T05:42:23.749Z",
+        "latestStatement": {
+          "disclosedDate": "2026-08-13",
+          "disclosedTime": "15:35:00",
+          "localCode": "77350",
+          "documentType": "1QFinancialStatements_Consolidated_JP",
+          "period": "1Q",
+          "fiscalYearEnd": "2027-03-31",
+          "periodEnd": "2026-06-30",
+          "netSales": 121775000000,
+          "operatingProfit": 14368000000,
+          "ordinaryProfit": 15419000000,
+          "profit": 10490000000,
+          "eps": 55.47,
+          "forecastNetSales": 743000000000,
+          "forecastOperatingProfit": 156500000000,
+          "forecastProfit": 115000000000,
+          "forecastEps": 608.06,
+          "expectedProgressPct": 25,
+          "profitProgressPct": 9.1,
+          "epsProgressPct": 9.1,
+          "netSalesProgressPct": 16.4,
+          "operatingProfitProgressPct": 9.2,
+          "progressBasis": 9.1,
+          "progressVsExpectedPct": -15.9
+        }
+      },
+      "buy": 12741,
+      "tp": 15519,
+      "sl": 11154,
+      "rr": 1.75,
+      "winRate": 49,
+      "winRateCalibrated": 38,
+      "checks": {
+        "score": 56,
+        "passed": 1,
+        "earnings": {
+          "score": 54,
+          "ok": false,
+          "label": "実決算弱い",
+          "reason": "決算日 2026-08-13 / EPS 55.47 / 進捗 9.1% / 期待比 -15.9pt",
+          "actual": {
+            "disclosedDate": "2026-08-13",
+            "disclosedTime": "15:35:00",
+            "localCode": "77350",
+            "documentType": "1QFinancialStatements_Consolidated_JP",
+            "period": "1Q",
+            "fiscalYearEnd": "2027-03-31",
+            "periodEnd": "2026-06-30",
+            "netSales": 121775000000,
+            "operatingProfit": 14368000000,
+            "ordinaryProfit": 15419000000,
+            "profit": 10490000000,
+            "eps": 55.47,
+            "forecastNetSales": 743000000000,
+            "forecastOperatingProfit": 156500000000,
+            "forecastProfit": 115000000000,
+            "forecastEps": 608.06,
+            "expectedProgressPct": 25,
+            "profitProgressPct": 9.1,
+            "epsProgressPct": 9.1,
+            "netSalesProgressPct": 16.4,
+            "operatingProfitProgressPct": 9.2,
+            "progressBasis": 9.1,
+            "progressVsExpectedPct": -15.9
+          }
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 44,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.72,
+          "volume7d": -45.63,
+          "volume30d": -15.35
+        },
+        "chart": {
+          "score": 60,
+          "ok": false,
+          "label": "押し目待ち",
+          "reason": "25日乖離 -9.3% / RSI 37.9"
+        }
+      },
+      "changes": {
+        "7d": -22.61,
+        "30d": -1.16,
+        "90d": 2.81,
+        "volume7d": -45.63,
+        "volume30d": -15.35
+      },
+      "technical": {
+        "deviation": -9.32,
+        "rsi": 37.9,
         "volumeRatio": 0.72,
         "trendOk": false,
         "pullbackOk": false,
@@ -8214,8 +8214,8 @@
       "themeFlowBonus": 0,
       "overheatPenalty": 0,
       "signal": "見送り",
-      "price": 1624,
-      "date": "2026-10-19",
+      "price": 1620,
+      "date": "2026-10-20",
       "theme": "防衛",
       "themeIds": [
         "jp-defense"
@@ -8253,8 +8253,8 @@
           "progressVsExpectedPct": 10.6
         }
       },
-      "buy": 1616,
-      "tp": 1900,
+      "buy": 1612,
+      "tp": 1888,
       "sl": 1454,
       "rr": 1.75,
       "winRate": 49,
@@ -8303,28 +8303,28 @@
           "score": 27,
           "ok": false,
           "label": "出来高不足",
-          "ratio": 0.29,
-          "volume7d": -80.44,
-          "volume30d": -4.42
+          "ratio": 0.21,
+          "volume7d": -87.22,
+          "volume30d": 14.76
         },
         "chart": {
           "score": 48,
           "ok": false,
           "label": "位置悪い",
-          "reason": "25日乖離 -6.7% / RSI 34.6"
+          "reason": "25日乖離 -6.8% / RSI 32.6"
         }
       },
       "changes": {
-        "7d": -1.28,
-        "30d": 1.82,
-        "90d": -10.42,
-        "volume7d": -80.44,
-        "volume30d": -4.42
+        "7d": -0.37,
+        "30d": 1.12,
+        "90d": -8.58,
+        "volume7d": -87.22,
+        "volume30d": 14.76
       },
       "technical": {
-        "deviation": -6.7,
-        "rsi": 34.6,
-        "volumeRatio": 0.29,
+        "deviation": -6.79,
+        "rsi": 32.6,
+        "volumeRatio": 0.21,
         "trendOk": false,
         "pullbackOk": false,
         "volumeOk": false
@@ -8710,79 +8710,6 @@
       }
     },
     {
-      "code": "1321",
-      "name": "日経225連動型上場投信",
-      "score": 65,
-      "flowScore": 64,
-      "treasureScore": 72,
-      "kabuScore": 70,
-      "confirmationScore": 74,
-      "themeFlowBonus": 0,
-      "overheatPenalty": 0,
-      "signal": "監視継続",
-      "price": 676.6,
-      "date": "2026-10-19",
-      "theme": "半導体",
-      "themeIds": [
-        "jp-semiconductor"
-      ],
-      "type": "東証ETF",
-      "quality": "業績良好候補",
-      "newsRisk": "悪材料未検出",
-      "financial": null,
-      "buy": 666,
-      "tp": 719,
-      "sl": 636,
-      "rr": 1.77,
-      "winRate": 73,
-      "winRateCalibrated": 40,
-      "checks": {
-        "score": 74,
-        "passed": 4,
-        "earnings": {
-          "score": 80,
-          "ok": true,
-          "label": "業績良好",
-          "reason": "業績良好候補"
-        },
-        "material": {
-          "score": 64,
-          "ok": true,
-          "label": "材料確認OK",
-          "reason": "悪材料未検出"
-        },
-        "volume": {
-          "score": 62,
-          "ok": true,
-          "label": "出来高確認OK",
-          "ratio": 1.08,
-          "volume7d": 65.78,
-          "volume30d": -40.49
-        },
-        "chart": {
-          "score": 86,
-          "ok": true,
-          "label": "好位置",
-          "reason": "25日乖離 -2.0% / RSI 48.1"
-        }
-      },
-      "changes": {
-        "7d": -5.96,
-        "30d": 1.71,
-        "90d": 0.94,
-        "volume7d": 65.78,
-        "volume30d": -40.49
-      },
-      "technical": {
-        "deviation": -1.98,
-        "rsi": 48.1,
-        "volumeRatio": 1.08,
-        "trendOk": false,
-        "pullbackOk": true,
-        "volumeOk": true
-      }
-    },
-    {
       "code": "1328",
       "name": "金価格連動型上場投信",
       "score": 62,
@@ -8853,6 +8780,79 @@
         "trendOk": false,
         "pullbackOk": true,
         "volumeOk": true
+      }
+    },
+    {
+      "code": "1321",
+      "name": "日経225連動型上場投信",
+      "score": 67,
+      "flowScore": 70,
+      "treasureScore": 87,
+      "kabuScore": 64,
+      "confirmationScore": 72,
+      "themeFlowBonus": 0,
+      "overheatPenalty": 0,
+      "signal": "監視継続",
+      "price": 668.2,
+      "date": "2026-10-20",
+      "theme": "半導体",
+      "themeIds": [
+        "jp-semiconductor"
+      ],
+      "type": "東証ETF",
+      "quality": "業績良好候補",
+      "newsRisk": "悪材料未検出",
+      "financial": null,
+      "buy": 658,
+      "tp": 711,
+      "sl": 628,
+      "rr": 1.77,
+      "winRate": 66,
+      "winRateCalibrated": 44,
+      "checks": {
+        "score": 72,
+        "passed": 3,
+        "earnings": {
+          "score": 80,
+          "ok": true,
+          "label": "業績良好",
+          "reason": "業績良好候補"
+        },
+        "material": {
+          "score": 64,
+          "ok": true,
+          "label": "材料確認OK",
+          "reason": "悪材料未検出"
+        },
+        "volume": {
+          "score": 54,
+          "ok": false,
+          "label": "出来高不足",
+          "ratio": 0.82,
+          "volume7d": 76.66,
+          "volume30d": -25.37
+        },
+        "chart": {
+          "score": 86,
+          "ok": true,
+          "label": "好位置",
+          "reason": "25日乖離 -3.2% / RSI 45.8"
+        }
+      },
+      "changes": {
+        "7d": -7.01,
+        "30d": 0.51,
+        "90d": -2.31,
+        "volume7d": 76.66,
+        "volume30d": -25.37
+      },
+      "technical": {
+        "deviation": -3.16,
+        "rsi": 45.8,
+        "volumeRatio": 0.82,
+        "trendOk": false,
+        "pullbackOk": true,
+        "volumeOk": false
       }
     },
     {
