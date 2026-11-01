@@ -431,12 +431,15 @@ function technicalSignal(quote) {
   };
 }
 
-function estimateTradePlan(technical, quote) {
+function estimateTradePlan(technical, quote, regime) {
   const price = technical?.current ?? num(quote?.latest?.close, null);
   if (!price) return { buy: null, tp: null, sl: null, rr: null, winRate: null };
   const deviation = num(technical?.deviation, 0);
   const rsi = num(technical?.rsi, 50);
-  const buyDiscount = deviation > 4 ? 0.03 : deviation < -4 ? 0.005 : 0.015;
+  // 25日線より上は従来どおり（過熱3% / 押されている0.5% / 通常1.5%）。
+  // 25日線の下では、過熱していない銘柄だけ押し目を0.5%に縮め、統合買いが届くようにする。
+  let buyDiscount = deviation > 4 ? 0.03 : deviation < -4 ? 0.005 : 0.015;
+  if (regime && regime.bullish === false && !(deviation > 4)) buyDiscount = 0.005;
   const buy = Math.round(price * (1 - buyDiscount));
 
   // 損切/利確はATR(実測ボラティリティ)ベース。バックテスト(scripts/backtest-strategy.js)で
@@ -727,14 +730,14 @@ function signalFor(stock) {
   return "見送り";
 }
 
-function buildStock(ticker, instrument, quote, financial = null, marketData = null) {
+function buildStock(ticker, instrument, quote, financial = null, marketData = null, regime = null) {
   const technical = technicalSignal(quote);
   const overheat = overheatAdjustments(quote, technical);
   let flow = clamp(fundFlowScore(quote) - overheat.flowPenalty + investorFlowBonus(marketData));
   const baseTreasure = instrumentScore(instrument);
   const kind = stockSignalKind(instrument, quote);
   const signalBonus = kind === "buy" ? 18 : kind === "watch" ? 12 : kind === "early" ? 7 : -8;
-  const trade = estimateTradePlan(technical, quote);
+  const trade = estimateTradePlan(technical, quote, regime);
   const checks = confirmationChecks(instrument, technical, quote, financial);
   const technicalScore = technical?.score || 0;
   const kabuScore = trade.winRate != null
@@ -862,12 +865,13 @@ function main() {
   const financials = marketData.financials || {};
   const instruments = collectInstrumentMap(marketData);
   mergeDiscoveries(quotes, instruments);
+  const regime = marketRegime(quotes);
 
   const stocks = [...instruments.entries()]
     .map(([ticker, instrument]) => {
       const quote = quotes[String(ticker)];
       if (!quote) return null;
-      return buildStock(ticker, instrument, quote, financials[String(ticker)] || null, marketData);
+      return buildStock(ticker, instrument, quote, financials[String(ticker)] || null, marketData, regime);
     })
     .filter((stock) => stock && stock.price != null)
     .filter((stock) => stock.treasureScore >= 50 || stock.flowScore >= 52 || stock.kabuScore >= 45)
@@ -886,7 +890,7 @@ function main() {
 
   writeJson(outputPath, {
     source: "fund-flow-treasure-kabukazidou",
-    logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime); 全市場発掘(market-discovery)上位5銘柄を治験合流",
+    logic: "score=fundFlow×28%+treasure×18%+kabu×34%+confirmation×20%+themeBonus-overheatPenalty; ETF/指数連動-4; 統合銘柄ランキング向けに個別株優先（非ETF/REIT/連動を上位に）; 買い候補はRSI≤65・個別株のみ; 損切/利確=ATR14ベース(-2.0/+3.5, バックテスト較正済); fundFlowに海外投資家4週需給±5(投資部門別TSEPrime); 全市場発掘(market-discovery)上位5銘柄を治験合流; 25日線の下では過熱していない銘柄の買い目標を0.5%下に縮める",
     updatedAt: new Date().toISOString(),
     marketUpdatedAt: marketData.updatedAt || null,
     marketRegime: marketRegime(quotes),
