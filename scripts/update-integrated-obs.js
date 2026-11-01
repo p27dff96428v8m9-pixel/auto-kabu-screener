@@ -80,6 +80,8 @@ const MAX_POSITIONS = Math.max(1, Number(process.env.OBS_MAX_POSITIONS || 10));
 const PRACTICE_INITIAL_CAPITAL = Math.max(10000, Number(process.env.OBS_PRACTICE_CAPITAL || 1000000));
 const PRACTICE_POSITION_PCT = Math.min(0.5, Math.max(0.02, Number(process.env.OBS_PRACTICE_PCT || 0.15)));
 const PRACTICE_MAX_POSITIONS = Math.max(1, Number(process.env.OBS_PRACTICE_MAX_POSITIONS || 6));
+// 実践だけ: 利確までの道のりを7割進んだ建玉は、その後の損切を取得値に引き上げる。
+const PRACTICE_BREAKEVEN_PROGRESS = Math.min(0.95, Math.max(0.5, Number(process.env.OBS_PRACTICE_BREAKEVEN_PROGRESS || 0.70)));
 const PRACTICE_MIN_BUDGET = Math.max(1000, Number(process.env.OBS_PRACTICE_MIN_BUDGET || 10000));
 // 2026-08-17: 空き枠を古い active の先着で埋めると後続の統合買い候補を取りこぼす
 // （例: りそな利確後に7/29到達のみずほを到達価格で補完購入）。運用開始後は4方式とも新規到達だけ買う。
@@ -695,13 +697,30 @@ function settlePosition(pf, item, exitType, exitPrice, nowIso) {
   return record;
 }
 
+// 実践だけ。利確までの7割まで一度でも進んだら印を付け、その後に取得値まで戻ったら取得値で手仕舞う。
+// 検証用の3方式と、観測スペースの利確/損切はそのまま。利確と元の損切が同じ足で付いたときは、そちらを優先する。
+function maybePracticeBreakeven(pf, item, curPrice, nowIso) {
+  const pos = pf && pf.positions ? pf.positions[item.code] : null;
+  if (!pos) return null;
+  const entry = Number(pos.entryPrice);
+  const tp = Number(item.tp);
+  if (!(entry > 0) || !(tp > entry) || !(curPrice > 0)) return null;
+  const progress = (curPrice - entry) / (tp - entry);
+  if (!pos.breakevenArmed && progress >= PRACTICE_BREAKEVEN_PROGRESS && curPrice < tp) {
+    pos.breakevenArmed = true;
+  }
+  if (!pos.breakevenArmed || !(curPrice <= entry)) return null;
+  return settlePosition(pf, item, "breakeven", curPrice, nowIso);
+}
+
 // 1銘柄×1モードの利確/損切イベントをLINE本文に整形する。
 // 実弾運用の判断材料になるよう、方式ごとの実現損益と実戦候補順位を併記する。
 function buildSettleMessage(ev, rankMap) {
   const yen = (n) => `${Math.round(n).toLocaleString()}円`;
   const modeLabel = MODE_LABELS[ev.mode] || ev.mode;
-  const emoji = ev.exitType === "tp" ? "✅" : ev.exitType === "timeout" ? "⏱️" : "⚠️";
+  const emoji = ev.exitType === "tp" ? "✅" : ev.exitType === "breakeven" ? "🟦" : ev.exitType === "timeout" ? "⏱️" : "⚠️";
   const title = ev.exitType === "tp" ? "利確ライン到達"
+    : ev.exitType === "breakeven" ? "利確まで7割進んだため取得値で手仕舞い"
     : ev.exitType === "timeout" ? `保有期限(${HOLD_LIMIT_DAYS}日)到達・手仕舞い`
     : "損切ライン到達";
   const lines = [
@@ -710,6 +729,8 @@ function buildSettleMessage(ev, rankMap) {
     `区分: ${ev.category || "—"}`,
     ev.exitType === "tp"
       ? `現在値 ${yen(ev.exitPrice)} ≥ 利確 ${ev.tp != null ? yen(ev.tp) : "—"}`
+      : ev.exitType === "breakeven"
+        ? `現在値 ${yen(ev.exitPrice)} ≤ 取得値（利確までの7割到達後に損切を取得値へ引き上げ）`
       : ev.exitType === "timeout"
         ? `現在値 ${yen(ev.exitPrice)}（利確/損切に未到達のまま期限超過）`
         : `現在値 ${yen(ev.exitPrice)} ≤ 損切 ${ev.sl != null ? yen(ev.sl) : "—"}`,
@@ -723,6 +744,7 @@ function buildSettleMessage(ev, rankMap) {
   }
   lines.push("──────────");
   lines.push(ev.exitType === "tp" ? "実弾保有中なら利益確定の検討を。"
+    : ev.exitType === "breakeven" ? "実弾保有中なら建値撤退の検討を。検証用の保有は元の損切のままです。"
     : ev.exitType === "timeout" ? "実弾保有中なら資金回転のため手仕舞いの検討を。"
     : "実弾保有中なら迷わず損切りを。");
   lines.push(`詳細: ${PAGE_URL}`);
@@ -951,6 +973,23 @@ async function main() {
           };
         }
       } else {
+        if (Number.isFinite(curPrice)) {
+          const record = maybePracticeBreakeven(obs.portfolio[def.key].practice, item, curPrice, nowIso);
+          if (record) {
+            console.log(`実践の建値撤退[${def.key}]: ${item.code} ${item.name || ""} ${record.pnl >= 0 ? "+" : ""}${record.pnl}円`);
+            settleEvents[`${item.code}__${def.key}__breakeven`] = {
+              code: item.code,
+              name: item.name || item.code,
+              mode: def.key,
+              category: getCategoryLabel(item.signal),
+              exitType: "breakeven",
+              exitPrice: curPrice,
+              tp: item.tp,
+              sl: item.sl,
+              entries: [{ variant: "practice", pnl: record.pnl, pnlPct: record.pnlPct, entryPrice: record.entryPrice, exitPrice: record.exitPrice }]
+            };
+          }
+        }
         stillActive.push(item);
       }
     }
@@ -995,7 +1034,7 @@ async function main() {
     slCooldownDays: SL_COOLDOWN_DAYS,
     maxSlPct: MAX_SL_PCT,
     fillPolicy: "fresh-hit-only",
-    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。4方式とも空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄再エントリーしない。損切幅>10%は見送り。実践は資金100万・評価額15%・同時6本。",
+    note: "仮想購入は統合買い候補のみ。確認候補・監視継続・見送りは対照群。4方式とも空き枠は新規到達だけ埋める（古い観測の先着補完なし）。損切後14日は同銘柄再エントリーしない。損切幅>10%は見送り。実践は資金100万・評価額15%・同時6本。利確までの7割まで進んだ実践の建玉は、損切を取得値に引き上げる。",
     since: "2026-08-12"
   };
   for (const def of modeDefs) {
